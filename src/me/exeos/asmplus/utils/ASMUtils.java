@@ -264,15 +264,17 @@ public class ASMUtils implements Opcodes {
 
     public static AbstractInsnNode getMethodEnd(MethodNode from) {
         if (from.instructions.size() == 0)
-            throw new IllegalStateException("Method has no instructions");
+            return null;
         
         AbstractInsnNode end = from.instructions.get(from.instructions.size() - 1);
-        while (end != null && end.getOpcode() < IRETURN || end.getOpcode() > RETURN) {
-            end = end.getPrevious();
+        if (end != null) {
+            while (end.getOpcode() < IRETURN || end.getOpcode() > RETURN) {
+                end = end.getPrevious();
+
+                if (end == null)
+                    break;
+            }
         }
-        
-        if (end == null)
-            throw new IllegalStateException("Method does not return");
         
         return end;
     }
@@ -763,6 +765,10 @@ public class ASMUtils implements Opcodes {
 
     public static boolean isString(AbstractInsnNode insnNode) {
         return insnNode instanceof LdcInsnNode && ((LdcInsnNode) insnNode).cst instanceof String;
+    }
+
+    public static boolean isJumpOrCondition(AbstractInsnNode insnNode) {
+        return insnNode.getOpcode() >= IFEQ && insnNode.getOpcode() <= GOTO;
     }
 
     /* ___ END: checks & conditions ___ */

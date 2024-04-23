@@ -1,5 +1,7 @@
 package com.bytus.utils;
 
+import me.exeos.asmplus.utils.RandomUtil;
+
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
@@ -62,9 +64,6 @@ public class CryptUtil {
     }
 
     public static byte[] genKey(int length) {
-        byte[] randomBytes = new byte[length];
-        SecureRandom secureRandom = new SecureRandom();
-        secureRandom.nextBytes(randomBytes);
-        return randomBytes;
+        return RandomUtil.getBytes(length);
     }
 }

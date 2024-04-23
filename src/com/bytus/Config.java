@@ -2,8 +2,8 @@ package com.bytus;
 
 import com.bytus.core.transformer.Transformer;
 import com.bytus.impl.transformer.PreProcessor;
-import com.bytus.impl.transformer.TestTransformer;
 import com.bytus.impl.transformer.enc.EncryptionTransformer;
+import com.bytus.impl.transformer.flow.ControlFlowTransformer;
 import com.bytus.impl.transformer.renamer.RenameTransformer;
 
 import java.util.ArrayList;
@@ -22,13 +22,21 @@ public class Config {
     /* _______ */
 
     /* Encryptor */
-    public static boolean DO_ENC = true;
+    public static boolean DO_ENC = false;
     public static String ENCRYPTOR_CNAME = "BytusCL";
+    /* _______ */
+
+    /* Flow */
+    public static boolean DO_FLOW = true;
     /* _______ */
 
     public static ArrayList<Transformer> transformers() {
         ArrayList<Transformer> transformers = new ArrayList<>();
         transformers.add(new PreProcessor());
+
+        if (DO_FLOW) {
+            transformers.add(new ControlFlowTransformer());
+        }
 
         if (DO_RENAME) {
             transformers.add(new RenameTransformer());

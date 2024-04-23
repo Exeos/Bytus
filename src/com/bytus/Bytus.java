@@ -12,7 +12,7 @@ public class Bytus {
     }
 
     public void start() throws Exception {
-        core.load("C:\\Users\\valentin\\Desktop\\coding\\java\\Bytus\\jars\\obftest.jar");
+        core.load("C:\\Users\\valentin\\Desktop\\coding\\java\\Bytus\\jars\\obftest - org.jar");
         core.transform(Config.transformers());
         core.export("jars\\out.jar");
     }
