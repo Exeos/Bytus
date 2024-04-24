@@ -517,7 +517,7 @@ public class ASMUtils implements Opcodes {
      * @return List<AbstractInsnNode> for a random jump
      */
     public static List<AbstractInsnNode> getJump(LabelNode to) {
-        return getJump(RandomUtil.getInt(IFEQ, GOTO), to);
+        return getJump(RandomUtil.getInt(IFEQ, IF_ICMPLT), to);
     }
 
     /**
@@ -526,6 +526,9 @@ public class ASMUtils implements Opcodes {
      * @return List<AbstractInsnNode></> for jump
      */
     public static List<AbstractInsnNode> getJump(int jumpOpcode, LabelNode to) {
+        if (jumpOpcode >= IF_ICMPGE) {
+            throw new IllegalStateException("Jump code cant be greater than IF_ICMPGE(" + IF_ICMPGE + ")");
+        }
         List<AbstractInsnNode> jump = new ArrayList<>();
         switch (jumpOpcode) {
             /* val == 0 */
@@ -574,18 +577,18 @@ public class ASMUtils implements Opcodes {
             /* int0 < int 1*/
             case IF_ICMPLT:
             {
-                int less = RandomUtil.getInt(Integer.MIN_VALUE, Integer.MAX_VALUE - 1);
+                int less = RandomUtil.getInt(Integer.MIN_VALUE, Integer.MAX_VALUE - 10);
 
-                jump.add(getIntPush(less));
                 jump.add(getIntPush(RandomUtil.getInt(less + 1, Integer.MAX_VALUE)));
+                jump.add(getIntPush(less));
 
                 jump.add(new JumpInsnNode(IF_ICMPLT, to));
             }
             break;
             /* int0 >= int1 */
-            case IF_ICMPGE:
+            case IF_ICMPGE: // bis hier
             {
-                int more = RandomUtil.getInt(Integer.MIN_VALUE + 1, Integer.MAX_VALUE);
+                int more = RandomUtil.getInt(0, Integer.MAX_VALUE);
 
                 jump.add(getIntPush(more));
                 jump.add(getIntPush(RandomUtil.getInt(Integer.MIN_VALUE, more)));
@@ -595,10 +598,10 @@ public class ASMUtils implements Opcodes {
             /* int0 > int1 */
             case IF_ICMPGT:
             {
-                int more = RandomUtil.getInt(Integer.MIN_VALUE + 1, Integer.MAX_VALUE);
+                int more = RandomUtil.getInt(Integer.MIN_VALUE + 10, Integer.MAX_VALUE);
 
-                jump.add(getIntPush(more));
                 jump.add(getIntPush(RandomUtil.getInt(Integer.MIN_VALUE, more - 1)));
+                jump.add(getIntPush(more));
                 jump.add(new JumpInsnNode(IF_ICMPGT, to));
             }
             break;
@@ -631,6 +634,8 @@ public class ASMUtils implements Opcodes {
             case GOTO:
                 jump.add(new JumpInsnNode(GOTO, to));
                 break;
+            default:
+                System.out.println("This branch should never be reached. Opcode: " + jumpOpcode);
         }
         return jump;
     }

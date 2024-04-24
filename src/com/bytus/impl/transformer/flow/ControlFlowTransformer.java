@@ -36,7 +36,7 @@ public class ControlFlowTransformer extends Transformer {
                     /* blocks */
                     /* 1 */
                     LabelNode firstBlockEntry = new LabelNode();
-                    LabelNode firstBlockSwitchEntry = new LabelNode();
+//                    LabelNode firstBlockSwitchEntry = new LabelNode();
 
                     /* 2 */
                     LabelNode secondBlockEntry = new LabelNode();
@@ -59,21 +59,13 @@ public class ControlFlowTransformer extends Transformer {
 
                     LabelNode proxyFirstBlock = new LabelNode();
                     LabelNode proxySecondBlock = new LabelNode();
-                    LabelNode proxyHashString = new LabelNode();
 
                     // proxy jump block 1
                     proxyJumps.add(proxyFirstBlock);
-                    proxyJumps.addAll(ASMUtils.getDebugInsn("pf1_" + DELETE_ME));
                     proxyJumps.addAll(ASMUtils.getJump(firstBlockEntry));
                     // proxy jump block 2
                     proxyJumps.add(proxySecondBlock);
-                    proxyJumps.addAll(ASMUtils.getDebugInsn("pf2_" + DELETE_ME));
                     proxyJumps.addAll(ASMUtils.getJump(secondBlockEntry));
-                    // proxy to hash string
-                    proxyJumps.add(proxyHashString);
-                    proxyJumps.addAll(ASMUtils.getDebugInsn("pfSH_" + DELETE_ME));
-                    proxyJumps.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/String", "hashCode", "()I"));
-                    proxyJumps.addAll(ASMUtils.getJump(firstBlockSwitchEntry));
 
                     /* First block */
                     firstBlock.addAll(ASMUtils.getJump(proxyFirstBlock));
@@ -87,10 +79,7 @@ public class ControlFlowTransformer extends Transformer {
 
                             /* Build switch value */
                             String switchValue = sharedNameGen.name();
-                            switchInsns.add(new LdcInsnNode(switchValue));
-                            /* Hash string */
-                            switchInsns.addAll(ASMUtils.getJump(proxyHashString));
-                            switchInsns.add(firstBlockSwitchEntry);
+                            switchInsns.add(ASMUtils.getIntPush(switchValue.hashCode()));
 
                             /* Switch cases */
                             ArrayList<SwitchCase> cases = new ArrayList<>();
@@ -114,23 +103,21 @@ public class ControlFlowTransformer extends Transformer {
                             break;
                         /* branch at default */
                         case 1:
-                            break;
+                            throw new IllegalStateException("This switch branch should never be reached");
                         default:
                             throw new IllegalStateException("This switch branch should never be reached");
                     }
                     blocksCombined.addAll(firstBlock);
 
                     /* Second block */
-                    secondBlock.addAll(ASMUtils.getJump(proxySecondBlock));
                     secondBlock.add(secondBlockEntry);
                     switch (0) {
                         case 0:
-                            secondBlock.addAll(ASMUtils.getDebugInsn("second_block_" + DELETE_ME));
                             secondBlock.add(new JumpInsnNode(realJumpInsn.getOpcode(), realJumpInsn.label));
                             secondBlock.addAll(ASMUtils.getJump(afterInsn));
                             break;
                         case 1:
-                            break;
+                            throw new IllegalStateException("This switch branch should never be reached");
                         default:
                             throw new IllegalStateException("This switch branch should never be reached");
                     }
