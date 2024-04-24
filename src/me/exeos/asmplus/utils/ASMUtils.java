@@ -634,6 +634,21 @@ public class ASMUtils implements Opcodes {
         }
         return jump;
     }
+
+    /**
+     * @param debugMessage String in LDC
+     * @return LDC Insn with debugMessage,which gets poped right after
+     */
+
+    public static List<AbstractInsnNode> getDebugInsn(String debugMessage) {
+        System.out.println("WARNING YOU STILL HAVE DEBUG IN OUTPUT");
+        ArrayList<AbstractInsnNode> insnNodes = new ArrayList<>();
+        insnNodes.add(new LdcInsnNode(debugMessage));
+        insnNodes.add(new InsnNode(POP));
+
+        return insnNodes;
+    }
+
     /* ___ END: jumps ___ */
 
     /* ___ END: get x by / based on y ___ */

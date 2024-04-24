@@ -1,6 +1,7 @@
 package com.bytus.impl.transformer.flow;
 
 import com.bytus.core.transformer.Transformer;
+import com.bytus.utils.NameGen;
 import me.exeos.asmplus.codegen.lookupswitch.LookupSwitchGenerator;
 import me.exeos.asmplus.codegen.lookupswitch.SwitchCase;
 import me.exeos.asmplus.utils.ASMUtils;
@@ -15,6 +16,7 @@ public class ControlFlowTransformer extends Transformer {
     public boolean transform() {
         for (ClassNode classNode : getClasses()) {
             for (MethodNode methodNode : classNode.methods) {
+                NameGen sharedNameGen = new NameGen();
                 /* Insert proxy jumps after method return */
                 ArrayList<AbstractInsnNode> proxyJumps = new ArrayList<>();
                 AbstractInsnNode methodEnd = ASMUtils.getMethodEnd(methodNode);
@@ -22,16 +24,21 @@ public class ControlFlowTransformer extends Transformer {
                     System.out.println("Skipped " + classNode.name + "." + methodNode.name + methodNode.desc + " because couldn't find return insn");
                     continue;
                 }
+                int DELETE_ME = 0;
                 for (AbstractInsnNode insnNode : methodNode.instructions.toArray()) {
                     if (!ASMUtils.isJumpOrCondition(insnNode)) {
                         continue;
                     }
 
                     JumpInsnNode realJumpInsn = (JumpInsnNode) insnNode;
-                    LabelNode realJump = new LabelNode();
+                    LabelNode afterInsn = new LabelNode();
 
                     /* blocks */
+                    /* 1 */
                     LabelNode firstBlockEntry = new LabelNode();
+                    LabelNode firstBlockSwitchEntry = new LabelNode();
+
+                    /* 2 */
                     LabelNode secondBlockEntry = new LabelNode();
                     ArrayList<AbstractInsnNode> firstBlock = new ArrayList<>();
                     ArrayList<AbstractInsnNode> secondBlock = new ArrayList<>();
@@ -52,17 +59,21 @@ public class ControlFlowTransformer extends Transformer {
 
                     LabelNode proxyFirstBlock = new LabelNode();
                     LabelNode proxySecondBlock = new LabelNode();
-                    LabelNode proxyRealJump = new LabelNode();
+                    LabelNode proxyHashString = new LabelNode();
 
                     // proxy jump block 1
                     proxyJumps.add(proxyFirstBlock);
+                    proxyJumps.addAll(ASMUtils.getDebugInsn("pf1_" + DELETE_ME));
                     proxyJumps.addAll(ASMUtils.getJump(firstBlockEntry));
                     // proxy jump block 2
                     proxyJumps.add(proxySecondBlock);
+                    proxyJumps.addAll(ASMUtils.getDebugInsn("pf2_" + DELETE_ME));
                     proxyJumps.addAll(ASMUtils.getJump(secondBlockEntry));
-                    // proxy to real jump
-                    proxyJumps.add(proxyRealJump);
-                    proxyJumps.addAll(ASMUtils.getJump(realJump));
+                    // proxy to hash string
+                    proxyJumps.add(proxyHashString);
+                    proxyJumps.addAll(ASMUtils.getDebugInsn("pfSH_" + DELETE_ME));
+                    proxyJumps.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/String", "hashCode", "()I"));
+                    proxyJumps.addAll(ASMUtils.getJump(firstBlockSwitchEntry));
 
                     /* First block */
                     firstBlock.addAll(ASMUtils.getJump(proxyFirstBlock));
@@ -75,15 +86,18 @@ public class ControlFlowTransformer extends Transformer {
                             ArrayList<AbstractInsnNode> switchInsns = new ArrayList<>();
 
                             /* Build switch value */
-                            String switchValue = new String(RandomUtil.getBytes(RandomUtil.getInt(32, 64)));
+                            String switchValue = sharedNameGen.name();
                             switchInsns.add(new LdcInsnNode(switchValue));
+                            /* Hash string */
+                            switchInsns.addAll(ASMUtils.getJump(proxyHashString));
+                            switchInsns.add(firstBlockSwitchEntry);
 
                             /* Switch cases */
                             ArrayList<SwitchCase> cases = new ArrayList<>();
                             for (int i = 0; i < switchSize; i++) {
                                 if (i == branchIndex) {
                                     /* got to block 2 proxy */
-                                    cases.add(new SwitchCase(switchValue, ASMUtils.getJump(proxySecondBlock)));
+                                    cases.add(new SwitchCase(switchValue.hashCode(), ASMUtils.getJump(proxySecondBlock)));
                                 } else {
                                     /* do bogus code */
                                     int hashOffset = RandomUtil.getInt(-500, 500);
@@ -91,7 +105,6 @@ public class ControlFlowTransformer extends Transformer {
                                         hashOffset = RandomUtil.getInt(-500, 500);
                                     }
                                     cases.add(new SwitchCase(switchValue.hashCode() + hashOffset, ASMUtils.getJump(firstBlockEntry)));
-//                                    cases.add(new SwitchCase(switchValue.hashCode() + hashOffset, ASMUtils.getJump(ASMUtils.getRandomLabel(methodNode))));
                                 }
                             }
                             /* Gen switch and add to switch insns */
@@ -112,8 +125,9 @@ public class ControlFlowTransformer extends Transformer {
                     secondBlock.add(secondBlockEntry);
                     switch (0) {
                         case 0:
+                            secondBlock.addAll(ASMUtils.getDebugInsn("second_block_" + DELETE_ME));
                             secondBlock.add(new JumpInsnNode(realJumpInsn.getOpcode(), realJumpInsn.label));
-//                            secondBlock.addAll(ASMUtils.getJump(proxyRealJump));
+                            secondBlock.addAll(ASMUtils.getJump(afterInsn));
                             break;
                         case 1:
                             break;
@@ -122,15 +136,14 @@ public class ControlFlowTransformer extends Transformer {
                     }
                     blocksCombined.addAll(secondBlock);
 
-                    /* add label to actual jump */
-                    blocksCombined.add(realJump);
-
                     /* insert flow blocks */
                     methodNode.instructions.insert(insnNode.getPrevious(), ASMUtils.convertToIList(blocksCombined));
-
-                    methodNode.maxStack += 30;
-                    methodNode.maxLocals += 30;
+                    methodNode.instructions.insert(insnNode.getPrevious(), afterInsn);
+                    methodNode.instructions.remove(insnNode);
+                    DELETE_ME++;
                 }
+                methodNode.maxStack += 30;
+                methodNode.maxLocals += 30;
                 methodNode.instructions.insert(methodEnd, ASMUtils.convertToIList(proxyJumps));
             }
         }
