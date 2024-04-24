@@ -4,6 +4,7 @@ import com.bytus.core.transformer.Transformer;
 import com.bytus.impl.transformer.PreProcessor;
 import com.bytus.impl.transformer.enc.EncryptionTransformer;
 import com.bytus.impl.transformer.flow.ControlFlowTransformer;
+import com.bytus.impl.transformer.flow.LabelSeederTransformer;
 import com.bytus.impl.transformer.renamer.RenameTransformer;
 
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ public class Config {
         transformers.add(new PreProcessor());
 
         if (DO_FLOW) {
+            transformers.add(new LabelSeederTransformer());
             transformers.add(new ControlFlowTransformer());
         }
 

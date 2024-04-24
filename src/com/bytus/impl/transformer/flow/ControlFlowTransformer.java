@@ -24,8 +24,10 @@ public class ControlFlowTransformer extends Transformer {
                     System.out.println("Skipped " + classNode.name + "." + methodNode.name + methodNode.desc + " because couldn't find return insn");
                     continue;
                 }
-                int DELETE_ME = 0;
                 for (AbstractInsnNode insnNode : methodNode.instructions.toArray()) {
+                    if (insnNode.getOpcode() >= IRETURN && insnNode.getOpcode() <= RETURN) {
+                        break;
+                    }
                     if (!ASMUtils.isJumpOrCondition(insnNode)) {
                         continue;
                     }
@@ -113,8 +115,11 @@ public class ControlFlowTransformer extends Transformer {
                     secondBlock.add(secondBlockEntry);
                     switch (0) {
                         case 0:
+                            /* actual jump */
                             secondBlock.add(new JumpInsnNode(realJumpInsn.getOpcode(), realJumpInsn.label));
                             secondBlock.addAll(ASMUtils.getJump(afterInsn));
+                            /* bogus jumps */
+                            secondBlock.addAll(ASMUtils.getJump(ASMUtils.getRandomLabel(methodNode)));
                             break;
                         case 1:
                             throw new IllegalStateException("This switch branch should never be reached");
@@ -127,7 +132,6 @@ public class ControlFlowTransformer extends Transformer {
                     methodNode.instructions.insert(insnNode.getPrevious(), ASMUtils.convertToIList(blocksCombined));
                     methodNode.instructions.insert(insnNode.getPrevious(), afterInsn);
                     methodNode.instructions.remove(insnNode);
-                    DELETE_ME++;
                 }
                 methodNode.maxStack += 30;
                 methodNode.maxLocals += 30;
