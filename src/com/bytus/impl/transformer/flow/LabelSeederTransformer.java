@@ -1,16 +1,14 @@
 package com.bytus.impl.transformer.flow;
 
 import com.bytus.core.transformer.Transformer;
-import com.bytus.utils.NameGen;
-import me.exeos.asmplus.codegen.lookupswitch.LookupSwitchGenerator;
-import me.exeos.asmplus.codegen.lookupswitch.SwitchCase;
 import me.exeos.asmplus.utils.ASMUtils;
-import me.exeos.asmplus.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
 import java.util.ArrayList;
 
+@Deprecated
 public class LabelSeederTransformer extends Transformer {
+
     @Override
     public boolean transform() {
         for (ClassNode classNode : getClasses()) {
@@ -44,10 +42,10 @@ public class LabelSeederTransformer extends Transformer {
 
                     // proxy to exit
                     proxyJumps.add(proxy);
-                    proxyJumps.addAll(ASMUtils.getJump(exit));
+                    proxyJumps.addAll(ASMUtils.getJumpInsns(exit));
 
                     /* exit to proxy then exit */
-                    jumpToProxy.addAll(ASMUtils.getJump(proxy));
+                    jumpToProxy.addAll(ASMUtils.getJumpInsns(proxy));
                     jumpToProxy.add(exit);
 
 

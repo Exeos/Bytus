@@ -64,13 +64,13 @@ public class ControlFlowTransformer extends Transformer {
 
                     // proxy jump block 1
                     proxyJumps.add(proxyFirstBlock);
-                    proxyJumps.addAll(ASMUtils.getJump(firstBlockEntry));
+                    proxyJumps.addAll(ASMUtils.getJumpInsns(firstBlockEntry));
                     // proxy jump block 2
                     proxyJumps.add(proxySecondBlock);
-                    proxyJumps.addAll(ASMUtils.getJump(secondBlockEntry));
+                    proxyJumps.addAll(ASMUtils.getJumpInsns(secondBlockEntry));
 
                     /* First block */
-                    firstBlock.addAll(ASMUtils.getJump(proxyFirstBlock));
+                    firstBlock.addAll(ASMUtils.getJumpInsns(proxyFirstBlock));
                     firstBlock.add(firstBlockEntry);
                     switch (0) {
                         /* branch at case */
@@ -88,14 +88,14 @@ public class ControlFlowTransformer extends Transformer {
                             for (int i = 0; i < switchSize; i++) {
                                 if (i == branchIndex) {
                                     /* got to block 2 proxy */
-                                    cases.add(new SwitchCase(switchValue.hashCode(), ASMUtils.getJump(proxySecondBlock)));
+                                    cases.add(new SwitchCase(switchValue.hashCode(), ASMUtils.getJumpInsns(proxySecondBlock)));
                                 } else {
                                     /* do bogus code */
                                     int hashOffset = RandomUtil.getInt(-500, 500);
                                     while (hashOffset == 0) {
                                         hashOffset = RandomUtil.getInt(-500, 500);
                                     }
-                                    cases.add(new SwitchCase(switchValue.hashCode() + hashOffset, ASMUtils.getJump(firstBlockEntry)));
+                                    cases.add(new SwitchCase(switchValue.hashCode() + hashOffset, ASMUtils.getJumpInsns(firstBlockEntry)));
                                 }
                             }
                             /* Gen switch and add to switch insns */
@@ -117,9 +117,9 @@ public class ControlFlowTransformer extends Transformer {
                         case 0:
                             /* actual jump */
                             secondBlock.add(new JumpInsnNode(realJumpInsn.getOpcode(), realJumpInsn.label));
-                            secondBlock.addAll(ASMUtils.getJump(afterInsn));
+                            secondBlock.addAll(ASMUtils.getJumpInsns(afterInsn));
                             /* bogus jumps */
-                            secondBlock.addAll(ASMUtils.getJump(ASMUtils.getRandomLabel(methodNode)));
+                            secondBlock.addAll(ASMUtils.getJumpInsns(ASMUtils.getRandomLabel(methodNode)));
                             break;
                         case 1:
                             throw new IllegalStateException("This switch branch should never be reached");

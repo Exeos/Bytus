@@ -3,6 +3,7 @@ package com.bytus;
 import com.bytus.core.transformer.Transformer;
 import com.bytus.impl.transformer.PreProcessor;
 import com.bytus.impl.transformer.enc.EncryptionTransformer;
+import com.bytus.impl.transformer.flow.BlockShuffleTransformer;
 import com.bytus.impl.transformer.flow.ControlFlowTransformer;
 import com.bytus.impl.transformer.flow.LabelSeederTransformer;
 import com.bytus.impl.transformer.renamer.RenameTransformer;
@@ -36,8 +37,9 @@ public class Config {
         transformers.add(new PreProcessor());
 
         if (DO_FLOW) {
-            transformers.add(new LabelSeederTransformer());
-            transformers.add(new ControlFlowTransformer());
+            transformers.add(new BlockShuffleTransformer());
+//            transformers.add(new LabelSeederTransformer());
+//            transformers.add(new ControlFlowTransformer());
         }
 
         if (DO_RENAME) {
