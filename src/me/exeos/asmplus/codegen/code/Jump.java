@@ -40,7 +40,8 @@ public class Jump {
         if (label == null) {
             throw new IllegalStateException("Jump label can't be null");
         }
-        ArrayList<AbstractInsnNode> combine = new ArrayList<>(condition);
+        ArrayList<AbstractInsnNode> combine = new ArrayList<>();
+        combine.addAll(condition);
         combine.add(new JumpInsnNode(opcode, label));
 
         return combine;

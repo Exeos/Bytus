@@ -118,6 +118,12 @@ public class ControlFlowTransformer extends Transformer {
                             /* actual jump */
                             secondBlock.add(new JumpInsnNode(realJumpInsn.getOpcode(), realJumpInsn.label));
                             secondBlock.addAll(ASMUtils.getJumpInsns(afterInsn));
+
+                            if (RandomUtil.chance(30)) {
+                                secondBlock.addAll(ASMUtils.getCheckCastMessage(com.bytus.utils.RandomUtil.randomPhrase(), false));
+                                secondBlock.add(new VarInsnNode(ASTORE, RandomUtil.getInt(0, methodNode.maxLocals)));
+                            }
+
                             /* bogus jumps */
                             secondBlock.addAll(ASMUtils.getJumpInsns(ASMUtils.getRandomLabel(methodNode)));
                             break;

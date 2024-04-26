@@ -1,14 +1,19 @@
 package me.exeos.asmplus.codegen.block;
 
+import jdk.nashorn.internal.runtime.regexp.joni.constants.OPCode;
 import me.exeos.asmplus.codegen.code.Jump;
 import me.exeos.asmplus.utils.ASMUtils;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.LabelNode;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class CodeBlock {
+
+    public String debug;
 
     private LabelNode entry = new LabelNode();
     public final ArrayList<AbstractInsnNode> code = new ArrayList<>();
@@ -25,6 +30,11 @@ public class CodeBlock {
         this(null, null);
     }
 
+    public CodeBlock(String debug) {
+        this(null, null);
+        this.debug = debug;
+    }
+
     public ArrayList<AbstractInsnNode> genBlockCode() {
         return genBlockCode(null, false);
     }
@@ -37,30 +47,25 @@ public class CodeBlock {
         return genBlockCode(null, encapsulate);
     }
 
-    public ArrayList<AbstractInsnNode> genBlockCode(Jump jumpTemplate, boolean encapsulate) {
+    public ArrayList<AbstractInsnNode> genBlockCode(Jump jumpTemplateE, boolean encapsulate) {
         ArrayList<AbstractInsnNode> blockCode = new ArrayList<>();
         LabelNode exit = null;
-        if (jumpTemplate == null) {
-            jumpTemplate = new Jump();
-        }
 
         /* Jump to block exit, so you can only access block with entry */
         if (encapsulate) {
             exit = new LabelNode();
-
-            jumpTemplate.setLabel(exit);
-            blockCode.addAll(jumpTemplate.getJump());
+            blockCode.addAll(ASMUtils.getJumpInsns(exit));
         }
 
         blockCode.add(entry);
         blockCode.addAll(code);
         if (next != null) {
-            jumpTemplate.setLabel(next.entry);
-            blockCode.addAll(jumpTemplate.getJump());
+            blockCode.addAll(ASMUtils.getJumpInsns(Opcodes.GOTO, next.entry));
         }
 
         if (encapsulate) {
             blockCode.add(exit);
+            blockCode.add(new InsnNode(Opcodes.NOP));
         }
 
         return blockCode;

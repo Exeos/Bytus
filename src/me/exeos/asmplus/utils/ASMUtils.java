@@ -518,7 +518,7 @@ public class ASMUtils implements Opcodes {
      * @return List<AbstractInsnNode> for a random jump
      */
     public static List<AbstractInsnNode> getJumpInsns(LabelNode to) {
-        return getJumpInsns(GOTO, to);
+        return getJumpInsns(RandomUtil.getInt(IFEQ, IF_ICMPLT), to);
     }
 
     /**
@@ -546,7 +546,6 @@ public class ASMUtils implements Opcodes {
     public static Jump getJump(int jumpOpcode, LabelNode to) {
         if (jumpOpcode >= IF_ICMPGE) {
             jumpOpcode = GOTO;
-//            throw new IllegalStateException("Jump code cant be greater than IF_ICMPGE(" + IF_ICMPGE + ")");
         }
         Jump jump = new Jump();
         switch (jumpOpcode) {
@@ -641,13 +640,14 @@ public class ASMUtils implements Opcodes {
         return jump.setOpcode(jumpOpcode).setLabel(to);
     }
 
+    /* ___ END: jumps ___ */
+
     /**
      * @param debugMessage String in LDC
      * @return LDC Insn with debugMessage,which gets poped right after
      */
 
     public static List<AbstractInsnNode> getDebugInsn(String debugMessage) {
-        System.out.println("WARNING YOU STILL HAVE DEBUG IN OUTPUT");
         ArrayList<AbstractInsnNode> insnNodes = new ArrayList<>();
         insnNodes.add(new LdcInsnNode(debugMessage));
         insnNodes.add(new InsnNode(POP));
@@ -655,7 +655,20 @@ public class ASMUtils implements Opcodes {
         return insnNodes;
     }
 
-    /* ___ END: jumps ___ */
+    public static List<AbstractInsnNode> getCheckCastMessage(String message) {
+        return getCheckCastMessage(message, true);
+    }
+
+    public static List<AbstractInsnNode> getCheckCastMessage(String message, boolean pop) {
+        ArrayList<AbstractInsnNode> insns = new ArrayList<>();
+
+        insns.add(new InsnNode(ACONST_NULL));
+        insns.add(new TypeInsnNode(CHECKCAST, "L" + message.replace(" ", "") + ";"));
+        if (pop)
+            insns.add(new InsnNode(POP));
+
+        return insns;
+    }
 
     /* ___ END: get x by / based on y ___ */
 

@@ -3,9 +3,7 @@ package com.bytus.impl.transformer.flow;
 import com.bytus.core.transformer.Transformer;
 import me.exeos.asmplus.codegen.block.CodeBlock;
 import me.exeos.asmplus.utils.ASMUtils;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -15,9 +13,13 @@ public class BlockShuffleTransformer extends Transformer {
     public boolean transform() {
         for (ClassNode classNode : getClasses()) {
             for (MethodNode methodNode : classNode.methods) {
+                if (!methodNode.tryCatchBlocks.isEmpty()) {
+                    continue;
+                }
+
                 int methodSize = methodNode.instructions.size();
-                int count = -1;
-                int every = 5;
+                int count = 0;
+                int every = 2;
                 if (methodSize <= 10) {
                     if (methodSize <= 2) {
                         continue;
@@ -26,12 +28,11 @@ public class BlockShuffleTransformer extends Transformer {
                 }
 
                 ArrayList<CodeBlock> blocks = new ArrayList<>();
-                CodeBlock current = new CodeBlock();
+                CodeBlock current = new CodeBlock("first");
 
                 /* Split method insns into blocks */
                 for (AbstractInsnNode insnNode : methodNode.instructions) {
                     boolean isLastInsn = insnNode == methodNode.instructions.getLast();
-
                     current.add(insnNode);
 
                     if (count % every == 0 || isLastInsn) {
@@ -39,7 +40,8 @@ public class BlockShuffleTransformer extends Transformer {
                             blocks.add(current);
                             break;
                         }
-                        CodeBlock next = new CodeBlock().prev(current);
+                        CodeBlock next = new CodeBlock(String.valueOf(count));
+                        next.prev(current);
                         current.next(next);
                         blocks.add(current);
                         current = next;
@@ -53,9 +55,10 @@ public class BlockShuffleTransformer extends Transformer {
 
                 ArrayList<AbstractInsnNode> rearrangedMethod = new ArrayList<>(ASMUtils.getJumpInsns(entry.entry()));
                 for (CodeBlock block : blocks) {
-                    rearrangedMethod.addAll(block.genBlockCode(false));
+                    rearrangedMethod.addAll(block.genBlockCode(ASMUtils.getJump(GOTO, new LabelNode()), true));
                 }
-                methodNode.instructions = ASMUtils.convertToIList(rearrangedMethod);
+                methodNode.instructions.clear();
+                methodNode.instructions.add(ASMUtils.convertToIList(rearrangedMethod));
             }
         }
         return true;

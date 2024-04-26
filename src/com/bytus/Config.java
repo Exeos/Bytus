@@ -37,9 +37,8 @@ public class Config {
         transformers.add(new PreProcessor());
 
         if (DO_FLOW) {
-            transformers.add(new BlockShuffleTransformer());
-//            transformers.add(new LabelSeederTransformer());
-//            transformers.add(new ControlFlowTransformer());
+            transformers.add(new ControlFlowTransformer());
+//            transformers.add(new BlockShuffleTransformer());
         }
 
         if (DO_RENAME) {

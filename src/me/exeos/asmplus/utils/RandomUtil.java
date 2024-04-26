@@ -20,6 +20,13 @@ public class RandomUtil {
         return (int) ((Math.random() * (max - min)) + min);
     }
 
+    public static boolean chance(int percentage) {
+        if (percentage < 0 || percentage > 100) {
+            throw new IllegalArgumentException("Percentage must be between 0 - 100");
+        }
+        return percentage <= getInt(0, 100);
+    }
+
     public static byte[] getBytes(int length) {
         byte[] randomBytes = new byte[length];
         SecureRandom secureRandom = new SecureRandom();
