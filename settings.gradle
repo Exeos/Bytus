@@ -11,5 +11,5 @@ plugins {
 }
 
 rootProject.name = 'Bytus'
-include('app', ':asmplus')
-project(':asmplus').projectDir = new File('C:\\Users\\fish\\dev\\code\\java\\asmplus_gradle\\lib')
+include('core', ':asmplus')
+project(':asmplus').projectDir = new File('C:\\Users\\fish\\dev\\code\\java\\asmplus\\asmplus')
