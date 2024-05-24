@@ -10,6 +10,9 @@ plugins {
     id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
 }
 
+//rootProject.name = 'Bytus'
+//include('core')
+
 rootProject.name = 'Bytus'
 include('core', ':asmplus')
 project(':asmplus').projectDir = new File('C:\\Users\\fish\\dev\\code\\java\\asmplus\\asmplus')

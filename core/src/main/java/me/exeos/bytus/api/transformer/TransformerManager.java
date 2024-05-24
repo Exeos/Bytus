@@ -4,6 +4,8 @@ import me.exeos.bytus.Bytus;
 import me.exeos.bytus.api.config.Config;
 import me.exeos.bytus.api.config.ConfigInterface;
 import me.exeos.bytus.api.logger.Task;
+import me.exeos.bytus.transformers.PreProcessor;
+import me.exeos.bytus.transformers.renamer.RenameTransformer;
 
 import java.util.LinkedList;
 
@@ -17,7 +19,11 @@ public class TransformerManager implements ConfigInterface {
             throw new IllegalStateException("Can't construct TransformerManager before loading Config");
         }
 
+        transformers.add(new PreProcessor());
 
+        if (isRenamerEnabled()) {
+            transformers.add(new RenameTransformer());
+        }
     }
 
     public void applyTransformers() {

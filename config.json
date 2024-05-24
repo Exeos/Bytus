@@ -1,0 +1,12 @@
+{
+  "io": {
+    "input": "C:\\Users\\fish\\dev\\code\\java\\Bytus\\io\\obftest-org.jar",
+    "output": "C:\\Users\\fish\\dev\\code\\java\\Bytus\\io\\out.jar"
+  },
+  "exclude": {
+
+  },
+  "renamer": {
+    "enable": true
+  }
+}

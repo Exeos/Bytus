@@ -6,6 +6,7 @@ import me.exeos.bytus.api.config.ConfigInterface;
 import me.exeos.bytus.api.config.ConfigLoader;
 import me.exeos.bytus.api.logger.Logger;
 import me.exeos.bytus.api.logger.Task;
+import me.exeos.bytus.api.transformer.TransformerManager;
 
 import java.io.IOException;
 
@@ -17,7 +18,6 @@ public class Bytus implements ConfigInterface {
 
     public Config config;
     public BJARLoader jarLoader;
-
 
     public Bytus() {
         if (instance != null) {
@@ -33,15 +33,18 @@ public class Bytus implements ConfigInterface {
             return;
         }
 
-        /* init before transformer */
-        if (!loadConfig(args) || !loadJar()) {
-            return;
+        try {
+            /* init before transformer */
+            if (loadConfig(args) && loadJar()) {
+                transform();
+                exportJar();
+            }
+        } catch (Exception e) {
+            logger.error(e);
         }
-
-
     }
 
-    private boolean loadConfig(String[] args) {
+    private boolean loadConfig(String[] args) throws IOException {
         Task configTask = new Task("Loading Config").start();
         ConfigLoader configLoader = new ConfigLoader();
 
@@ -79,5 +82,21 @@ public class Bytus implements ConfigInterface {
         }
         jarLoadTask.finish();
         return true;
+    }
+
+    private void transform() {
+        Task transformTask = new Task("Applying transformers").start("Applying transformers");
+        new TransformerManager().applyTransformers();
+        transformTask.finish();
+    }
+
+    private void exportJar() {
+        Task jarLoadTask = new Task("Exporting jar").start();
+        try {
+            jarLoader.export(getOutputPath());
+        } catch (Exception e) {
+            jarLoadTask.fail("Failed to export jar: " + e.getCause() + " " + e.getMessage());
+        }
+        jarLoadTask.finish();
     }
 }

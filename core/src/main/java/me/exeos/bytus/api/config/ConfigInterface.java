@@ -5,14 +5,14 @@ import me.exeos.bytus.Bytus;
 public interface ConfigInterface {
 
     default String getInputPath() {
-        return (String) Bytus.instance.config.getValue("io.inputPath");
+        return (String) Bytus.instance.config.getValue("io.input");
     }
 
     default String getOutputPath() {
-        return (String) Bytus.instance.config.getValue("io.outputPath");
+        return (String) Bytus.instance.config.getValue("io.output");
     }
 
     default boolean isRenamerEnabled() {
-        return (boolean) Bytus.instance.config.getValue("rename.enable");
+        return (boolean) Bytus.instance.config.getValue("renamer.enable");
     }
 }

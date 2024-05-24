@@ -21,7 +21,7 @@ public class Task {
         }
         running = true;
 
-        Bytus.instance.logger.info(message);
+        Bytus.instance.logger.info(message + task);
 
         return this;
     }
@@ -32,7 +32,7 @@ public class Task {
 
     public void fail(String message) {
         if (!running) {
-            throw new IllegalStateException("Can't fail task, no task running");
+            return;
         }
         running = false;
 
@@ -45,10 +45,11 @@ public class Task {
 
     public void finish(String message) {
         if (!running) {
-            throw new IllegalStateException("Can't finish task, no task running");
+            return;
         }
         running = false;
 
         Bytus.instance.logger.success(message);
+        System.out.println();
     }
 }
