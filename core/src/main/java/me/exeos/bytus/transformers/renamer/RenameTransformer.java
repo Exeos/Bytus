@@ -36,6 +36,9 @@ public class RenameTransformer extends Transformer {
         SimpleHierarchyAwareMappingLookup lookup = new SimpleHierarchyAwareMappingLookup(getClasses());
         UniqueNameGen classNameGen = new UniqueNameGen();
         for (ClassNode classNode : getClasses()) {
+            if (classNode.name.equals(getBootstrapName())) {
+                continue;
+            }
             String newClassName = classNameGen.next();
             lookup.remapClass(classNode.name, newClassName);
 

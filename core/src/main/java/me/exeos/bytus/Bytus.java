@@ -40,7 +40,7 @@ public class Bytus implements ConfigInterface {
                 exportJar();
             }
         } catch (Exception e) {
-            logger.error(e);
+            e.printStackTrace();
         }
     }
 
@@ -85,7 +85,7 @@ public class Bytus implements ConfigInterface {
     }
 
     private void transform() {
-        Task transformTask = new Task("Applying transformers").start("Applying transformers");
+        Task transformTask = new Task("Applying transformers").start();
         new TransformerManager().applyTransformers();
         transformTask.finish();
     }

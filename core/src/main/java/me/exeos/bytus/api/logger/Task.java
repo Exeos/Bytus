@@ -12,7 +12,7 @@ public class Task {
     }
 
     public Task start() {
-        return start("Starting Task: ");
+        return start("Task: ");
     }
 
     public Task start(String message) {
@@ -40,7 +40,8 @@ public class Task {
     }
 
     public void finish() {
-        finish("Finished Task: " + task);
+        finish("success");
+//        finish("Finished Task: " + task);
     }
 
     public void finish(String message) {

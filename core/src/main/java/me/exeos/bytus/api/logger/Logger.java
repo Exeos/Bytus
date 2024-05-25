@@ -2,26 +2,26 @@ package me.exeos.bytus.api.logger;
 
 public class Logger {
 
-    private final String prefix = "[Bytus]-> ";
+    private final String prefix = "[Bytus->";
 
     private void print(String prefix, Object out) {
-        System.out.println(this.prefix + prefix + ": " + out);
+        System.out.println(this.prefix + prefix + "]: " + out);
     }
 
     public void success(Object out) {
-        print("success", out);
+        print("s", out);
     }
 
     public void info(Object out) {
-        print("info", out);
+        print("i", out);
     }
 
     public void warning(Object out) {
-        print("warning", out);
+        print("w", out);
     }
 
     public void error(Object out) {
-        print("error", out);
+        print("e", out);
     }
 
 }

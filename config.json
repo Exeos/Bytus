@@ -1,12 +1,18 @@
 {
   "io": {
-    "input": "C:\\Users\\fish\\dev\\code\\java\\Bytus\\io\\obftest-org.jar",
+    "input": "C:\\Users\\fish\\dev\\code\\java\\Bytus\\io\\obftest-main.jar",
     "output": "C:\\Users\\fish\\dev\\code\\java\\Bytus\\io\\out.jar"
   },
-  "exclude": {
 
-  },
+  "mainClass": "dev/sim0n/evaluator/Main",
+  "mainClassMain": "main",
+
+  "bootstrapClassName": "Main",
+
+  "exclude": [],
+
+  "pack": true,
   "renamer": {
-    "enable": true
+    "enable": false
   }
 }
