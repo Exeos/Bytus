@@ -5,7 +5,9 @@ import me.exeos.bytus.api.transformer.Transformer;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-public class PreProcessor extends Transformer {
+import java.util.Collections;
+
+public class PosProcessor extends Transformer {
 
     @Override
     public boolean transform() {
@@ -14,6 +16,9 @@ public class PreProcessor extends Transformer {
             for (MethodNode methodNode : classNode.methods) {
                 ASMUtils.removeDebugInfos(methodNode);
             }
+
+            Collections.shuffle(classNode.fields);
+            Collections.shuffle(classNode.methods);
         }
         return true;
     }

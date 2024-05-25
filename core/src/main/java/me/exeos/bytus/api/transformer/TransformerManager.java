@@ -5,9 +5,12 @@ import me.exeos.bytus.api.config.Config;
 import me.exeos.bytus.api.config.ConfigInterface;
 import me.exeos.bytus.api.logger.Task;
 import me.exeos.bytus.transformers.Bootstraper;
-import me.exeos.bytus.transformers.PreProcessor;
-import me.exeos.bytus.transformers.encryption.Encryptor;
+import me.exeos.bytus.transformers.PosProcessor;
+import me.exeos.bytus.transformers.encryption.NumberEncryptionTransformer;
 import me.exeos.bytus.transformers.encryption.StringEncryptionTransformer;
+import me.exeos.bytus.transformers.flow.BlockShuffleTransformer;
+import me.exeos.bytus.transformers.flow.BranchCodeSwitcherTransformer;
+import me.exeos.bytus.transformers.flow.ControlFlowTransformer;
 import me.exeos.bytus.transformers.packer.ClassEncryptionTransformer;
 import me.exeos.bytus.transformers.renamer.RenameTransformer;
 
@@ -27,18 +30,34 @@ public class TransformerManager implements ConfigInterface {
             transformers.add(new ClassEncryptionTransformer());
         }
         transformers.add(new Bootstraper());
-        transformers.add(new PreProcessor());
 
-        if (isStrEncEnabled()) {
-            transformers.add(new Encryptor());
+        if (isAnyFlowEnabled() && isStrEncEnabled()) {
+            transformers.add(new StringEncryptionTransformer());
+        }
+        if (isControlFlowEnabled()) {
+            transformers.add(new ControlFlowTransformer());
+        }
+        if (isBlockShufflerEnabled()) {
+            transformers.add(new BlockShuffleTransformer());
+        }
+        if (isFlowOpcodeSwitcherEnabled()) {
+            transformers.add(new BranchCodeSwitcherTransformer());
         }
 
+        addEncIfEnabled();
+        if (isRenamerEnabled()) {
+            transformers.add(new RenameTransformer());
+        }
+
+        transformers.add(new PosProcessor());
+    }
+
+    private void addEncIfEnabled() {
         if (isStrEncEnabled()) {
             transformers.add(new StringEncryptionTransformer());
         }
-
-        if (isRenamerEnabled()) {
-            transformers.add(new RenameTransformer());
+        if (isNumEncEnabled()) {
+            transformers.add(new NumberEncryptionTransformer());
         }
     }
 

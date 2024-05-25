@@ -56,4 +56,24 @@ public interface ConfigInterface {
     default boolean isStrEncEnabled() {
         return (boolean) getValue("encrypt.strings");
     }
+
+    default boolean isNumEncEnabled() {
+        return (boolean) getValue("encrypt.numbers");
+    }
+
+    default boolean isBlockShufflerEnabled() {
+        return (boolean) getValue("controlFlow.blockShuffle");
+    }
+
+    default boolean isControlFlowEnabled() {
+        return (boolean) getValue("controlFlow.controlFlow");
+    }
+
+    default boolean isFlowOpcodeSwitcherEnabled() {
+        return (boolean) getValue("controlFlow.opcodeSwitcher");
+    }
+
+    default boolean isAnyFlowEnabled() {
+        return isControlFlowEnabled() || isBlockShufflerEnabled() || isFlowOpcodeSwitcherEnabled();
+    }
 }

@@ -9,11 +9,16 @@ import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.ClassNode;
+
+import java.util.LinkedList;
 
 public class ClassEncryptionTransformer extends Transformer {
 
     public static String clName;
     public static final String SUFFIX = "";
+
+    public static final LinkedList<ClassNode> excluded = new LinkedList<>();
 
     static {
         int max = 100;

@@ -2,6 +2,7 @@ package me.exeos.bytus.api.transformer;
 
 import me.exeos.bytus.Bytus;
 import me.exeos.bytus.api.config.ConfigInterface;
+import me.exeos.bytus.transformers.packer.ClassEncryptionTransformer;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 
@@ -32,5 +33,9 @@ public abstract class Transformer implements ConfigInterface, Opcodes {
 
     protected void addClass(byte[] classBytes) {
         Bytus.instance.jarLoader.putClass(classBytes);
+    }
+
+    public void excludeFromPacker(ClassNode classNode) {
+        ClassEncryptionTransformer.excluded.add(classNode);
     }
 }

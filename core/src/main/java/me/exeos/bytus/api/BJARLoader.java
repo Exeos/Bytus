@@ -34,7 +34,7 @@ public class BJARLoader extends JarLoader implements ConfigInterface {
             String className = classNode.name;
             byte[] classBytes = classWriter.toByteArray();
 
-            if (isPackEnabled() && !className.equals(getBootstrapName()) && !className.equals(ClassEncryptionTransformer.clName)) {
+            if (isPackEnabled() && !ClassEncryptionTransformer.excluded.contains(classNode) && !className.equals(getBootstrapName()) && !className.equals(ClassEncryptionTransformer.clName)) {
                 KeyPair signKeyPair = CryptUtil.generateKeyPair();
 
                 byte[] cryptKey = CryptUtil.genKey(32);

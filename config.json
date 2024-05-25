@@ -16,6 +16,12 @@
     "enable": false
   },
   "encrypt": {
-    "strings": true
+    "strings": true,
+    "numbers": true
+  },
+  "controlFlow": {
+    "blockShuffle": true,
+    "controlFlow": true,
+    "opcodeSwitcher": true
   }
 }
