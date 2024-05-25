@@ -21,7 +21,7 @@ public class RenameTransformer extends Transformer {
         Remapper remapper = remap();
         HashMap<String, ClassNode> remapped = new HashMap<>();
 
-        for (ClassNode classNode : getClasses()) {
+        for (ClassNode classNode : getAllClasses()) {
             remapper.remapNode(classNode, shared);
             remapped.put(classNode.name, classNode);
         }

@@ -1,6 +1,5 @@
 package me.exeos.bytus.transformers;
 
-import me.exeos.bytus.Bytus;
 import me.exeos.bytus.api.transformer.Transformer;
 import me.exeos.bytus.transformers.packer.ClassEncryptionTransformer;
 import org.objectweb.asm.*;
@@ -11,9 +10,9 @@ public class Bootstraper extends Transformer {
     public boolean transform() {
 
         if (isPackEnabled()) {
-            Bytus.instance.jarLoader.putClass(decCLBootstrap());
+            addClass(decCLBootstrap());
         } else {
-            Bytus.instance.jarLoader.putClass(defaultBootstrap());
+            addClass(defaultBootstrap());
         }
 
         return true;

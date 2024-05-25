@@ -27,7 +27,7 @@ public class ClassEncryptionTransformer extends Transformer {
 
     @Override
     public boolean transform() {
-        Bytus.instance.jarLoader.putClass(decClassLoader());
+        addClass(decClassLoader());
         return true;
     }
 

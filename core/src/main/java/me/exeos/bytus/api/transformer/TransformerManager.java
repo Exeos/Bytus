@@ -6,6 +6,8 @@ import me.exeos.bytus.api.config.ConfigInterface;
 import me.exeos.bytus.api.logger.Task;
 import me.exeos.bytus.transformers.Bootstraper;
 import me.exeos.bytus.transformers.PreProcessor;
+import me.exeos.bytus.transformers.encryption.Encryptor;
+import me.exeos.bytus.transformers.encryption.StringEncryptionTransformer;
 import me.exeos.bytus.transformers.packer.ClassEncryptionTransformer;
 import me.exeos.bytus.transformers.renamer.RenameTransformer;
 
@@ -26,6 +28,14 @@ public class TransformerManager implements ConfigInterface {
         }
         transformers.add(new Bootstraper());
         transformers.add(new PreProcessor());
+
+        if (isStrEncEnabled()) {
+            transformers.add(new Encryptor());
+        }
+
+        if (isStrEncEnabled()) {
+            transformers.add(new StringEncryptionTransformer());
+        }
 
         if (isRenamerEnabled()) {
             transformers.add(new RenameTransformer());

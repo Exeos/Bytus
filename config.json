@@ -14,5 +14,8 @@
   "pack": true,
   "renamer": {
     "enable": false
+  },
+  "encrypt": {
+    "strings": true
   }
 }

@@ -52,4 +52,8 @@ public interface ConfigInterface {
     default boolean isRenamerEnabled() {
         return (boolean) getValue("renamer.enable");
     }
+
+    default boolean isStrEncEnabled() {
+        return (boolean) getValue("encrypt.strings");
+    }
 }
