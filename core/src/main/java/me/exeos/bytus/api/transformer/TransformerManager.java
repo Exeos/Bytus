@@ -6,8 +6,10 @@ import me.exeos.bytus.api.config.ConfigInterface;
 import me.exeos.bytus.api.logger.Task;
 import me.exeos.bytus.transformers.Bootstraper;
 import me.exeos.bytus.transformers.PosProcessor;
-import me.exeos.bytus.transformers.encryption.NumberEncryptionTransformer;
+import me.exeos.bytus.transformers.encryption.number.NumberToStrLengthTransformer;
+import me.exeos.bytus.transformers.encryption.number.UnderOverFlowIntTransformer;
 import me.exeos.bytus.transformers.encryption.StringEncryptionTransformer;
+import me.exeos.bytus.transformers.encryption.number.XorNumberTransformer;
 import me.exeos.bytus.transformers.flow.BlockShuffleTransformer;
 import me.exeos.bytus.transformers.flow.BranchCodeSwitcherTransformer;
 import me.exeos.bytus.transformers.flow.ControlFlowTransformer;
@@ -28,8 +30,8 @@ public class TransformerManager implements ConfigInterface {
 
         if (isPackEnabled()) {
             transformers.add(new ClassEncryptionTransformer());
+            transformers.add(new Bootstraper());
         }
-        transformers.add(new Bootstraper());
 
         if (isAnyFlowEnabled() && isStrEncEnabled()) {
             transformers.add(new StringEncryptionTransformer());
@@ -57,7 +59,15 @@ public class TransformerManager implements ConfigInterface {
             transformers.add(new StringEncryptionTransformer());
         }
         if (isNumEncEnabled()) {
-            transformers.add(new NumberEncryptionTransformer());
+            if (isNumEncXorEnabled()) {
+                transformers.add(new XorNumberTransformer());
+            }
+            if (isNumEncNumToStrEnabled()) {
+                transformers.add(new NumberToStrLengthTransformer());
+            }
+            if (isNumEncUnderOverFlowEnabled()) {
+                transformers.add(new UnderOverFlowIntTransformer());
+            }
         }
     }
 

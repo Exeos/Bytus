@@ -58,7 +58,19 @@ public interface ConfigInterface {
     }
 
     default boolean isNumEncEnabled() {
-        return (boolean) getValue("encrypt.numbers");
+        return (boolean) getValue("encrypt.numbers.enable");
+    }
+
+    default boolean isNumEncXorEnabled() {
+        return (boolean) getValue("encrypt.numbers.xor");
+    }
+
+    default boolean isNumEncUnderOverFlowEnabled() {
+        return (boolean) getValue("encrypt.numbers.underOverFlow");
+    }
+
+    default boolean isNumEncNumToStrEnabled() {
+        return (boolean) getValue("encrypt.numbers.numberToStrLen");
     }
 
     default boolean isBlockShufflerEnabled() {

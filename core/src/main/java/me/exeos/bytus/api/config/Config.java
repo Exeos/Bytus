@@ -1,6 +1,5 @@
 package me.exeos.bytus.api.config;
 
-import javax.annotation.Nullable;
 import java.util.HashMap;
 
 public class Config {
@@ -11,7 +10,6 @@ public class Config {
         this.keySet = keySet;
     }
 
-    @Nullable
     public Object getValue(String key) {
         return keySet.getOrDefault(key, null);
     }
