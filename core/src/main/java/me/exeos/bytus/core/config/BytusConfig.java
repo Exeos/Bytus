@@ -1,5 +1,7 @@
 package me.exeos.bytus.core.config;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import me.exeos.bytus.core.config.members.ConstantsConfigMember;
 import me.exeos.bytus.core.config.members.PackerConfigMember;
 import me.exeos.bytus.core.config.members.IOConfigMember;
@@ -20,7 +22,13 @@ public class BytusConfig {
     public final ConstantsConfigMember constants;
     public final boolean flow;
 
-    public BytusConfig(IOConfigMember io, List<String> exclusions, PackerConfigMember packer, ConstantsConfigMember constants, boolean flow) {
+    @JsonCreator
+    public BytusConfig(
+            @JsonProperty("io") IOConfigMember io,
+            @JsonProperty("exclusions") List<String> exclusions,
+            @JsonProperty("packer") PackerConfigMember packer,
+            @JsonProperty("constants") ConstantsConfigMember constants,
+            @JsonProperty("flow") boolean flow) {
         this.io = io;
         this.exclusions = exclusions;
         this.packer = packer;

@@ -1,0 +1,18 @@
+{
+  "io": {
+    "inputPath": "./in.jar",
+    "outputPath": "./out.jar"
+  },
+  "exclusions": [],
+  "packer": {
+    "enable": false,
+    "mainClassName": "",
+    "bootstrapClassName": ""
+  },
+  "constants": {
+    "enable": false,
+    "strings": false,
+    "numbers": false
+  },
+  "flow": true
+}

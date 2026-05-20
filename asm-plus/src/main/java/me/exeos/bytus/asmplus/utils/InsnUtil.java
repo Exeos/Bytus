@@ -1,14 +1,20 @@
 package me.exeos.bytus.asmplus.utils;
 
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.IntInsnNode;
-import org.objectweb.asm.tree.LdcInsnNode;
+import org.objectweb.asm.tree.*;
 
+import java.util.List;
 import java.util.Optional;
 
 public class InsnUtil implements Opcodes {
+
+    public static boolean isReturn(AbstractInsnNode insnNode) {
+        return insnNode.getOpcode() >= Opcodes.IRETURN && insnNode.getOpcode() <= Opcodes.RETURN;
+    }
+
+    public static boolean isBranch(AbstractInsnNode insnNode) {
+        return insnNode instanceof JumpInsnNode;
+    }
 
     public static boolean isIConstPush(AbstractInsnNode insnNode) {
         return isIConstPush(insnNode.getOpcode());
@@ -77,4 +83,9 @@ public class InsnUtil implements Opcodes {
         return Optional.empty();
     }
 
+    public static void addToInsnList(List<AbstractInsnNode> source, InsnList target) {
+        for (AbstractInsnNode insnNode : source) {
+            target.add(insnNode);
+        }
+    }
 }

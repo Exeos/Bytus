@@ -10,6 +10,7 @@ repositories {
 }
 
 dependencies {
+    implementation(project(":core"))
 }
 
 java {

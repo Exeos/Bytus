@@ -8,6 +8,7 @@ import me.exeos.bytus.core.exceptions.BytusPosTransformException;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.FlowFlattening;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -19,7 +20,7 @@ public class Bytus {
 
     private final BytusConfig config;
 
-    private Bytus(String config) {
+    public Bytus(String config) {
         this.config = BytusConfig.fromJson(config);
     }
 
@@ -35,7 +36,7 @@ public class Bytus {
                 throw new BytusInitException("Failed to create output File", e);
             }
         }
-        if (inputFile.exists()) {
+        if (!inputFile.exists()) {
             throw new BytusInitException("Provided input does not exist");
         }
 
@@ -57,6 +58,10 @@ public class Bytus {
 
     private TransformerPipeline mapConfigToTransformers(JarArchive jar) {
         List<Transformer> transformers = new ArrayList<>();
+
+        if (config.flow) {
+            transformers.add(new FlowFlattening(jar, config.exclusions, List.of()));
+        }
 
         if (config.constants.enable()) {
             if (config.constants.numbers()) {
