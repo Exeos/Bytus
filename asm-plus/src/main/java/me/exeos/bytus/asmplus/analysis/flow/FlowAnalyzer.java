@@ -11,6 +11,7 @@ import org.objectweb.asm.tree.*;
 
 import java.util.*;
 
+// TODO handle RET 
 public class FlowAnalyzer {
 
     public static void printDOT(List<BasicBlock> blocks) {
@@ -22,6 +23,7 @@ public class FlowAnalyzer {
         for (BasicBlock block : blocks) {
             String type1 = block.instructions.getFirst().getClass().getSimpleName();
             if (block.successors.isEmpty()) {
+                // Print node without any outgoing edges
                 System.out.println("  block" + blockIds.get(block) + type1 + ";");
             } else {
                 for (BasicBlock succ : block.successors) {
@@ -300,6 +302,10 @@ public class FlowAnalyzer {
                             .computeIfAbsent(entry.getKey(), _ -> new HashSet<>())
                             .add(handlerBlock);
                 }
+            }
+
+            for (BasicBlock successor : block.successors) {
+                successor.predecessors.add(block);
             }
         }
     }

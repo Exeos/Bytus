@@ -10,6 +10,7 @@ import me.exeos.bytus.asmplus.codegen.lookupswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.lookupswitch.SwitchCase;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
 import org.objectweb.asm.Opcodes;
@@ -17,6 +18,7 @@ import org.objectweb.asm.tree.*;
 
 import java.util.*;
 
+// TODO: make verifier shut up about frames
 public class FlowFlattening extends Transformer {
 
     public FlowFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions) {
@@ -134,7 +136,7 @@ public class FlowFlattening extends Transformer {
             handlers.add(new SwitchCase(blockKeys.get(block), handlerInsns));
         }
 
-        return LookupSwitchGenerator.gen(handlers, new SwitchCase(0, endMethodByThrow()), false);
+        return LookupSwitchGenerator.gen(handlers, new SwitchCase(0, MethodUtil.endMethodByThrow()), false);
     }
 
     private InsnList updateStateMachine(int key, int stateVar, LabelNode loopStart) {
@@ -160,16 +162,5 @@ public class FlowFlattening extends Transformer {
         }
 
         return result;
-    }
-
-    private InsnList endMethodByThrow() {
-        InsnList insnList = new InsnList();
-
-        insnList.add(new TypeInsnNode(Opcodes.NEW, "java/lang/IllegalStateException"));
-        insnList.add(new InsnNode(Opcodes.DUP));
-        insnList.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/IllegalStateException", "<init>", "()V", false));
-        insnList.add(new InsnNode(Opcodes.ATHROW));
-
-        return insnList;
     }
 }

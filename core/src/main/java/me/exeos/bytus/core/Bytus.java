@@ -9,6 +9,7 @@ import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.FlowFlattening;
+import me.exeos.bytus.core.transformer.impl.flow.JumpFlattening;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -61,6 +62,7 @@ public class Bytus {
 
         if (config.flow) {
             transformers.add(new FlowFlattening(jar, config.exclusions, List.of()));
+            transformers.add(new JumpFlattening(jar, config.exclusions, List.of()));
         }
 
         if (config.constants.enable()) {

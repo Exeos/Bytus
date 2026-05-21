@@ -19,6 +19,11 @@ public class BasicBlock {
     public Set<BasicBlock> normalSuccessors = new HashSet<>();
 
     /**
+     * All immediate blocks before this Block
+     */
+    public Set<BasicBlock> predecessors = new HashSet<>();
+
+    /**
      * Maps instructions that are inside try catch block protected regions to their handler blocks
      */
     public Map<AbstractInsnNode, HashSet<BasicBlock>> exceptionDispatchMap = new HashMap<>();
