@@ -293,7 +293,7 @@ public class FlowAnalyzer {
             }
 
             // link exception handlers to block from all matching TryCatchBlocks
-            for (Map.Entry<AbstractInsnNode, ArrayList<TryCatchBlockNode>> entry : getMatchingTryCatchBlockHandlers(methodNode, block).entrySet()) {
+            for (Map.Entry<AbstractInsnNode, ArrayList<TryCatchBlockNode>> entry : mapExceptionDispatchersToHandlers(methodNode, block).entrySet()) {
                 for (TryCatchBlockNode tryCatchBlockNode : entry.getValue()) {
                     BasicBlock handlerBlock = blockMap.get(tryCatchBlockNode.handler);
 
@@ -310,9 +310,14 @@ public class FlowAnalyzer {
         }
     }
 
-    // this needs a better name and docs
-    private static Map<AbstractInsnNode, ArrayList<TryCatchBlockNode>> getMatchingTryCatchBlockHandlers(MethodNode methodNode, BasicBlock block) {
-        Map<AbstractInsnNode, ArrayList<TryCatchBlockNode>> matchingHandlers = new HashMap<>();
+    /**
+     * Maps instructions that can result in exceptional control flow transfer to all their possible handlers
+     * @param methodNode Method containing block to analyze
+     * @param block Block in method to analyze
+     * @return Map, mapping instructions that can result in exceptional control flow transfer to all their possible handlers
+     */
+    private static Map<AbstractInsnNode, ArrayList<TryCatchBlockNode>> mapExceptionDispatchersToHandlers(MethodNode methodNode, BasicBlock block) {
+        Map<AbstractInsnNode, ArrayList<TryCatchBlockNode>> dispatcherHandlerMap = new HashMap<>();
 
         // method exception table
         for (AbstractInsnNode insnNode : block.instructions) {
@@ -321,7 +326,7 @@ public class FlowAnalyzer {
                 int startIndex = methodNode.instructions.indexOf(tryCatchBlock.start);
                 int endIndex = methodNode.instructions.indexOf(tryCatchBlock.end);
                 if (insnIndex >= startIndex && insnIndex < endIndex) {
-                    matchingHandlers.computeIfAbsent(insnNode, k -> new ArrayList<>()).add(tryCatchBlock);
+                    dispatcherHandlerMap.computeIfAbsent(insnNode, k -> new ArrayList<>()).add(tryCatchBlock);
                 }
             }
         }
@@ -334,11 +339,11 @@ public class FlowAnalyzer {
                 int startIndex = methodNode.instructions.indexOf(tryCatchBlock.start);
                 int endIndex = methodNode.instructions.indexOf(tryCatchBlock.end);
                 if (insnIndex >= startIndex && insnIndex < endIndex) {
-                    matchingHandlers.computeIfAbsent(last, k -> new ArrayList<>()).add(tryCatchBlock);
+                    dispatcherHandlerMap.computeIfAbsent(last, k -> new ArrayList<>()).add(tryCatchBlock);
                 }
             }
         }
 
-        return matchingHandlers;
+        return dispatcherHandlerMap;
     }
 }
