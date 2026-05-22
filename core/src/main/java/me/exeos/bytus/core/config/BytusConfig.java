@@ -3,10 +3,9 @@ package me.exeos.bytus.core.config;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import me.exeos.bytus.core.config.members.ConstantsConfigMember;
+import me.exeos.bytus.core.config.members.FlowConfigMember;
 import me.exeos.bytus.core.config.members.PackerConfigMember;
 import me.exeos.bytus.core.config.members.IOConfigMember;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,7 +19,7 @@ public class BytusConfig {
     public final List<String> exclusions;
     public final PackerConfigMember packer;
     public final ConstantsConfigMember constants;
-    public final boolean flow;
+    public final FlowConfigMember flow;
 
     @JsonCreator
     public BytusConfig(
@@ -28,7 +27,7 @@ public class BytusConfig {
             @JsonProperty("exclusions") List<String> exclusions,
             @JsonProperty("packer") PackerConfigMember packer,
             @JsonProperty("constants") ConstantsConfigMember constants,
-            @JsonProperty("flow") boolean flow) {
+            @JsonProperty("flow") FlowConfigMember flow) {
         this.io = io;
         this.exclusions = exclusions;
         this.packer = packer;

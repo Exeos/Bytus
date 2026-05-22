@@ -60,9 +60,9 @@ public class Bytus {
     private TransformerPipeline mapConfigToTransformers(JarArchive jar) {
         List<Transformer> transformers = new ArrayList<>();
 
-        if (config.flow) {
-            transformers.add(new FlowFlattening(jar, config.exclusions, List.of()));
-            transformers.add(new JumpFlattening(jar, config.exclusions, List.of()));
+        if (config.flow.enable()) {
+            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.maxDispatcherChainLength()));
+//            transformers.add(new JumpFlattening(jar, config.exclusions, List.of()));
         }
 
         if (config.constants.enable()) {

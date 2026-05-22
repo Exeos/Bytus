@@ -14,5 +14,8 @@
     "strings": false,
     "numbers": false
   },
-  "flow": true
+  "flow": {
+    "enable": true,
+    "maxDispatcherChainLength": 3
+  }
 }

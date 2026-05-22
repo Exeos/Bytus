@@ -13,6 +13,7 @@ import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
@@ -44,8 +45,15 @@ import java.util.*;
  */
 public class FlowFlattening extends Transformer {
 
-    public FlowFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions) {
+
+    /**
+     * Maximal path length to reach actual block handler
+     */
+    private final int maxDispatcherChainLength;
+
+    public FlowFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int maxDispatcherChainLength) {
         super(jar, exclusions, inclusions);
+        this.maxDispatcherChainLength = maxDispatcherChainLength;
     }
 
     @Override
@@ -219,12 +227,12 @@ public class FlowFlattening extends Transformer {
        Map<BasicBlock, int[]> result = new HashMap<>();
        Set<Integer> usedKeys = new HashSet<>();
 
-        Random random = new Random();
         for (BasicBlock block : blocks) {
-            int[] pathKeys = new int[3];
+            int[] pathKeys = new int[RandomUtil.getInt(1, Math.max(1, maxDispatcherChainLength + 1))];
+
             for (int i = 0; i < pathKeys.length; i++) {
                 do {
-                    pathKeys[i] = random.nextInt(Integer.MAX_VALUE);
+                    pathKeys[i] = RandomUtil.nextInt();
                 } while (usedKeys.contains(pathKeys[i]));
                 usedKeys.add(pathKeys[i]);
             }

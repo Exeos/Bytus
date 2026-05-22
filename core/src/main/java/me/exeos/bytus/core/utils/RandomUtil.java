@@ -1,14 +1,23 @@
 package me.exeos.bytus.core.utils;
 
+import java.util.Random;
+
 public class RandomUtil {
+
+    private static final Random rnd = new Random();
+
+    public static int nextInt() {
+        return rnd.nextInt(Integer.MAX_VALUE);
+    }
 
     public static int getInt() {
         return getInt(Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
     public static int getInt(int min, int max) {
-        if (min == max)
+        if (min == max) {
             return min;
+        }
 
         if (min > max) {
             throw new IllegalArgumentException("Max must be greater than min");
