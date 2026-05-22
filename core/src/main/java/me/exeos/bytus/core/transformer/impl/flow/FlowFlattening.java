@@ -43,13 +43,13 @@ public class FlowFlattening extends Transformer {
                     methodNode.instructions.remove(insn);
                 }
 
-                Map<BasicBlock, Integer> blockKeys = genBlockKeys(basicBlocks);
+                Map<BasicBlock, int[]> blockKeys = genBlockKeys(basicBlocks);
                 int stateVar = methodNode.maxLocals++;
 
                 InsnList obfuscated = new InsnList();
 
                 // load key of first block and store it in the state var
-                obfuscated.add(InsnUtil.getIntPush(blockKeys.get(basicBlocks.getFirst())));
+                obfuscated.add(InsnUtil.getIntPush(blockKeys.get(basicBlocks.getFirst())[0]));
                 obfuscated.add(new VarInsnNode(Opcodes.ISTORE, stateVar));
 
                 LabelNode loopStart = new LabelNode();
@@ -62,7 +62,7 @@ public class FlowFlattening extends Transformer {
         }
     }
 
-    private InsnList generateStateMachineSwitch(List<BasicBlock> basicBlocks, Map<BasicBlock, Integer> blockKeys, int stateVar, LabelNode loopStart) {
+    private InsnList generateStateMachineSwitch(List<BasicBlock> basicBlocks, Map<BasicBlock, int[]> blockKeys, int stateVar, LabelNode loopStart) {
         List<SwitchCase> handlers = new ArrayList<>();
         for (BasicBlock block : basicBlocks) {
             InsnList handlerInsns = new InsnList();
@@ -75,11 +75,11 @@ public class FlowFlattening extends Transformer {
                         LabelNode newTrueBranch = new LabelNode();
 
                         handlerInsns.add(new JumpInsnNode(jumpBlock.dispatcher.getOpcode(), newTrueBranch));
-                        handlerInsns.add(updateStateMachine(blockKeys.get(jumpBlock.falseBranchBlock.get()), stateVar, loopStart));
+                        handlerInsns.add(updateStateMachine(blockKeys.get(jumpBlock.falseBranchBlock.get())[0], stateVar, loopStart));
                         handlerInsns.add(newTrueBranch);
                     }
 
-                    handlerInsns.add(updateStateMachine(blockKeys.get(jumpBlock.trueBranchBlock), stateVar, loopStart));
+                    handlerInsns.add(updateStateMachine(blockKeys.get(jumpBlock.trueBranchBlock)[0], stateVar, loopStart));
                 }
                 case SwitchBlock switchBlock -> {
                     List<SwitchCase> innerHandlers = new ArrayList<>();
@@ -92,7 +92,7 @@ public class FlowFlattening extends Transformer {
                                 BasicBlock targetBlock = switchBlock.keyCaseMap.get(key);
 
                                 InsnList innerHandler = new InsnList();
-                                innerHandler.add(updateStateMachine(blockKeys.get(targetBlock), stateVar, loopStart));
+                                innerHandler.add(updateStateMachine(blockKeys.get(targetBlock)[0], stateVar, loopStart));
                                 innerHandlers.add(new SwitchCase(key, innerHandler));
                             }
                         }
@@ -102,7 +102,7 @@ public class FlowFlattening extends Transformer {
                                 BasicBlock targetBlock = switchBlock.keyCaseMap.get(key);
 
                                 InsnList innerHandler = new InsnList();
-                                innerHandler.add(updateStateMachine(blockKeys.get(targetBlock), stateVar, loopStart));
+                                innerHandler.add(updateStateMachine(blockKeys.get(targetBlock)[0], stateVar, loopStart));
                                 innerHandlers.add(new SwitchCase(key, innerHandler));
                             }
                         }
@@ -111,7 +111,7 @@ public class FlowFlattening extends Transformer {
 
                     // Default Case
                     InsnList defaultCaseInsn = new InsnList();
-                    defaultCaseInsn.add(updateStateMachine(blockKeys.get(switchBlock.defaultBlock), stateVar, loopStart));
+                    defaultCaseInsn.add(updateStateMachine(blockKeys.get(switchBlock.defaultBlock)[0], stateVar, loopStart));
                     SwitchCase defaultCase = new SwitchCase(0, defaultCaseInsn);
 
                     // original instructions up to the switch
@@ -123,7 +123,7 @@ public class FlowFlattening extends Transformer {
                 }
                 case FallTroughBlock fallTroughBlock -> {
                     InsnUtil.addToInsnList(block.instructions, handlerInsns);
-                    handlerInsns.add(updateStateMachine(blockKeys.get(fallTroughBlock.fallTroughBlock), stateVar, loopStart));
+                    handlerInsns.add(updateStateMachine(blockKeys.get(fallTroughBlock.fallTroughBlock)[0], stateVar, loopStart));
                 }
                 case TerminalBlock terminalBlock -> {
                     InsnUtil.addToInsnList(block.instructions, handlerInsns);
@@ -133,7 +133,15 @@ public class FlowFlattening extends Transformer {
                 }
             }
 
-            handlers.add(new SwitchCase(blockKeys.get(block), handlerInsns));
+
+            int[] pathKeys = blockKeys.get(block);
+            for (int i = 0; i < pathKeys.length - 1; i++) {
+                InsnList pathInsn = new InsnList();
+                pathInsn.add(updateStateMachine(pathKeys[i + 1], stateVar, loopStart));
+                handlers.add(new SwitchCase(pathKeys[i], pathInsn));
+            }
+
+            handlers.add(new SwitchCase(pathKeys[pathKeys.length - 1], handlerInsns));
         }
 
         return LookupSwitchGenerator.gen(handlers, new SwitchCase(0, MethodUtil.endMethodByThrow()), false);
@@ -149,16 +157,26 @@ public class FlowFlattening extends Transformer {
         return instructions;
     }
 
-    private Map<BasicBlock, Integer> genBlockKeys(List<BasicBlock> basicBlocks) {
-       Map<BasicBlock, Integer> result = new HashMap<>();
+    /**
+     * Assignes an array of unique ints to each block. First item in the array is the entry to the path leading to that block
+     * @param basicBlocks
+     * @return
+     */
+    private Map<BasicBlock, int[]> genBlockKeys(List<BasicBlock> basicBlocks) {
+       Map<BasicBlock, int[]> result = new HashMap<>();
+       Set<Integer> used = new HashSet<>();
 
         Random random = new Random();
         for (BasicBlock block : basicBlocks) {
-            int state;
-            do {
-                state = random.nextInt(Integer.MAX_VALUE);
-            } while (result.containsValue(state));
-            result.put(block, state);
+            int[] pathKeys = new int[3];
+            for (int i = 0; i < pathKeys.length; i++) {
+                do {
+                    pathKeys[i] = random.nextInt(Integer.MAX_VALUE);
+                } while (used.contains(pathKeys[i]));
+                used.add(pathKeys[i]);
+            }
+
+            result.put(block, pathKeys);
         }
 
         return result;
