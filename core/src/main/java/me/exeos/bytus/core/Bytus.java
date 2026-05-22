@@ -62,7 +62,7 @@ public class Bytus {
 
         if (config.flow.enable()) {
             transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.maxDispatcherChainLength()));
-//            transformers.add(new JumpFlattening(jar, config.exclusions, List.of()));
+            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.maxDispatcherChainLength()));
         }
 
         if (config.constants.enable()) {

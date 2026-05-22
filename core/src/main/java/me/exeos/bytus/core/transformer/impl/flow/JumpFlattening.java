@@ -7,6 +7,7 @@ import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
@@ -14,26 +15,34 @@ import java.util.*;
 
 /**
  * Control-flow obfuscation transformer that "flattens" jumps by routing them through
- * a central dispatcher implemented as a {@code lookupswitch}.
+ * a central {@code lookupswitch}-based dispatcher.
  *
  * <p>Overview:
  * <ol>
- *   <li>Assign each {@link LabelNode} in the method a random integer "key".</li>
- *   <li>Add a new local int variable that holds the next key to execute.</li>
+ *   <li>Assign each {@link LabelNode} a chain (path) of unique, random integer keys.</li>
+ *   <li>Add a new local int variable that holds the current dispatcher key.</li>
  *   <li>Rewrite every {@link JumpInsnNode} so it:
  *     <ol>
- *       <li>stores the target label's key into the key local</li>
+ *       <li>stores the target label’s path entry key into the key local</li>
  *       <li>jumps to the dispatcher entry label</li>
  *     </ol>
  *   </li>
  *   <li>Insert a dispatcher block near the start of the method that:
- *     loads the state local and jumps to the matching label via {@code lookupswitch}.</li>
+ *     loads the key local and uses {@code lookupswitch} to either
+ *     <ol>
+ *       <li>advance along the key chain (updating the key local and re-entering the dispatcher), or</li>
+ *       <li>jump to the final key that transfers control to the original target label.</li>
+ *     </ol>
+ *   </li>
  * </ol>
  */
 public class JumpFlattening extends Transformer {
 
-    public JumpFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions) {
+    private final int maxDispatcherChainLength;
+
+    public JumpFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int maxDispatcherChainLength) {
         super(jar, exclusions, inclusions);
+        this.maxDispatcherChainLength = maxDispatcherChainLength;
     }
 
     @Override
@@ -45,7 +54,7 @@ public class JumpFlattening extends Transformer {
                 }
 
                 // create label to key mapping
-                Map<LabelNode, Integer> labelKeyMap = assignLabelsToKeys(methodNode.instructions);
+                Map<LabelNode, int[]> labelPathMap = assignLabelsToPaths(methodNode.instructions);
                 LabelNode dispatcherEntry = new LabelNode();
                 int keyVarIndex = methodNode.maxLocals++;
 
@@ -53,42 +62,47 @@ public class JumpFlattening extends Transformer {
                 boolean didUpdateAnyJumps = rewriteJumpsToDispatcher(
                         methodNode,
                         dispatcherEntry,
-                        labelKeyMap,
+                        labelPathMap,
                         keyVarIndex
                 );
 
                 if (didUpdateAnyJumps) {
                     // insert dispatcher
-                    methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelKeyMap, keyVarIndex));
+                    methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex));
                 }
             }
         }
     }
 
     /**
-     * Assigns each {@link LabelNode} in the instruction list a unique, random int.
+     * Assigns each {@link LabelNode} in the instruction list a path consisting of unique, random ints.
      *
-     * <p>Keys become the case keys in the {@code lookupswitch} dispatcher.</p>
+     * <p>The intent is to avoid a simple 1-to-1:
+     * the dispatcher will have to traverse multiple states before reaching the final block handler.</p>
      *
      * @param instructions method instruction list
-     * @return map of label -> assigned key
+     * @return map of label -> array of path states (first is entry state for that block)
      */
-    private Map<LabelNode, Integer> assignLabelsToKeys(InsnList instructions) {
-        Random random = new Random();
-        Map<LabelNode, Integer> labelKeyMap = new HashMap<>();
+    private Map<LabelNode, int[]> assignLabelsToPaths(InsnList instructions) {
+        Map<LabelNode, int[]> labelPathMap = new HashMap<>();
+        Set<Integer> usedKeys = new HashSet<>();
 
         for (AbstractInsnNode insnNode : instructions) {
             if (insnNode instanceof LabelNode labelNode) {
-                int key;
-                do {
-                    key = random.nextInt(Integer.MAX_VALUE);
-                } while (labelKeyMap.containsValue(key));
+                int[] pathKeys = new int[RandomUtil.getInt(1, Math.max(1, maxDispatcherChainLength + 1))];
 
-                labelKeyMap.put(labelNode, key);
+                for (int i = 0; i < pathKeys.length; i++) {
+                    do {
+                        pathKeys[i] = RandomUtil.nextInt();
+                    } while (usedKeys.contains(pathKeys[i]));
+                    usedKeys.add(pathKeys[i]);
+                }
+
+                labelPathMap.put(labelNode, pathKeys);
             }
         }
 
-        return labelKeyMap;
+        return labelPathMap;
     }
 
     /**
@@ -98,13 +112,18 @@ public class JumpFlattening extends Transformer {
      *   goto dispatcherEnd
      * dispatcherEntry:
      *   iload key
-     *   lookupswitch { key -> goto corresponding label ... default -> throw }
+     *   lookupswitch {
+     *      chain_entry -> goto next_in_chain...,
+     *      last_in_chain -> goto actual_dispatcher,
+     *      actual_dispatcher -> goto real_label,
+     *      default -> throw
+     *  }
      * dispatcherEnd:
      * </pre>
      *
      * <p>The initial {@code goto dispatcherEnd} ensures dispatcher doesn't get executed unless explicitly jumped to</p>
      */
-    private InsnList buildDispatcher(LabelNode dispatcherEntry, Map<LabelNode, Integer> labelKeyMap, int keyVarIndex) {
+    private InsnList buildDispatcher(LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex) {
         InsnList insn = new InsnList();
 
         LabelNode dispatcherEnd = new LabelNode();
@@ -118,14 +137,25 @@ public class JumpFlattening extends Transformer {
         // Create switch.
         // cases: key -> goto original label.
         List<SwitchCase> cases = new ArrayList<>();
-        for (Map.Entry<LabelNode, Integer> entry : labelKeyMap.entrySet()) {
-            int caseKey = entry.getValue();
+        for (Map.Entry<LabelNode, int[]> entry : labelPathMap.entrySet()) {
+            int[] path = entry.getValue();
             LabelNode targetLabel = entry.getKey();
 
             InsnList caseInsn = new InsnList();
             caseInsn.add(new JumpInsnNode(Opcodes.GOTO, targetLabel));
 
-            cases.add(new SwitchCase(caseKey, caseInsn));
+            cases.add(new SwitchCase(path[path.length - 1], caseInsn));
+
+            // Add path chain
+            // entry -> chain -> .. -> handler
+            for (int i = 0; i < path.length - 1; i++) {
+                InsnList pathInsn = new InsnList();
+                pathInsn.add(InsnUtil.getIntPush(path[i + 1]));
+                pathInsn.add(new VarInsnNode(Opcodes.ISTORE, keyVarIndex));
+                pathInsn.add(new JumpInsnNode(Opcodes.GOTO, dispatcherEntry));
+
+                cases.add(new SwitchCase(path[i], pathInsn));
+            }
         }
 
         // Default: Method ends by throw. This should never be reached.
@@ -144,18 +174,18 @@ public class JumpFlattening extends Transformer {
      *
      * @return true if at least one jump was rewritten
      */
-    private boolean rewriteJumpsToDispatcher(MethodNode methodNode, LabelNode dispatcherEntry, Map<LabelNode, Integer> labelKeyMap, int keyVarIndex) {
+    private boolean rewriteJumpsToDispatcher(MethodNode methodNode, LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex) {
         boolean updatedJumps = false;
 
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof JumpInsnNode jumpInsnNode) {
-                Integer key = labelKeyMap.get(jumpInsnNode.label);
-                if (key == null) {
+                int[] path = labelPathMap.get(jumpInsnNode.label);
+                if (path == null) {
                     continue;
                 }
 
                 InsnList updateKeyInsn = new InsnList();
-                updateKeyInsn.add(InsnUtil.getIntPush(key));
+                updateKeyInsn.add(InsnUtil.getIntPush(path[0]));
                 updateKeyInsn.add(new VarInsnNode(Opcodes.ISTORE, keyVarIndex));
 
 
