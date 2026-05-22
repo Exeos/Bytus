@@ -20,7 +20,10 @@ public class RandomUtil {
         }
 
         if (min > max) {
-            throw new IllegalArgumentException("Max must be greater than min");
+//            throw new IllegalArgumentException("Max must be greater than min");
+            int temp = min;
+            min = max;
+            max = temp;
         }
 
         return (int) ((Math.random() * (max - min)) + min);

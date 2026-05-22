@@ -14,6 +14,7 @@ import me.exeos.bytus.core.transformer.impl.flow.JumpFlattening;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -61,8 +62,8 @@ public class Bytus {
         List<Transformer> transformers = new ArrayList<>();
 
         if (config.flow.enable()) {
-            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.maxDispatcherChainLength()));
-            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.maxDispatcherChainLength()));
+            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
+            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
         }
 
         if (config.constants.enable()) {

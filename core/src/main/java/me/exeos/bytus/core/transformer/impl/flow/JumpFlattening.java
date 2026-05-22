@@ -38,10 +38,11 @@ import java.util.*;
  */
 public class JumpFlattening extends Transformer {
 
-    private final int maxDispatcherChainLength;
+    private final int minDispatcherChainLength, maxDispatcherChainLength;
 
-    public JumpFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int maxDispatcherChainLength) {
+    public JumpFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int minDispatcherChainLength, int maxDispatcherChainLength) {
         super(jar, exclusions, inclusions);
+        this.minDispatcherChainLength = minDispatcherChainLength;
         this.maxDispatcherChainLength = maxDispatcherChainLength;
     }
 
@@ -89,7 +90,7 @@ public class JumpFlattening extends Transformer {
 
         for (AbstractInsnNode insnNode : instructions) {
             if (insnNode instanceof LabelNode labelNode) {
-                int[] pathKeys = new int[RandomUtil.getInt(1, Math.max(1, maxDispatcherChainLength + 1))];
+                int[] pathKeys = new int[RandomUtil.getInt(Math.max(1, this.minDispatcherChainLength), Math.max(1, maxDispatcherChainLength + 1))];
 
                 for (int i = 0; i < pathKeys.length; i++) {
                     do {

@@ -49,10 +49,11 @@ public class FlowFlattening extends Transformer {
     /**
      * Maximal path length to reach actual block handler
      */
-    private final int maxDispatcherChainLength;
+    private final int minDispatcherChainLength, maxDispatcherChainLength;
 
-    public FlowFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int maxDispatcherChainLength) {
+    public FlowFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int minDispatcherChainLength, int maxDispatcherChainLength) {
         super(jar, exclusions, inclusions);
+        this.minDispatcherChainLength = minDispatcherChainLength;
         this.maxDispatcherChainLength = maxDispatcherChainLength;
     }
 
@@ -228,7 +229,7 @@ public class FlowFlattening extends Transformer {
        Set<Integer> usedKeys = new HashSet<>();
 
         for (BasicBlock block : blocks) {
-            int[] pathKeys = new int[RandomUtil.getInt(1, Math.max(1, maxDispatcherChainLength + 1))];
+            int[] pathKeys = new int[RandomUtil.getInt(Math.max(1, minDispatcherChainLength), Math.max(1, maxDispatcherChainLength + 1))];
 
             for (int i = 0; i < pathKeys.length; i++) {
                 do {
