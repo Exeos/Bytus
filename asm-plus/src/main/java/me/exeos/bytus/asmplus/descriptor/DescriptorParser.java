@@ -1,0 +1,61 @@
+package me.exeos.bytus.asmplus.descriptor;
+
+import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+
+public class DescriptorParser {
+
+    private final static Set<Character> validDescMemberPrimitives = Set.of('B', 'C', 'D', 'F', 'I', 'J', 'S', 'Z');
+
+    public static MethodDescriptor parseMethodDesc(String descriptor) {
+        int argsStartIndex = descriptor.indexOf('(') + 1;
+        int argsEndIndex = descriptor.indexOf(')');
+
+        List<DescriptorMember> args = parseMembers(descriptor, argsStartIndex, argsEndIndex);
+        DescriptorMember returnType = parseMembers(descriptor, argsEndIndex + 1, descriptor.length()).getFirst();
+
+        return new MethodDescriptor(args, returnType);
+    }
+
+    public static List<DescriptorMember> parseMembers(String container) {
+        return parseMembers(container, 0, container.length());
+    }
+
+    public static List<DescriptorMember> parseMembers(String container, int startIndex, int endIndex) {
+        List<DescriptorMember> members = new ArrayList<>();
+
+        StringBuilder classNameBuilder = new StringBuilder();
+        boolean buildingClassName = false;
+
+        char[] containerChars = container.toCharArray();
+        for (int i = startIndex; i < endIndex; i++) {
+            char c = containerChars[i];
+
+            switch (c) {
+                case 'L' -> {
+                    buildingClassName = true;
+                }
+                case ';' -> {
+                    buildingClassName = false;
+                    classNameBuilder = new StringBuilder();
+
+                    members.add(new DescriptorMember(classNameBuilder.toString(), false));
+                }
+                default -> {
+                    if (buildingClassName) {
+                        classNameBuilder.append(c);
+                    } else if (validDescMemberPrimitives.contains(c)) {
+                        members.add(new DescriptorMember(String.valueOf(c), true));
+                    } else {
+                        throw new IllegalArgumentException("Invalid string provided. Char: " + c + " at index: " + i + " is not within class definition or a valid primitive");
+                    }
+                }
+            }
+        }
+
+        return members;
+    }
+}
