@@ -1,11 +1,12 @@
 package me.exeos.bytus.core.transformer;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.util.List;
 
-public abstract class Transformer {
+public abstract class Transformer implements Opcodes{
 
     private final JarArchive jar;
 

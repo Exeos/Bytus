@@ -18,5 +18,10 @@
     "enable": true,
     "minDispatcherChainLength": 1,
     "maxDispatcherChainLength": 3
+  },
+  "references": {
+    "enable": false,
+    "methodCall": true,
+    "fieldAccess": false
   }
 }
