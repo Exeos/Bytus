@@ -70,38 +70,6 @@ public class ReferenceEncryptionTransformer extends Transformer {
         return new InvokeDynamicInsnNode(RandomUtil.getString(RandomUtil.getInt(12, 36)), descriptor, bsmHandle, methodSignature);
     }
 
-    public static CallSite bootstrap(MethodHandles.Lookup lookup, String ignored, MethodType methodType, String methodSignature) {
-        try {
-            String memberDesc = methodSignature.split("#")[0];
-            String accessCode = methodSignature.split("#")[1];
-            String memberName = methodSignature.split("#")[2];
-            String className = methodSignature.split("#")[3].replace("/", ".");
-
-            Class<?> clazz = Class.forName(className);
-
-            MethodType correctType = MethodType.fromMethodDescriptorString(memberDesc,
-                    clazz.getClassLoader());
-
-            MethodHandle handle = null;
-
-            if (accessCode.equals("182") || accessCode.equals("184")) {
-                if (accessCode.equals("182")) {
-                    handle = lookup.findVirtual(clazz, memberName, correctType).asType(methodType);
-                } else {
-                    handle = lookup.findStatic(clazz, memberName, correctType).asType(methodType);
-                }
-            }
-
-            if (handle == null)
-                return null;
-
-            return new MutableCallSite(handle);
-        } catch (Exception e) {
-            System.out.println("e -> " + e.getMessage());
-            return null;
-        }
-    }
-
     private void addBootstrapMethod(ClassNode classNode, String bootstrapName) {
         MethodNode methodVisitor = new MethodNode(ACC_PUBLIC | ACC_STATIC, bootstrapName, BOOTSTRAP_DESC, null, null);
         methodVisitor.visitCode();
