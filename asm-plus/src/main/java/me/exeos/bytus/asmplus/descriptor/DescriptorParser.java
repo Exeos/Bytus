@@ -29,6 +29,8 @@ public class DescriptorParser {
 
         StringBuilder classNameBuilder = new StringBuilder();
         boolean buildingClassName = false;
+        boolean buildingArray = false;
+        int arrayDepth = 0;
 
         char[] containerChars = container.toCharArray();
         for (int i = startIndex; i < endIndex; i++) {
@@ -40,15 +42,32 @@ public class DescriptorParser {
                 }
                 case ';' -> {
                     buildingClassName = false;
+
+                    members.add(new DescriptorMember(classNameBuilder.toString(), false, buildingArray, arrayDepth));
                     classNameBuilder = new StringBuilder();
 
-                    members.add(new DescriptorMember(classNameBuilder.toString(), false));
+                    buildingArray = false;
+                    arrayDepth = 0;
+                }
+                case '[' -> {
+                    buildingArray = true;
+                    arrayDepth++;
+                }
+                case 'V' -> {
+                    if (!buildingClassName) {
+                        members.add(new DescriptorMember(String.valueOf(c), true, false, 0));
+                    } else {
+                        classNameBuilder.append(c);
+                    }
                 }
                 default -> {
                     if (buildingClassName) {
                         classNameBuilder.append(c);
                     } else if (validDescMemberPrimitives.contains(c)) {
-                        members.add(new DescriptorMember(String.valueOf(c), true));
+                        members.add(new DescriptorMember(String.valueOf(c), true, buildingArray, arrayDepth));
+
+                        buildingArray = false;
+                        arrayDepth = 0;
                     } else {
                         throw new IllegalArgumentException("Invalid string provided. Char: " + c + " at index: " + i + " is not within class definition or a valid primitive");
                     }

@@ -20,4 +20,8 @@ public class MethodUtil {
 
         return insnList;
     }
+
+    public static boolean hasAccess(MethodNode methodNode, int accessCode) {
+        return (methodNode.access & accessCode) != 0;
+    }
 }

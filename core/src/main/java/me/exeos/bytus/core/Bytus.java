@@ -7,9 +7,11 @@ import me.exeos.bytus.core.exceptions.BytusInitException;
 import me.exeos.bytus.core.exceptions.BytusPosTransformException;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.transformer.impl.PreProcessor;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.JumpFlattening;
+import me.exeos.bytus.core.transformer.impl.flow.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 
 import java.io.File;
@@ -62,10 +64,16 @@ public class Bytus {
     private TransformerPipeline mapConfigToTransformers(JarArchive jar) {
         List<Transformer> transformers = new ArrayList<>();
 
-        if (config.flow.enable()) {
-            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
-            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
+        transformers.add(new PreProcessor(jar, config.exclusions, List.of()));
+
+        if (config.flow.data()) {
+            transformers.add(new ParamGenerifier(jar, config.exclusions, List.of()));
         }
+
+//        if (config.flow.enable()) {
+//            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
+//            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
+//        }
 
         if (config.constants.enable()) {
             if (config.constants.numbers()) {
