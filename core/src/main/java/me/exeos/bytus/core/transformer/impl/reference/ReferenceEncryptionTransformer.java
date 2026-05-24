@@ -31,13 +31,14 @@ public class ReferenceEncryptionTransformer extends Transformer {
         AtomicInteger invokeDynamicCount = new AtomicInteger();
 
         for (ClassNode classNode : getIncludedClasses()) {
+            if ((classNode.access & ACC_INTERFACE) != 0) continue;
 
             String bootstrapName = RandomUtil.getString(RandomUtil.getInt(12, 36));
 
             boolean anyCalls = false;
 
             for (MethodNode methodNode : classNode.methods) {
-                if ((classNode.access & ACC_INTERFACE) != 0) continue;
+                if (methodNode.instructions.size() == 0) continue;
 
                 for (AbstractInsnNode abstractInsnNode : methodNode.instructions.toArray()) {
                     if (abstractInsnNode instanceof MethodInsnNode methodInsnNode && this.methodCall) {
