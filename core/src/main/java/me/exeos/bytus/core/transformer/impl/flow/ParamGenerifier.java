@@ -23,6 +23,9 @@ public class ParamGenerifier extends Transformer {
     public void transform(TransformerPipeline pipeline) {
         Set<String> includedMethods = new HashSet<>();
         for (ClassNode classNode : getIncludedClasses()) {
+            if (classNode.name.contains("Enum")) {
+                System.out.println();
+            }
             for (MethodNode methodNode : classNode.methods) {
                 includedMethods.add(classNode.name + methodNode.name);
             }
@@ -30,98 +33,139 @@ public class ParamGenerifier extends Transformer {
 
         for (ClassNode classNode : getIncludedClasses()) {
             for (MethodNode methodNode : classNode.methods) {
-                int paramArrVarIndex = methodNode.maxLocals++;
-                for (AbstractInsnNode insnNode : methodNode.instructions) {
-                    if (insnNode instanceof MethodInsnNode methodInsnNode) {
-                        if (!includedMethods.contains(classNode.name + methodInsnNode.name)) {
-                            continue;
-                        }
-
-                        MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
-                        if (descriptor.args.isEmpty()) {
-                            continue;
-                        }
-
-                        int paramArrLength = descriptor.args.size();
-                        InsnList insn = new InsnList();
-
-                        insn.add(InsnUtil.getIntPush(paramArrLength));
-                        insn.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
-                        insn.add(new VarInsnNode(ASTORE, paramArrVarIndex));
-
-                        for (int i = 0; i < descriptor.args.size(); i++) {
-                            DescriptorMember arg = descriptor.args.get(i);
-
-                            insn.add(new VarInsnNode(ALOAD, paramArrVarIndex));
-                            insn.add(new InsnNode(SWAP));
-                            insn.add(InsnUtil.getIntPush(i));
-                            insn.add(new InsnNode(SWAP));
-                            if (arg.isPrimitive && !arg.isArray) {
-                                String primClassName = TypeUtil.primitiveToClass(arg.value.toCharArray()[0]);
-
-                                insn.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + arg.value + ")L" + primClassName + ";"));
-                            }
-                            insn.add(new InsnNode(AASTORE));
-                        }
-                        insn.add(new VarInsnNode(ALOAD, paramArrVarIndex));
-
-                        methodNode.instructions.insertBefore(insnNode, insn);
-                        methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType.toDesc();
-                    }
-                }
+                convertParamPassing(classNode, methodNode, includedMethods);
             }
+
             for (MethodNode methodNode : classNode.methods) {
-                // parse desc
-                MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodNode.desc);
-                if (descriptor.args.isEmpty()) {
+                convertParamUsage(methodNode);
+            }
+        }
+    }
+
+    private void convertParamPassing(ClassNode classNode, MethodNode methodNode, Set<String> includedMethods) {
+        int paramArrVarIndex = methodNode.maxLocals++;
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            if (insnNode instanceof InvokeDynamicInsnNode invokeDynamicInsnNode) {
+                MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(invokeDynamicInsnNode.desc);
+                if (descriptor.params.isEmpty()) {
                     continue;
                 }
 
-                // if method is static param is stored at index 0 if not then that would be the class instance
-                int paramArrIndex = MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
+                int paramArrLength = descriptor.params.size();
+                InsnList arrBuilder = new InsnList();
 
-                Map<Integer, DescriptorMember> argMap = new HashMap<>();
-                for (int i = 0; i < descriptor.args.size(); i++) {
-                    argMap.put(i + paramArrIndex, descriptor.args.get(i));
-                }
+                arrBuilder.add(InsnUtil.getIntPush(paramArrLength));
+                arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
+                arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
 
-                // convert load insn
-                if (!(methodNode.name.equals("main") && methodNode.desc.equals("([Ljava/lang/String;)V"))) {
-                    methodNode.desc = "([Ljava/lang/Object;)" + (descriptor.returnType.isPrimitive ? descriptor.returnType.value : ("L" + descriptor.returnType.value + ";"));
-                }
+                // reverse order because stack top is the last param
+                for (int i = descriptor.params.size() - 1; i >= 0; i--) {
+                    DescriptorMember param = descriptor.params.get(i);
 
-                AbstractInsnNode current = methodNode.instructions.getFirst();
-                while (current != null) {
-                    AbstractInsnNode next = current.getNext();
+                    arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+                    arrBuilder.add(new InsnNode(SWAP));
+                    arrBuilder.add(InsnUtil.getIntPush(i));
+                    arrBuilder.add(new InsnNode(SWAP));
+                    if (param.isPrimitive && !param.isArray) {
+                        String primClassName = TypeUtil.primitiveToClass(param.value.toCharArray()[0]);
 
-                    current = next;
-                }
-                for (ListIterator<AbstractInsnNode> it = methodNode.instructions.iterator(); it.hasNext(); ) {
-                    AbstractInsnNode insnNode = it.next();
-                    if (insnNode instanceof VarInsnNode varInsnNode && InsnUtil.isLoad(insnNode)) {
-                        DescriptorMember argLoaded = argMap.get(varInsnNode.var);
-                        if (argLoaded == null) {
-                            continue;
-                        }
-                        InsnList loadInsn = new InsnList();
-
-                        loadInsn.add(new VarInsnNode(ALOAD, paramArrIndex));
-                        loadInsn.add(InsnUtil.getIntPush(varInsnNode.var - paramArrIndex));
-                        loadInsn.add(new InsnNode(AALOAD));
-                        loadInsn.add(new TypeInsnNode(CHECKCAST, argLoaded.toNonePrimitive().getType()));
-                        if (argLoaded.isPrimitive && !argLoaded.isArray) {
-                            loadInsn.add(new MethodInsnNode(
-                                    INVOKEVIRTUAL,
-                                    TypeUtil.primitiveToClass(argLoaded.value.toCharArray()[0]),
-                                    TypeUtil.clsInstanceToPrimMethodName(argLoaded.value.toCharArray()[0]),
-                                    "()" + argLoaded.value
-                            ));
-                        }
-
-                        methodNode.instructions.insertBefore(insnNode, loadInsn);
-                        it.remove();
+                        arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.value + ")L" + primClassName + ";"));
                     }
+                    arrBuilder.add(new InsnNode(AASTORE));
                 }
+                arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+
+                methodNode.instructions.insertBefore(insnNode, arrBuilder);
+                invokeDynamicInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType.toDesc();
+            }
+            if (insnNode instanceof MethodInsnNode methodInsnNode) {
+                if (!includedMethods.contains(methodInsnNode.owner + methodInsnNode.name)) {
+                    continue;
+                }
+
+                MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
+                if (descriptor.params.isEmpty()) {
+                    continue;
+                }
+
+                int paramArrLength = descriptor.params.size();
+                InsnList arrBuilder = new InsnList();
+
+                arrBuilder.add(InsnUtil.getIntPush(paramArrLength));
+                arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
+                arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
+
+                // reverse order because stack top is the last param
+                for (int i = descriptor.params.size() - 1; i >= 0; i--) {
+                    DescriptorMember param = descriptor.params.get(i);
+
+                    arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+                    arrBuilder.add(new InsnNode(SWAP));
+                    arrBuilder.add(InsnUtil.getIntPush(i));
+                    arrBuilder.add(new InsnNode(SWAP));
+                    if (param.isPrimitive && !param.isArray) {
+                        String primClassName = TypeUtil.primitiveToClass(param.value.toCharArray()[0]);
+
+                        arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.value + ")L" + primClassName + ";"));
+                    }
+                    arrBuilder.add(new InsnNode(AASTORE));
+                }
+                arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+
+                methodNode.instructions.insertBefore(insnNode, arrBuilder);
+                methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType.toDesc();
+            }
+        }
+    }
+
+    private void convertParamUsage(MethodNode methodNode) {
+        MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodNode.desc);
+        if (descriptor.params.isEmpty()) {
+            return;
+        }
+
+        // change this methods description to use Object[] as the only param
+        if (!(methodNode.name.equals("main") && methodNode.desc.equals("([Ljava/lang/String;)V"))) {
+            methodNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType.toDesc();
+        }
+
+        int paramsStartIndex = MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
+
+        Map<Integer, DescriptorMember> paramIndexMap = new HashMap<>();
+        for (int i = 0; i < descriptor.params.size(); i++) {
+            paramIndexMap.put(i + paramsStartIndex, descriptor.params.get(i));
+        }
+
+        for (ListIterator<AbstractInsnNode> it = methodNode.instructions.iterator(); it.hasNext(); ) {
+            AbstractInsnNode insnNode = it.next();
+            if (insnNode instanceof VarInsnNode loadInsn && InsnUtil.isLoad(insnNode)) {
+                DescriptorMember param = paramIndexMap.get(loadInsn.var);
+                if (param == null) {
+                    continue;
+                }
+
+                InsnList loadFromArr = new InsnList();
+
+                // load Object[] containing params
+                loadFromArr.add(new VarInsnNode(ALOAD, paramsStartIndex));
+                // push index of param (-paramsStartIndex because first param will always be arr[0] but loadInsn.var will be 1 for virtual methods)
+                loadFromArr.add(InsnUtil.getIntPush(loadInsn.var - paramsStartIndex));
+                // load param from array
+                loadFromArr.add(new InsnNode(AALOAD));
+                // cast to correct type
+                loadFromArr.add(new TypeInsnNode(CHECKCAST, (param.isArray ? param : param.toNonePrimitive()).getType()));
+                // if param was primitive convert it to primitive
+                if (param.isPrimitive && !param.isArray) {
+                    loadFromArr.add(new MethodInsnNode(
+                            INVOKEVIRTUAL,
+                            TypeUtil.primitiveToClass(param.value.toCharArray()[0]),
+                            TypeUtil.clsInstanceToPrimMethodName(param.value.toCharArray()[0]),
+                            "()" + param.value
+                    ));
+                }
+
+                methodNode.instructions.insertBefore(insnNode, loadFromArr);
+                it.remove();
             }
         }
     }

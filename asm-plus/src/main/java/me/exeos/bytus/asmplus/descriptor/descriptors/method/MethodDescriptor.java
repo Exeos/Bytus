@@ -7,11 +7,11 @@ import java.util.List;
 // TODO maybe replace with record
 public class MethodDescriptor {
 
-    public final List<DescriptorMember> args;
+    public final List<DescriptorMember> params;
     public DescriptorMember returnType;
 
-    public MethodDescriptor(List<DescriptorMember> args, DescriptorMember returnType) {
-        this.args = args;
+    public MethodDescriptor(List<DescriptorMember> params, DescriptorMember returnType) {
+        this.params = params;
         this.returnType = returnType;
     }
 }
