@@ -43,16 +43,27 @@ public class ReferenceEncryptionTransformer extends Transformer {
                     if (abstractInsnNode instanceof MethodInsnNode methodInsnNode && this.methodCall) {
 
                         if (methodInsnNode.name.equals("<init>")) {
+                            if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName)) continue;
+
+                            if (getJar().classes().containsKey(methodInsnNode.owner)) {
+                                ClassNode ownerClass = getJar().classes().get(methodInsnNode.owner);
+                                if ((ownerClass.access & ACC_ABSTRACT) != 0)
+                                    continue; // doesnt work for abstract super call
+                            } else
+                                continue; // skip cause we cant be sure
+
                             AbstractInsnNode prev = abstractInsnNode.getPrevious();
-                            if (prev.getOpcode() == DUP) {
-                                AbstractInsnNode dup = prev;
-                                prev = prev.getPrevious();
+
+                            while (prev != null) {
                                 if (prev.getOpcode() == NEW) {
-                                    methodNode.instructions.remove(prev);
-                                    methodNode.instructions.remove(dup);
+                                    AbstractInsnNode next = prev.getNext();
+                                    if (next.getOpcode() == DUP) {
+                                        methodNode.instructions.remove(next);
+                                        methodNode.instructions.remove(prev);
+                                        break;
+                                    }
                                 }
-                            } else {
-                                continue; // super call in a constructor
+                                prev = prev.getPrevious();
                             }
                         }
 
