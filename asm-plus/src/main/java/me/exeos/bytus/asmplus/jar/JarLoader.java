@@ -10,39 +10,52 @@ import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 
 public class JarLoader {
 
-    public static JarArchive load(File input) throws IOException {
-        JarArchive archive = new JarArchive(new HashMap<>(), new HashMap<>());
+    public static JarArchive load(File input, File dependencies) throws IOException {
+        JarArchive archive = new JarArchive(new HashMap<>(), new HashMap<>(), new HashMap<>());
 
         try (JarFile jarFile = new JarFile(input)) {
-            Enumeration<? extends JarEntry> entries = jarFile.entries();
-            JarEntry entry;
+            loadFiles(archive.classes(), archive.resources(), jarFile);
+        }
 
-            while (entries.hasMoreElements()) {
-                entry = entries.nextElement();
-                if (!entry.isDirectory()) {
-                    InputStream stream = jarFile.getInputStream(entry);
-                    byte[] entryBytes = stream.readAllBytes();
-
-                    if (isClass(entryBytes) && entry.getName().endsWith(".class")) {
-                        ClassReader classReader = new ClassReader(entryBytes);
-                        ClassNode classNode = new ClassNode();
-
-                        classReader.accept(classNode, ClassReader.SKIP_FRAMES + ClassReader.SKIP_DEBUG);
-                        archive.classes().put(classNode.name, classNode);
-                    } else {
-                        archive.resources().put(entry.getName(), entryBytes);
-                    }
+        if (dependencies != null && dependencies.exists() && dependencies.isDirectory()) {
+            for (File f : Objects.requireNonNull(dependencies.listFiles())) {
+                try (JarFile jarFile = new JarFile(f)) {
+                    loadFiles(archive.dependencies(), archive.resources(), jarFile);
                 }
             }
         }
 
         return archive;
+    }
+
+    public static void loadFiles(HashMap<String, ClassNode> classes, HashMap<String, byte[]> resources, JarFile jarFile) throws IOException {
+        Enumeration<? extends JarEntry> entries = jarFile.entries();
+        JarEntry entry;
+
+        while (entries.hasMoreElements()) {
+            entry = entries.nextElement();
+            if (!entry.isDirectory()) {
+                InputStream stream = jarFile.getInputStream(entry);
+                byte[] entryBytes = stream.readAllBytes();
+
+                if (isClass(entryBytes) && entry.getName().endsWith(".class")) {
+                    ClassReader classReader = new ClassReader(entryBytes);
+                    ClassNode classNode = new ClassNode();
+
+                    classReader.accept(classNode, ClassReader.SKIP_FRAMES + ClassReader.SKIP_DEBUG);
+                    classes.put(classNode.name, classNode);
+                } else {
+                    resources.put(entry.getName(), entryBytes);
+                }
+            }
+        }
     }
 
     public static void export(JarArchive jar, OutputStream output) throws IOException {

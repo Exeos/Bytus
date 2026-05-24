@@ -45,12 +45,10 @@ public class ReferenceEncryptionTransformer extends Transformer {
                         if (methodInsnNode.name.equals("<init>")) {
                             if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName)) continue;
 
-                            if (getJar().classes().containsKey(methodInsnNode.owner)) {
-                                ClassNode ownerClass = getJar().classes().get(methodInsnNode.owner);
-                                if ((ownerClass.access & ACC_ABSTRACT) != 0)
-                                    continue; // doesnt work for abstract super call
-                            } else
-                                continue; // skip cause we cant be sure
+                            ClassNode ownerClass = getJar().getClassNode(methodInsnNode.owner);
+                            if (ownerClass != null && (ownerClass.access & ACC_ABSTRACT) != 0) {
+                                continue; // doesnt work for abstract super call
+                            }
 
                             AbstractInsnNode prev = abstractInsnNode.getPrevious();
 
@@ -78,14 +76,12 @@ public class ReferenceEncryptionTransformer extends Transformer {
                     if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
 
                         // check if field is final
-                        if (getJar().classes().containsKey(fieldInsnNode.owner)) {
-                            ClassNode ownerClass = getJar().classes().get(fieldInsnNode.owner);
+                        ClassNode ownerClass = getJar().getClassNode(fieldInsnNode.owner);
+                        if (ownerClass != null) {
                             boolean isFinal = ownerClass.fields.stream()
                                     .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
                                     .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
                             if (isFinal) continue;
-                        } else {
-                            continue; // we cant be sure
                         }
 
                         InvokeDynamicInsnNode invokeDynamicInsnNode = makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, bootstrapName);

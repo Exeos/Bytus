@@ -30,6 +30,7 @@ public class Bytus {
     public void obfuscate() {
         File inputFile = new File(config.io.inputPath());
         File outputFile = new File(config.io.outputPath());
+        File dependenciesPath = new File(config.io.dependenciesPath());
         if (!outputFile.exists()) {
             try {
                 if (!outputFile.createNewFile()) {
@@ -45,7 +46,7 @@ public class Bytus {
 
         JarArchive jar;
         try {
-            jar = JarLoader.load(inputFile);
+            jar = JarLoader.load(inputFile, dependenciesPath);
         } catch (IOException e) {
             throw new BytusInitException("Failed to load jar from input File", e);
         }

@@ -1,7 +1,8 @@
 {
   "io": {
     "inputPath": "./in.jar",
-    "outputPath": "./out.jar"
+    "outputPath": "./out.jar",
+    "dependenciesPath": "./libs"
   },
   "exclusions": [],
   "packer": {
