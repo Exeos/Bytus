@@ -46,7 +46,7 @@ public class ReferenceEncryptionTransformer extends Transformer {
                             if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName)) continue;
 
                             ClassNode ownerClass = getJar().getClassNode(methodInsnNode.owner);
-                            if (ownerClass != null && (ownerClass.access & ACC_ABSTRACT) != 0) {
+                            if (ownerClass == null || (ownerClass.access & ACC_ABSTRACT) != 0) {
                                 continue; // doesnt work for abstract super call
                             }
 
@@ -65,7 +65,7 @@ public class ReferenceEncryptionTransformer extends Transformer {
                             }
                         }
 
-                        InvokeDynamicInsnNode invokeDynamicInsnNode = makeMethodInvokeDynamicInsn(classNode, methodInsnNode, bootstrapName);
+                        InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeMethodInvokeDynamicInsn(classNode, methodInsnNode, bootstrapName);
                         methodNode.instructions.insert(methodInsnNode, invokeDynamicInsnNode);
                         methodNode.instructions.remove(methodInsnNode);
 
@@ -82,9 +82,11 @@ public class ReferenceEncryptionTransformer extends Transformer {
                                     .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
                                     .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
                             if (isFinal) continue;
+                        } else {
+                            continue; // we cant be sure, if its final and if we replace it, it wont work
                         }
 
-                        InvokeDynamicInsnNode invokeDynamicInsnNode = makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, bootstrapName);
+                        InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, bootstrapName);
                         methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
                         methodNode.instructions.remove(fieldInsnNode);
 
@@ -106,9 +108,9 @@ public class ReferenceEncryptionTransformer extends Transformer {
         Handle bsmHandle = new Handle(H_INVOKESTATIC, owner.name, bootstrapName, BOOTSTRAP_DESC, false);
         return new InvokeDynamicInsnNode(
                 RandomUtil.getString(RandomUtil.getInt(12, 36)), // not needed
-                fixMethodDescriptor(methodInsnNode.getOpcode(), methodInsnNode),
+                this.fixMethodDescriptor(methodInsnNode.getOpcode(), methodInsnNode),
                 bsmHandle,
-                getMethodSignature(owner, methodInsnNode));
+                this.getMethodSignature(owner, methodInsnNode));
     }
 
     private String fixMethodDescriptor(int opcode, MethodInsnNode methodInsnNode) {

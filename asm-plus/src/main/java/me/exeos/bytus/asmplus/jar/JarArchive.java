@@ -13,7 +13,7 @@ public record JarArchive(HashMap<String, ClassNode> classes, HashMap<String, Cla
             return dependencies.get(className);
         }
 
-        System.out.println("Class " + className + " not found in archive");
+        System.out.println("Class " + className + " not found in archive. Missing some dependencies?");
         return null;
         // throw new RuntimeException("Class " + className + " not found in archive");
     }
