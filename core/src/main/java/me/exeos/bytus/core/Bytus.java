@@ -11,6 +11,7 @@ import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTra
 import me.exeos.bytus.core.transformer.impl.flow.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
+import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -75,7 +76,12 @@ public class Bytus {
         }
 
         if (config.references.enable()) {
-            transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.methodCall(), config.references.fieldAccess()));
+            if (config.references.proxy()) {
+                transformers.add(new ReferenceProxyTransformer(jar, config.exclusions, List.of(), config.references.proxyMinDepth(), config.references.proxyMaxDepth()));
+            }
+            if (config.references.encrypt()) {
+                transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.encryptMethodCalls(), config.references.encryptFieldAccess()));
+            }
         }
         return new TransformerPipeline(transformers);
     }

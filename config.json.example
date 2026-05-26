@@ -22,7 +22,11 @@
   },
   "references": {
     "enable": false,
-    "methodCall": true,
-    "fieldAccess": false
+    "proxy": false,
+    "proxyMinDepth": 1,
+    "proxyMaxDepth": 3,
+    "encrypt": false,
+    "encryptMethodCalls": false,
+    "encryptFieldAccess": false
   }
 }

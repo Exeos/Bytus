@@ -12,7 +12,7 @@ import org.objectweb.asm.tree.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class ReferenceEncryptionTransformer extends Transformer {
+public final class ReferenceEncryptionTransformer extends Transformer {
 
     public static final String BOOTSTRAP_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;)Ljava/lang/invoke/CallSite;";
 
