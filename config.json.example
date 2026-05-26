@@ -12,6 +12,8 @@
   },
   "constants": {
     "enable": false,
+    "constantArray": true,
+    "splitStrings": true,
     "strings": false,
     "numbers": false
   },

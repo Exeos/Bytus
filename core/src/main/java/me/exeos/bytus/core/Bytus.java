@@ -7,11 +7,13 @@ import me.exeos.bytus.core.exceptions.BytusInitException;
 import me.exeos.bytus.core.exceptions.BytusPosTransformException;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
+import me.exeos.bytus.core.transformer.impl.string.SplitStringsTransformer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -69,10 +71,8 @@ public class Bytus {
             transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
         }
 
-        if (config.constants.enable()) {
-            if (config.constants.numbers()) {
-                transformers.add(new OverUnderFlowIntTransformer(jar, config.exclusions, List.of()));
-            }
+        if (config.constants.enable() && config.constants.splitStrings()) {
+            transformers.add(new SplitStringsTransformer(jar, config.exclusions, List.of()));
         }
 
         if (config.references.enable()) {
@@ -83,6 +83,16 @@ public class Bytus {
                 transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.encryptMethodCalls(), config.references.encryptFieldAccess()));
             }
         }
+
+        if (config.constants.enable()) {
+            if (config.constants.constantArray()) {
+                transformers.add(new ConstantArrayTransformer(jar, config.exclusions, List.of()));
+            }
+            if (config.constants.numbers()) {
+                transformers.add(new OverUnderFlowIntTransformer(jar, config.exclusions, List.of()));
+            }
+        }
+
         return new TransformerPipeline(transformers);
     }
 }

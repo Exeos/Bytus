@@ -29,7 +29,10 @@ public final class ReferenceProxyTransformer extends Transformer {
                 for (AbstractInsnNode insnNode : methodNode.instructions.toArray()) {
                     if (!(insnNode instanceof MethodInsnNode methodInsnNode)) continue;
 
-                    if (methodInsnNode.getOpcode() != INVOKESTATIC && methodInsnNode.getOpcode() != INVOKEVIRTUAL) continue;
+                    if (methodInsnNode.getOpcode() != INVOKESTATIC
+                            && methodInsnNode.getOpcode() != INVOKEVIRTUAL
+                            && methodInsnNode.getOpcode() != INVOKEINTERFACE)
+                        continue;
 
                     MethodNode[] proxyMethods = this.generateProxyMethods(classNode, methodInsnNode);
                     MethodNode firstProxy = proxyMethods[0];
