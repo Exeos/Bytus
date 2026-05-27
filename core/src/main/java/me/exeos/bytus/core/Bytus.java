@@ -15,12 +15,11 @@ import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
-import me.exeos.bytus.core.transformer.impl.string.SplitStringsTransformer;
+import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -101,9 +100,6 @@ public class Bytus {
             }
         }
 
-        if (config.references.enable()) {
-            transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.methodCall(), config.references.fieldAccess()));
-        }
         return new TransformerPipeline(transformers);
     }
 }

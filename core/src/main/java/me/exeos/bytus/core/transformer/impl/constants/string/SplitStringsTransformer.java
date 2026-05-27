@@ -1,4 +1,4 @@
-package me.exeos.bytus.core.transformer.impl.string;
+package me.exeos.bytus.core.transformer.impl.constants.string;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.transformer.Transformer;
