@@ -8,6 +8,14 @@ import java.util.Optional;
 
 public class InsnUtil implements Opcodes {
 
+    public static boolean isStore(AbstractInsnNode insnNode) {
+        return insnNode.getOpcode() >= ISTORE && insnNode.getOpcode() <= ASTORE;
+    }
+
+    public static boolean isLoad(AbstractInsnNode insnNode) {
+        return insnNode.getOpcode() >= ILOAD && insnNode.getOpcode() <= ALOAD;
+    }
+
     public static boolean isReturn(AbstractInsnNode insnNode) {
         return insnNode.getOpcode() >= Opcodes.IRETURN && insnNode.getOpcode() <= Opcodes.RETURN;
     }

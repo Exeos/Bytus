@@ -18,9 +18,12 @@
     "numbers": false
   },
   "flow": {
-    "enable": true,
-    "minDispatcherChainLength": 1,
-    "maxDispatcherChainLength": 3
+    "controlFlow": {
+      "enable": true,
+      "minDispatcherChainLength": 1,
+      "maxDispatcherChainLength": 3
+    },
+    "dataFlow": true
   },
   "references": {
     "enable": false,

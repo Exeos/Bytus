@@ -1,4 +1,4 @@
-package me.exeos.bytus.core.transformer.impl.flow;
+package me.exeos.bytus.core.transformer.impl.flow.control;
 
 import me.exeos.bytus.asmplus.analysis.flow.block.BasicBlock;
 import me.exeos.bytus.asmplus.analysis.flow.FlowAnalyzer;
