@@ -1,6 +1,5 @@
 package me.exeos.bytus.asmplus.utils;
 
-import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 

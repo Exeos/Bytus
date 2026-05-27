@@ -41,9 +41,9 @@ public class DescriptorParser {
                     buildingClassName = true;
                 }
                 case ';' -> {
-                    buildingClassName = false;
-
                     members.add(new DescriptorMember(classNameBuilder.toString(), false, buildingArray, arrayDepth));
+
+                    buildingClassName = false;
                     classNameBuilder = new StringBuilder();
 
                     buildingArray = false;
@@ -54,10 +54,10 @@ public class DescriptorParser {
                     arrayDepth++;
                 }
                 case 'V' -> {
-                    if (!buildingClassName) {
-                        members.add(new DescriptorMember(String.valueOf(c), true, false, 0));
-                    } else {
+                    if (buildingClassName) {
                         classNameBuilder.append(c);
+                    } else {
+                        members.add(new DescriptorMember(String.valueOf(c), true, false, 0));
                     }
                 }
                 default -> {

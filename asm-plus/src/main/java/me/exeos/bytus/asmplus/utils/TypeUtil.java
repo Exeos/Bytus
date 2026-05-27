@@ -34,11 +34,11 @@ public class TypeUtil implements Opcodes {
     }
 
     public static int loadOpcodeForType(DescriptorMember member) {
-        if (!member.isPrimitive || member.isArray) {
+        if (!member.isPrimitive() || member.isArray()) {
             return ALOAD;
         }
 
-        return switch (member.value.charAt(0)) {
+        return switch (member.value().charAt(0)) {
             case 'J' -> LLOAD;
             case 'D' -> DLOAD;
             case 'F' -> FLOAD;
@@ -47,11 +47,11 @@ public class TypeUtil implements Opcodes {
     }
 
     public static int storeOpcodeForType(DescriptorMember member) {
-        if (!member.isPrimitive || member.isArray) {
+        if (!member.isPrimitive() || member.isArray()) {
             return ASTORE;
         }
 
-        return switch (member.value.charAt(0)) {
+        return switch (member.value().charAt(0)) {
             case 'J' -> LSTORE;
             case 'D' -> DSTORE;
             case 'F' -> FSTORE;

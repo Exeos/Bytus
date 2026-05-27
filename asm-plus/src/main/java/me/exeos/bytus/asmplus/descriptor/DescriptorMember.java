@@ -2,19 +2,7 @@ package me.exeos.bytus.asmplus.descriptor;
 
 import me.exeos.bytus.asmplus.utils.TypeUtil;
 
-public class DescriptorMember {
-
-    public String value;
-    public boolean isPrimitive;
-    public boolean isArray;
-    public int arrayDepth;
-
-    public DescriptorMember(String value, boolean isPrimitive, boolean isArray, int arrayDepth) {
-        this.value = value;
-        this.isPrimitive = isPrimitive;
-        this.isArray = isArray;
-        this.arrayDepth = arrayDepth;
-    }
+public record DescriptorMember(String value, boolean isPrimitive, boolean isArray, int arrayDepth) {
 
     public int getSlotWidth() {
         if (!isArray && isPrimitive && (value.equals("D") || value.equals("J"))) {
