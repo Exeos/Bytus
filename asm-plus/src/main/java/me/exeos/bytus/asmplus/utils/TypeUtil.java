@@ -1,6 +1,9 @@
 package me.exeos.bytus.asmplus.utils;
 
-public class TypeUtil {
+import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
+import org.objectweb.asm.Opcodes;
+
+public class TypeUtil implements Opcodes {
 
     public static String primitiveToClass(char primitive) {
         return switch (primitive) {
@@ -30,4 +33,29 @@ public class TypeUtil {
         };
     }
 
+    public static int loadOpcodeForType(DescriptorMember member) {
+        if (!member.isPrimitive || member.isArray) {
+            return ALOAD;
+        }
+
+        return switch (member.value.charAt(0)) {
+            case 'J' -> LLOAD;
+            case 'D' -> DLOAD;
+            case 'F' -> FLOAD;
+            default  -> ILOAD;
+        };
+    }
+
+    public static int storeOpcodeForType(DescriptorMember member) {
+        if (!member.isPrimitive || member.isArray) {
+            return ASTORE;
+        }
+
+        return switch (member.value.charAt(0)) {
+            case 'J' -> LSTORE;
+            case 'D' -> DSTORE;
+            case 'F' -> FSTORE;
+            default  -> ISTORE;
+        };
+    }
 }

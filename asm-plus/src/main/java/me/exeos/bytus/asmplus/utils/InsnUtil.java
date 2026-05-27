@@ -1,5 +1,6 @@
 package me.exeos.bytus.asmplus.utils;
 
+import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
@@ -7,6 +8,10 @@ import java.util.List;
 import java.util.Optional;
 
 public class InsnUtil implements Opcodes {
+
+    public static boolean isStore(AbstractInsnNode insnNode) {
+        return insnNode.getOpcode() >= ISTORE && insnNode.getOpcode() <= ASTORE;
+    }
 
     public static boolean isLoad(AbstractInsnNode insnNode) {
         return insnNode.getOpcode() >= ILOAD && insnNode.getOpcode() <= ALOAD;

@@ -9,15 +9,14 @@ import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.FlowFlattening;
-import me.exeos.bytus.core.transformer.impl.flow.JumpFlattening;
-import me.exeos.bytus.core.transformer.impl.flow.ParamGenerifier;
+import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
+import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
+import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -66,14 +65,14 @@ public class Bytus {
 
         transformers.add(new PreProcessor(jar, config.exclusions, List.of()));
 
-        if (config.flow.data()) {
-            transformers.add(new ParamGenerifier(jar, config.exclusions, List.of()));
+        if (config.flow.dataFlow()) {
+            transformers.add(new ParamGenerifier(jar, config.exclusions, List.of(), config.mainClassName));
         }
 
-//        if (config.flow.enable()) {
-//            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
-//            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.minDispatcherChainLength(), config.flow.maxDispatcherChainLength()));
-//        }
+        if (config.flow.controlFlow().enable()) {
+            transformers.add(new FlowFlattening(jar, config.exclusions, List.of(), config.flow.controlFlow().minDispatcherChainLength(), config.flow.controlFlow().maxDispatcherChainLength()));
+            transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.controlFlow().minDispatcherChainLength(), config.flow.controlFlow().maxDispatcherChainLength()));
+        }
 
         if (config.constants.enable()) {
             if (config.constants.numbers()) {

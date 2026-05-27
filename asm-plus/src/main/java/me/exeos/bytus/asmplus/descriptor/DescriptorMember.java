@@ -16,6 +16,14 @@ public class DescriptorMember {
         this.arrayDepth = arrayDepth;
     }
 
+    public int getSlotWidth() {
+        if (!isArray && isPrimitive && (value.equals("D") || value.equals("J"))) {
+            return 2;
+        }
+
+        return 1;
+    }
+
     public String toDesc() {
         StringBuilder prefix = new StringBuilder();
         StringBuilder suffix = new StringBuilder();

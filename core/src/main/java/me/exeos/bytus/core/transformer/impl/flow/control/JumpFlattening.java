@@ -1,4 +1,4 @@
-package me.exeos.bytus.core.transformer.impl.flow;
+package me.exeos.bytus.core.transformer.impl.flow.control;
 
 import me.exeos.bytus.asmplus.codegen.lookupswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.lookupswitch.SwitchCase;
