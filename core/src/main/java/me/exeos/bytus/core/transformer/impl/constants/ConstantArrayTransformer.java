@@ -1,6 +1,7 @@
 package me.exeos.bytus.core.transformer.impl.constants;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
@@ -33,7 +34,7 @@ public final class ConstantArrayTransformer extends Transformer {
 
             Map<Object, Integer> constantIndexMap = this.assignIndices(constants);
 
-            String constantFieldName = "CONSTANTS";
+            String constantFieldName = ClassUtil.getNoneCollidingFieldName(getJar(), classNode, RandomUtil::getString);
 
             replaceConstants(classNode, constantIndexMap, constantFieldName);
             classNode.fields.add(new FieldNode(ACC_PRIVATE | ACC_STATIC, constantFieldName, "[Ljava/lang/Object;", null, null));
@@ -126,7 +127,7 @@ public final class ConstantArrayTransformer extends Transformer {
                     // insert return at the end
                     currentMethod.instructions.add(new InsnNode(RETURN));
                 }
-                currentMethod = new MethodNode(ACC_STATIC | ACC_PRIVATE, RandomUtil.getString(RandomUtil.getInt(12, 32)), "()V", null, null);
+                currentMethod = new MethodNode(ACC_STATIC | ACC_PRIVATE, ClassUtil.getNoneCollidingMethodName(getJar(), classNode, RandomUtil::getString), "()V", null, null);
                 classNode.methods.add(currentMethod);
                 current = 0;
                 list.add(new MethodInsnNode(INVOKESTATIC, classNode.name, currentMethod.name, currentMethod.desc, false));
