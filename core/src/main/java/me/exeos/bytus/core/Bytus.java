@@ -80,11 +80,11 @@ public class Bytus {
         }
 
         if (config.constants.enable()) {
-            if (config.constants.strings()) {
-                transformers.add(new StringEncryptionTransformer(jar, config.exclusions, List.of()));
-            }
             if (config.constants.splitStrings()) {
                 transformers.add(new SplitStringsTransformer(jar, config.exclusions, List.of()));
+            }
+            if (config.constants.strings()) {
+                transformers.add(new StringEncryptionTransformer(jar, config.exclusions, List.of()));
             }
         }
 

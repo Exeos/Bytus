@@ -8,9 +8,7 @@ import me.exeos.bytus.core.transformer.TransformerPipeline;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Rewrites String constants into an encrypted form and injects a runtime decrypt call.
@@ -100,8 +98,11 @@ public class StringEncryptionTransformer extends Transformer {
         insns.add(new IntInsnNode(NEWARRAY, T_INT));
         insns.add(new FieldInsnNode(PUTSTATIC, owner, keyArrField.name, keyArrField.desc));
 
+        List<Map.Entry<Integer, Integer>> indexKeyList = new ArrayList<>(indexKeyMap.entrySet());
+        Collections.shuffle(indexKeyList);
+
         // keys[id] = key;
-        for (Map.Entry<Integer, Integer> entry : indexKeyMap.entrySet()) {
+        for (Map.Entry<Integer, Integer> entry : indexKeyList) {
             insns.add(new FieldInsnNode(GETSTATIC, owner, keyArrField.name, keyArrField.desc));
             insns.add(InsnUtil.getIntPush(entry.getKey()));
             insns.add(InsnUtil.getIntPush(entry.getValue()));
