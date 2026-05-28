@@ -76,18 +76,16 @@ public final class ReferenceEncryptionTransformer extends Transformer {
                     }
                     if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
 
-                        // check if field is final
-                        ClassNode ownerClass = getJar().getClassNode(fieldInsnNode.owner);
-                        if (ownerClass != null) {
-                            boolean isFinal = ownerClass.fields.stream()
-                                    .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
-                                    .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
-                            if (isFinal) continue;
-                        } else {
-                            continue; // we cant be sure, if its final and if we replace it, it wont work
-                        }
+                        ClassNode declaringClass = this.findDeclaringClass(fieldInsnNode);
+                        if (declaringClass == null) continue;
 
-                        InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, bootstrapMethodName);
+                        // check if field is final
+                        boolean isFinal = declaringClass.fields.stream()
+                                .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
+                                .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
+                        if (isFinal) continue;
+
+                        InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, declaringClass, bootstrapMethodName);
                         methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
                         methodNode.instructions.remove(fieldInsnNode);
 
@@ -128,13 +126,13 @@ public final class ReferenceEncryptionTransformer extends Transformer {
         return methodInsnNode.desc;
     }
 
-    private InvokeDynamicInsnNode makeFieldInvokeDynamicInsn(ClassNode owner, FieldInsnNode fieldInsnNode, String bootstrapName) {
+    private InvokeDynamicInsnNode makeFieldInvokeDynamicInsn(ClassNode owner, FieldInsnNode fieldInsnNode, ClassNode declaringClass, String bootstrapName) {
         Handle bsmHandle = new Handle(H_INVOKESTATIC, owner.name, bootstrapName, BOOTSTRAP_DESC, false);
         return new InvokeDynamicInsnNode(
                 "", // not needed
                 this.fixFieldDescriptor(fieldInsnNode),
                 bsmHandle,
-                this.getFieldSignature(fieldInsnNode));
+                this.getFieldSignature(fieldInsnNode, declaringClass));
     }
 
     private String fixFieldDescriptor(FieldInsnNode fieldInsnNode) {
@@ -167,8 +165,19 @@ public final class ReferenceEncryptionTransformer extends Transformer {
         return methodSignature;
     }
 
-    private String getFieldSignature(FieldInsnNode fieldInsnNode) {
-        return fieldInsnNode.desc + "#" + this.getAccessCode(fieldInsnNode.getOpcode()) + "#" + fieldInsnNode.name + "#" + fieldInsnNode.owner;
+    private ClassNode findDeclaringClass(FieldInsnNode fieldInsnNode) {
+        ClassNode current = getJar().getClassNode(fieldInsnNode.owner);
+        while (current != null) {
+            boolean declared = current.fields.stream()
+                    .anyMatch(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc));
+            if (declared) return current;
+            current = getJar().getClassNode(current.superName);
+        }
+        return null;
+    }
+
+    private String getFieldSignature(FieldInsnNode fieldInsnNode, ClassNode declaringClass) {
+        return fieldInsnNode.desc + "#" + this.getAccessCode(fieldInsnNode.getOpcode()) + "#" + fieldInsnNode.name + "#" + declaringClass.name;
     }
 
 //    public static CallSite bootstrap(MethodHandles.Lookup lookup, String ignored, MethodType methodType, String methodSignature) {

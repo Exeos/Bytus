@@ -1,4 +1,6 @@
 import java.lang.invoke.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ReferenceTransformerTest {
 

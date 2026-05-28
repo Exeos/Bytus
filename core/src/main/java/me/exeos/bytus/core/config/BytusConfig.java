@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import me.exeos.bytus.core.config.members.*;
 import me.exeos.bytus.core.config.members.flow.FlowConfigMember;
+import me.exeos.bytus.core.config.members.reference.ReferencesConfigMember;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 

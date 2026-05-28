@@ -82,13 +82,11 @@ public class Bytus {
             transformers.add(new SplitStringsTransformer(jar, config.exclusions, List.of()));
         }
 
-        if (config.references.enable()) {
-            if (config.references.proxy()) {
-                transformers.add(new ReferenceProxyTransformer(jar, config.exclusions, List.of(), config.references.proxyMinDepth(), config.references.proxyMaxDepth()));
-            }
-            if (config.references.encrypt()) {
-                transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.encryptMethodCalls(), config.references.encryptFieldAccess()));
-            }
+        if (config.references.proxy().enable()) {
+                transformers.add(new ReferenceProxyTransformer(jar, config.exclusions, List.of(), config.references.proxy().minDepth(), config.references.proxy().maxDepth()));
+        }
+        if (config.references.encryption().enable()) {
+            transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.encryption().methodCalls(), config.references.encryption().fieldAccess()));
         }
 
         if (config.constants.enable()) {
