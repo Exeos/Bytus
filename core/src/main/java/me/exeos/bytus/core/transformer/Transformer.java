@@ -6,7 +6,7 @@ import org.objectweb.asm.tree.ClassNode;
 
 import java.util.List;
 
-public abstract class Transformer implements Opcodes{
+public abstract class Transformer implements Opcodes {
 
     private final JarArchive jar;
 

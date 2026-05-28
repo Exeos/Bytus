@@ -39,23 +39,10 @@ public final class ConstantArrayTransformer extends Transformer {
             replaceConstants(classNode, constantIndexMap, constantFieldName);
             classNode.fields.add(new FieldNode(ACC_PRIVATE | ACC_STATIC, constantFieldName, "[Ljava/lang/Object;", null, null));
 
-            MethodNode clinit = this.getOrCreateStaticBlock(classNode);
+            MethodNode clinit = ClassUtil.getOrCreateStaticInitializer(classNode);
             InsnList initializer = this.buildFieldInitializer(classNode, constantIndexMap, constantFieldName);
             clinit.instructions.insertBefore(clinit.instructions.getFirst(), initializer);
         });
-    }
-
-    private MethodNode getOrCreateStaticBlock(ClassNode classNode) {
-        for (MethodNode method : classNode.methods) {
-            if (!method.name.equals("<clinit>")) continue;
-            return method;
-        }
-
-        // no static block found
-        MethodNode methodNode = new MethodNode(ACC_STATIC, "<clinit>", "()V", null, null);
-        methodNode.instructions.add(new InsnNode(RETURN));
-        classNode.methods.add(methodNode);
-        return methodNode;
     }
 
     private void replaceConstants(ClassNode classNode, Map<Object, Integer> constants, String constantFieldName) {

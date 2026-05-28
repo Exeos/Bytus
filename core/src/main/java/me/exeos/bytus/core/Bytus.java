@@ -10,6 +10,7 @@ import me.exeos.bytus.core.transformer.TransformerPipeline;
 import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
+import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
@@ -78,8 +79,13 @@ public class Bytus {
             transformers.add(new JumpFlattening(jar, config.exclusions, List.of(), config.flow.controlFlow().minDispatcherChainLength(), config.flow.controlFlow().maxDispatcherChainLength()));
         }
 
-        if (config.constants.enable() && config.constants.splitStrings()) {
-            transformers.add(new SplitStringsTransformer(jar, config.exclusions, List.of()));
+        if (config.constants.enable()) {
+            if (config.constants.strings()) {
+                transformers.add(new StringEncryptionTransformer(jar, config.exclusions, List.of()));
+            }
+            if (config.constants.splitStrings()) {
+                transformers.add(new SplitStringsTransformer(jar, config.exclusions, List.of()));
+            }
         }
 
         if (config.references.proxy().enable()) {
