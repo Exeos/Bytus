@@ -11,16 +11,28 @@ import java.util.function.Consumer;
 
 public class HierarchyUtil {
 
-    public static void forEachAncestorClass(JarArchive jar,
-                                             ClassNode start,
-                                             Consumer<ClassNode> visitor) {
+    public static void forEachAncestorClass(JarArchive jar, ClassNode start, Consumer<ClassNode> visitor) {
+        forEachAncestorClass(jar, start, true, false, visitor);
+    }
+
+    public static void forEachAncestorClass(JarArchive jar, ClassNode start, boolean includeInterfaces, boolean includeStart, Consumer<ClassNode> visitor) {
         Deque<String> work = new ArrayDeque<>();
         Set<String> seen = new HashSet<>();
 
-        if (start.superName != null) {
-            work.add(start.superName);
+        if (start == null) {
+            return;
         }
-        work.addAll(start.interfaces);
+
+        if (includeStart) {
+            work.add(start.name);
+        } else {
+            if (start.superName != null) {
+                work.add(start.superName);
+            }
+            if (includeInterfaces) {
+                work.addAll(start.interfaces);
+            }
+        }
 
         while (!work.isEmpty()) {
             String name = work.removeFirst();
@@ -38,7 +50,10 @@ public class HierarchyUtil {
             if (cn.superName != null) {
                 work.add(cn.superName);
             }
-            work.addAll(cn.interfaces);
+
+            if (includeInterfaces) {
+                work.addAll(cn.interfaces);
+            }
         }
     }
 }

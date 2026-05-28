@@ -70,6 +70,12 @@ public class FlowFlattening extends Transformer {
                     continue;
                 }
 
+                // shuffle blocks, keep first at same pos
+                BasicBlock first = blocks.getFirst();
+                Collections.shuffle(blocks);
+                blocks.remove(first);
+                blocks.addFirst(first);
+
                 // locals mapping needs to be removed as it will be invalid
                 methodNode.localVariables = null;
 

@@ -135,10 +135,14 @@ public class JumpFlattening extends Transformer {
         insn.add(dispatcherEntry);
         insn.add(new VarInsnNode(Opcodes.ILOAD, keyVarIndex));
 
+        // shuffle for randomness
+        List<Map.Entry<LabelNode, int[]>> labelPathList = new ArrayList<>(labelPathMap.entrySet());
+        Collections.shuffle(labelPathList);
+
         // Create switch.
         // cases: key -> goto original label.
         List<SwitchCase> cases = new ArrayList<>();
-        for (Map.Entry<LabelNode, int[]> entry : labelPathMap.entrySet()) {
+        for (Map.Entry<LabelNode, int[]> entry : labelPathList) {
             int[] path = entry.getValue();
             LabelNode targetLabel = entry.getKey();
 

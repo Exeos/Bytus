@@ -12,8 +12,8 @@
   },
   "constants": {
     "enable": false,
-    "constantArray": true,
-    "splitStrings": true,
+    "constantArray": false,
+    "splitStrings": false,
     "strings": false,
     "numbers": false
   },
@@ -23,15 +23,18 @@
       "minDispatcherChainLength": 1,
       "maxDispatcherChainLength": 3
     },
-    "dataFlow": true
+    "dataFlow": false
   },
   "references": {
-    "enable": false,
-    "proxy": false,
-    "proxyMinDepth": 1,
-    "proxyMaxDepth": 3,
-    "encrypt": false,
-    "encryptMethodCalls": false,
-    "encryptFieldAccess": false
+    "encryption": {
+      "enable": false,
+      "methodCalls": false,
+      "fieldAccess": false
+    },
+    "proxy": {
+      "enable": false,
+      "minDepth": 1,
+      "maxDepth": 3
+    }
   }
 }
