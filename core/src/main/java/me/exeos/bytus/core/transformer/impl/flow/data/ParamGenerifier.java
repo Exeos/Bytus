@@ -8,8 +8,10 @@ import me.exeos.bytus.asmplus.utils.HierarchyUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.asmplus.utils.TypeUtil;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.JarContext;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
@@ -20,27 +22,39 @@ import java.util.*;
  * Pure aids to implement because of unlimited edge cases.
  * TODO: handle interfaces better than just excluding them
  */
-public class ParamGenerifier extends Transformer {
+public class ParamGenerifier extends AbstractTransformer {
 
     private final String mainClassName;
 
-    public ParamGenerifier(JarArchive jar, List<String> exclusions, List<String> inclusions, String mainClassName) {
-        super(jar, exclusions, inclusions);
-        this.mainClassName = mainClassName;
+
+    public ParamGenerifier(BytusConfig config) {
+        super(config);
+        mainClassName = config.mainClassName;
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
+    public boolean applies() {
+        return config.flow.dataFlow();
+    }
+
+    @Override
+    public int priority() {
+        return Priority.FLOW_PARAM_GENERIFY;
+    }
+
+
+    @Override
+    public void transform(JarContext context) {
         // ownerCtx + name + desc
         Set<String> exclusionsByDesc = new HashSet<>();
         // ownerCtx + name
         Set<String> exclusionsByName = new HashSet<>();
 
-        buildExclusions(exclusionsByDesc, exclusionsByName);
+        buildExclusions(context.jar(), exclusionsByDesc, exclusionsByName);
 
-        for (ClassNode classNode : getIncludedClasses()) {
+        for (ClassNode classNode : context.jar().classes().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                convertParamPassing(methodNode, exclusionsByDesc, exclusionsByName);
+                convertParamPassing(context.jar(), methodNode, exclusionsByDesc, exclusionsByName);
             }
 
             for (MethodNode methodNode : classNode.methods) {
@@ -49,8 +63,8 @@ public class ParamGenerifier extends Transformer {
         }
     }
 
-    private void buildExclusions(Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
-        for (ClassNode classNode : getIncludedClasses()) {
+    private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
+        for (ClassNode classNode : jar.classes().values()) {
             // map tracking amount of methods declared by their ower + name
             Map<String, Integer> methodDeclarationMap = new HashMap<>();
             for (MethodNode methodNode : classNode.methods) {
@@ -70,8 +84,8 @@ public class ParamGenerifier extends Transformer {
             }
         }
 
-        for (ClassNode classNode : getIncludedClasses()) {
-            expandExclusions(exclusionsByDesc, exclusionsByName, classNode);
+        for (ClassNode classNode : jar.classes().values()) {
+            expandExclusions(jar, exclusionsByDesc, exclusionsByName, classNode);
         }
 
         // exclude main method
@@ -79,12 +93,12 @@ public class ParamGenerifier extends Transformer {
     }
 
 
-    private void expandExclusions(Set<String> exclusionsByDesc, Set<String> exclusionsByName, ClassNode classNode) {
+    private void expandExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, ClassNode classNode) {
         // Collect all ancestor methods that are excluded, so we can exclude overrides and calls in this class.
         Set<String> excludedAncestorByDesc = new HashSet<>();
         Set<String> excludedAncestorByName = new HashSet<>();
 
-        HierarchyUtil.forEachAncestorClass(getJar(), classNode, ancestor -> {
+        HierarchyUtil.forEachAncestorClass(jar, classNode, ancestor -> {
             for (MethodNode m : ancestor.methods) {
                 String keyByDesc = ancestor.name + m.name + m.desc;
                 if (exclusionsByDesc.contains(keyByDesc)) {
@@ -129,14 +143,14 @@ public class ParamGenerifier extends Transformer {
      * @param exclusionsByDesc
      * @param exclusionsByName
      */
-    private void convertParamPassing(MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
+    private void convertParamPassing(JarArchive jar, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
         int paramArrVarIndex = methodNode.maxLocals++;
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof MethodInsnNode methodInsnNode) {
                 // check if target method is included and if ownerCtx of target method belongs to jarCtx
                 if (exclusionsByDesc.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)
                         || exclusionsByName.contains(methodInsnNode.owner + methodInsnNode.name)
-                        || !getJar().classes().containsKey(methodInsnNode.owner)
+                        || !jar.classes().containsKey(methodInsnNode.owner)
                 ) {
                     continue;
                 }

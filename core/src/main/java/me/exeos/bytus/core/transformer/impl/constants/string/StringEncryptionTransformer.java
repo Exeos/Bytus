@@ -1,14 +1,17 @@
 package me.exeos.bytus.core.transformer.impl.constants.string;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.ClassContext;
+import me.exeos.bytus.core.transformer.context.InsnListContext;
+import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
-import java.util.*;
+import java.util.Set;
 
 /**
  * Rewrites String constants into an encrypted form and injects a runtime decrypt call.
@@ -27,110 +30,79 @@ import java.util.*;
  *   <li>Generate a single decryptor class (added to the jarCtx) containing the decrypt method.</li>
  * </ul>
  */
-public class StringEncryptionTransformer extends Transformer {
+public class StringEncryptionTransformer extends AbstractTransformer {
 
     /**
      * Target ClassFile version for generated decryptor class.
      */
     private final static int CLASS_VERSION = V1_8;
+    private final static String DEC_METHOD_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
+    private static String DEC_CLASS_NAME = null;
+    private static String DEC_METHOD_NAME = null;
 
-    private final static String DEC_METHOD_DESC = "(Ljava/lang/String;[II)Ljava/lang/String;";
-
-    public StringEncryptionTransformer(JarArchive jar, List<String> exclusions, List<String> inclusions) {
-        super(jar, exclusions, inclusions);
+    public StringEncryptionTransformer(BytusConfig config) {
+        super(config);
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
-        String decClassName = ClassUtil.getNoneCollidingClassName(getJar(), RandomUtil::getString);
-        String decMethodName = RandomUtil.getString(1);
+    public boolean applies() {
+        return config.constants.enable() && config.constants.strings();
+    }
 
-        for (ClassNode classNode : getIncludedClasses()) {
-            FieldNode keyArrField = new FieldNode(
-                    ACC_PRIVATE | ACC_STATIC,
-                    ClassUtil.getNoneCollidingFieldName(getJar(), classNode, RandomUtil::getString),
-                    "[I",
-                    null,
-                    null
-            );
-            classNode.fields.add(keyArrField);
+    @Override
+    public int priority() {
+        return Priority.STR_ENCRYPT_STRINGS;
+    }
 
-            Map<Integer, Integer> keyByIndex = new HashMap<>();
-            int stringId = 0;
+    @Override
+    public void transform(JarContext context) {
+        DEC_CLASS_NAME = ClassUtil.getNoneCollidingClassName(context.jar(), RandomUtil::getString);
+        DEC_METHOD_NAME = RandomUtil.getString(1);
 
-            for (MethodNode methodNode : classNode.methods) {
-                for (AbstractInsnNode insnNode : methodNode.instructions) {
-                    if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
-                        int key = RandomUtil.getInt(1, 100);
+        ClassNode cryptClass = cryptClass();
+        context.pipeline().transform(new ClassContext(context, cryptClass), Set.of(StringEncryptionTransformer.class));
+        context.jar().classes().put(DEC_CLASS_NAME, cryptClass);
 
-                        keyByIndex.put(stringId, key);
+        super.transform(context);
+    }
 
-                        // stack goes from: plain_str -> encrypted_str, keyArr_reference, string_id
-                        // then decrypt method is called
-                        // stack after: plain_str
-                        InsnList callToDecrypt = new InsnList();
-                        callToDecrypt.add(new FieldInsnNode(GETSTATIC, classNode.name, keyArrField.name, keyArrField.desc));
-                        callToDecrypt.add(InsnUtil.getIntPush(stringId));
-                        callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, decClassName, decMethodName, DEC_METHOD_DESC));
+    @Override
+    public void transform(InsnListContext context) {
+        for (AbstractInsnNode insnNode : context.insnList()) {
+            if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
+                int key = RandomUtil.getInt(1, 100);
 
-                        ldcInsnNode.cst = crypt(cstString, key);
-                        methodNode.instructions.insert(insnNode, callToDecrypt);
+                // stack goes from: plain_str -> encrypted_str, keyArr_reference, string_id
+                // then decrypt method is called
+                // stack after: plain_str
+                InsnList callToDecrypt = new InsnList();
+                callToDecrypt.add(InsnUtil.getIntPush(key));
+                callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, DEC_CLASS_NAME, DEC_METHOD_NAME, DEC_METHOD_DESC));
 
-                        stringId++;
-                    }
-                }
+                ldcInsnNode.cst = crypt(cstString, key);
+                context.insnList().insert(insnNode, callToDecrypt);
             }
-
-            // initialize the key array in <clinit>.
-            MethodNode staticInitializer = ClassUtil.getOrCreateStaticInitializer(classNode);
-            staticInitializer.instructions.insertBefore(staticInitializer.instructions.getFirst(), buildKeyArrayInit(keyByIndex, classNode.name, keyArrField));
         }
-
-        // add class containing decrypt method to classes
-        getJar().classes().put(decClassName, cryptClass(decClassName, decMethodName));
     }
-
-    private InsnList buildKeyArrayInit(Map<Integer, Integer> indexKeyMap, String owner, FieldNode keyArrField) {
-        InsnList insns = new InsnList();
-
-        // keys = new int[keysSize];
-        insns.add(InsnUtil.getIntPush(indexKeyMap.size()));
-        insns.add(new IntInsnNode(NEWARRAY, T_INT));
-        insns.add(new FieldInsnNode(PUTSTATIC, owner, keyArrField.name, keyArrField.desc));
-
-        List<Map.Entry<Integer, Integer>> indexKeyList = new ArrayList<>(indexKeyMap.entrySet());
-        Collections.shuffle(indexKeyList);
-
-        // keys[id] = key;
-        for (Map.Entry<Integer, Integer> entry : indexKeyList) {
-            insns.add(new FieldInsnNode(GETSTATIC, owner, keyArrField.name, keyArrField.desc));
-            insns.add(InsnUtil.getIntPush(entry.getKey()));
-            insns.add(InsnUtil.getIntPush(entry.getValue()));
-            insns.add(new InsnNode(IASTORE));
-        }
-
-        return insns;
-    }
-
 
     /**
      * Generates:
      * <pre>
-     * public static String decrypt(String encrypted, int[] keys, int id) {
+     * public static String decrypt(String encrypted int key) {
      *   char[] in = encrypted.toCharArray();
      *   int len = in.length;
      *   char[] out = new char[len];
-     *   for (int i=0; i<len; i++) out[i] = (char)(in[i] ^ keys[id]);
+     *   for (int i=0; i<len; i++) out[i] = (char)(in[i] ^ key);
      *   return new String(out);
      * }
      * </pre>
      */
-    private ClassNode cryptClass(String className, String methodName) {
+    private ClassNode cryptClass() {
         ClassNode cc = new ClassNode();
-        cc.visit(CLASS_VERSION, ACC_PUBLIC, className, null, "java/lang/Object", null);
+        cc.visit(CLASS_VERSION, ACC_PUBLIC, DEC_CLASS_NAME, null, "java/lang/Object", null);
 
-        MethodNode cm = new MethodNode(ACC_PUBLIC | ACC_STATIC, methodName, DEC_METHOD_DESC, null, null);
-        cm.maxLocals = 3;
+        MethodNode cm = new MethodNode(ACC_PUBLIC | ACC_STATIC, DEC_METHOD_NAME, DEC_METHOD_DESC, null, null);
+        cm.maxLocals = 2;
 
         // load string from params
         cm.instructions.add(new VarInsnNode(ALOAD, 0));
@@ -172,9 +144,7 @@ public class StringEncryptionTransformer extends Transformer {
         cm.instructions.add(new VarInsnNode(ILOAD, indexVarIndex));
         cm.instructions.add(new InsnNode(CALOAD));
 
-        cm.instructions.add(new VarInsnNode(ALOAD, 1));
-        cm.instructions.add(new VarInsnNode(ILOAD, 2));
-        cm.instructions.add(new InsnNode(IALOAD));
+        cm.instructions.add(new VarInsnNode(ILOAD, 1));
 
         cm.instructions.add(new InsnNode(IXOR));
         cm.instructions.add(new InsnNode(I2C));

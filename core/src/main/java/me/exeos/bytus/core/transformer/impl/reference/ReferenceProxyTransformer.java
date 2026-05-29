@@ -1,53 +1,62 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.util.Arrays;
-import java.util.List;
 
-public final class ReferenceProxyTransformer extends Transformer {
+public final class ReferenceProxyTransformer extends AbstractTransformer {
 
     private final int minDepth, maxDepth;
 
-    public ReferenceProxyTransformer(JarArchive jar, List<String> exclusions, List<String> inclusions, int minDepth, int maxDepth) {
-        super(jar, exclusions, inclusions);
-        this.minDepth = minDepth;
-        this.maxDepth = maxDepth;
+    public ReferenceProxyTransformer(BytusConfig config) {
+        super(config);
+        minDepth = config.references.proxy().minDepth();
+        maxDepth = config.references.proxy().maxDepth();
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
-        for (ClassNode classNode : getIncludedClasses()) {
-            if ((classNode.access & ACC_INTERFACE) != 0) continue;
+    public boolean applies() {
+        return config.references.proxy().enable();
+    }
 
-            for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
-                for (AbstractInsnNode insnNode : methodNode.instructions.toArray()) {
-                    if (!(insnNode instanceof MethodInsnNode methodInsnNode)) continue;
+    @Override
+    public int priority() {
+        return Priority.REF_PROXY;
+    }
 
-                    if (methodInsnNode.getOpcode() != INVOKESTATIC
-                            && methodInsnNode.getOpcode() != INVOKEVIRTUAL
-                            && methodInsnNode.getOpcode() != INVOKEINTERFACE)
-                        continue;
+    @Override
+    public void transform(ClassContext context) {
+        ClassNode classNode = context.classNode();
+        if ((classNode.access & ACC_INTERFACE) != 0) return;
 
-                    MethodNode[] proxyMethods = this.generateProxyMethods(classNode, methodInsnNode);
-                    MethodNode firstProxy = proxyMethods[0];
+        for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
+            for (AbstractInsnNode insnNode : methodNode.instructions.toArray()) {
+                if (!(insnNode instanceof MethodInsnNode methodInsnNode)) continue;
 
-                    // replace the methodInsnNode with the call to the first proxy
-                    methodNode.instructions.set(methodInsnNode, new MethodInsnNode(
-                            INVOKESTATIC,
-                            classNode.name,
-                            firstProxy.name,
-                            firstProxy.desc,
-                            false
-                    ));
+                if (methodInsnNode.getOpcode() != INVOKESTATIC
+                        && methodInsnNode.getOpcode() != INVOKEVIRTUAL
+                        && methodInsnNode.getOpcode() != INVOKEINTERFACE)
+                    continue;
 
-                    classNode.methods.addAll(Arrays.asList(proxyMethods));
-                }
+                MethodNode[] proxyMethods = this.generateProxyMethods(classNode, methodInsnNode);
+                MethodNode firstProxy = proxyMethods[0];
+
+                // replace the methodInsnNode with the call to the first proxy
+                methodNode.instructions.set(methodInsnNode, new MethodInsnNode(
+                        INVOKESTATIC,
+                        classNode.name,
+                        firstProxy.name,
+                        firstProxy.desc,
+                        false
+                ));
+
+                classNode.methods.addAll(Arrays.asList(proxyMethods));
             }
         }
     }

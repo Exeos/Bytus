@@ -3,8 +3,10 @@ package me.exeos.bytus.core.transformer.impl.constants;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
@@ -21,28 +23,37 @@ import java.util.*;
  * Step 3. initialize the array field with the constants in the static block
  * Step 4. replace all ldc instructions with getstatic and array load
  */
-public final class ConstantArrayTransformer extends Transformer {
-    public ConstantArrayTransformer(JarArchive jar, List<String> exclusions, List<String> inclusions) {
-        super(jar, exclusions, inclusions);
+public final class ConstantArrayTransformer extends AbstractTransformer {
+
+    public ConstantArrayTransformer(BytusConfig config) {
+        super(config);
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
-        getIncludedClasses().forEach(classNode -> {
-            Set<Object> constants = this.collectConstants(classNode);
-            if (constants.isEmpty()) return;
+    public boolean applies() {
+        return config.constants.enable() && config.constants.constantArray();
+    }
 
-            Map<Object, Integer> constantIndexMap = this.assignIndices(constants);
+    @Override
+    public int priority() {
+        return Priority.CONST_ARRAY;
+    }
 
-            String constantFieldName = ClassUtil.getNoneCollidingFieldName(getJar(), classNode, RandomUtil::getString);
+    @Override
+    public void transform(ClassContext context) {
+        Set<Object> constants = this.collectConstants(context.classNode());
+        if (constants.isEmpty()) return;
 
-            replaceConstants(classNode, constantIndexMap, constantFieldName);
-            classNode.fields.add(new FieldNode(ACC_PRIVATE | ACC_STATIC, constantFieldName, "[Ljava/lang/Object;", null, null));
+        Map<Object, Integer> constantIndexMap = this.assignIndices(constants);
 
-            MethodNode clinit = ClassUtil.getOrCreateStaticInitializer(classNode);
-            InsnList initializer = this.buildFieldInitializer(classNode, constantIndexMap, constantFieldName);
-            clinit.instructions.insertBefore(clinit.instructions.getFirst(), initializer);
-        });
+        String constantFieldName = ClassUtil.getNoneCollidingFieldName(context.jarCtx().jar(), context.classNode(), RandomUtil::getString);
+
+        replaceConstants(context.classNode(), constantIndexMap, constantFieldName);
+        context.classNode().fields.add(new FieldNode(ACC_PRIVATE | ACC_STATIC, constantFieldName, "[Ljava/lang/Object;", null, null));
+
+        MethodNode clinit = ClassUtil.getOrCreateStaticInitializer(context.classNode());
+        InsnList initializer = this.buildFieldInitializer(context.jarCtx().jar(), context.classNode(), constantIndexMap, constantFieldName);
+        clinit.instructions.insertBefore(clinit.instructions.getFirst(), initializer);
     }
 
     private void replaceConstants(ClassNode classNode, Map<Object, Integer> constants, String constantFieldName) {
@@ -96,7 +107,7 @@ public final class ConstantArrayTransformer extends Transformer {
         });
     }
 
-    private InsnList buildFieldInitializer(ClassNode classNode, Map<Object, Integer> constants, String constantFieldName) {
+    private InsnList buildFieldInitializer(JarArchive jar, ClassNode classNode, Map<Object, Integer> constants, String constantFieldName) {
         InsnList list = new InsnList();
 
         list.add(new LdcInsnNode(constants.size()));
@@ -114,7 +125,7 @@ public final class ConstantArrayTransformer extends Transformer {
                     // insert return at the end
                     currentMethod.instructions.add(new InsnNode(RETURN));
                 }
-                currentMethod = new MethodNode(ACC_STATIC | ACC_PRIVATE, ClassUtil.getNoneCollidingMethodName(getJar(), classNode, RandomUtil::getString), "()V", null, null);
+                currentMethod = new MethodNode(ACC_STATIC | ACC_PRIVATE, ClassUtil.getNoneCollidingMethodName(jar, classNode, RandomUtil::getString), "()V", null, null);
                 classNode.methods.add(currentMethod);
                 current = 0;
                 list.add(new MethodInsnNode(INVOKESTATIC, classNode.name, currentMethod.name, currentMethod.desc, false));

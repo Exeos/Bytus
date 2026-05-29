@@ -1,21 +1,19 @@
-package me.exeos.bytus.core.trans;
+package me.exeos.bytus.core.transformer;
 
 import me.exeos.bytus.core.config.BytusConfig;
-import me.exeos.bytus.core.trans.context.ClassContext;
-import me.exeos.bytus.core.trans.context.InsnListContext;
-import me.exeos.bytus.core.trans.context.JarContext;
-import me.exeos.bytus.core.trans.context.MethodContext;
+import me.exeos.bytus.core.transformer.context.ClassContext;
+import me.exeos.bytus.core.transformer.context.InsnListContext;
+import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 public abstract class AbstractTransformer implements Opcodes {
 
-    protected final Pipeline pipeline;
     protected final BytusConfig config;
 
-    public AbstractTransformer(Pipeline pipeline, BytusConfig config) {
-        this.pipeline = pipeline;
+    public AbstractTransformer(BytusConfig config) {
         this.config = config;
     }
 
@@ -36,6 +34,7 @@ public abstract class AbstractTransformer implements Opcodes {
     }
 
     public void transform(InsnListContext context) {
+        // leaf
     }
 
     public abstract boolean applies();
