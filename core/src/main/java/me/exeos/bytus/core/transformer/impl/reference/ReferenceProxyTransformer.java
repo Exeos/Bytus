@@ -4,11 +4,12 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.util.Arrays;
+import java.util.Set;
 
 public final class ReferenceProxyTransformer extends AbstractTransformer {
 
@@ -56,7 +57,9 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
                         false
                 ));
 
-                classNode.methods.addAll(Arrays.asList(proxyMethods));
+                for (MethodNode proxyMethod : proxyMethods) {
+                    context.pipeline().emit(new MethodContext(context, proxyMethod), Set.of(ReferenceProxyTransformer.class));
+                }
             }
         }
     }

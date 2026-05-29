@@ -113,7 +113,6 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
 
         if (anyCalls) {
             MethodNode bsm = makeBootstrapMethod(bootstrapMethodName);
-            classNode.methods.add(bsm);
             context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class));
         }
     }
