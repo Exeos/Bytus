@@ -1,16 +1,19 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
+import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ReferenceEncryptionTransformer extends AbstractTransformer {
@@ -42,9 +45,9 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
         AtomicInteger methodCount = new AtomicInteger();
         AtomicInteger fieldCount = new AtomicInteger();
 
-        if ((classNode.access & ACC_INTERFACE) != 0) continue;
+        if ((classNode.access & ACC_INTERFACE) != 0) return;
 
-        String bootstrapMethodName = ClassUtil.getNoneCollidingMethodName(getJar(), classNode, RandomUtil::getString);
+        String bootstrapMethodName = ClassUtil.getNoneCollidingMethodName(context.jarCtx().jar(), classNode, RandomUtil::getString);
 
         boolean anyCalls = false;
 
@@ -58,7 +61,7 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
                         if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName))
                             continue;
 
-                        ClassNode ownerClass = getJar().getClassNode(methodInsnNode.owner);
+                        ClassNode ownerClass = context.jarCtx().jar().getClassNode(methodInsnNode.owner);
                         if (ownerClass == null || (ownerClass.access & ACC_ABSTRACT) != 0) {
                             continue; // doesnt work for abstract super call
                         }
@@ -88,7 +91,7 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
                 }
                 if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
 
-                    ClassNode declaringClass = this.findDeclaringClass(fieldInsnNode);
+                    ClassNode declaringClass = this.findDeclaringClass(context.jarCtx().jar(), fieldInsnNode);
                     if (declaringClass == null) continue;
 
                     // check if field is final
@@ -108,8 +111,11 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
             }
         }
 
-        if (anyCalls)
-            classNode.methods.add(this.makeBootstrapMethod(bootstrapMethodName));
+        if (anyCalls) {
+            MethodNode bsm = makeBootstrapMethod(bootstrapMethodName);
+            classNode.methods.add(bsm);
+            context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class));
+        }
     }
 
     private InvokeDynamicInsnNode makeMethodInvokeDynamicInsn(ClassNode owner, MethodInsnNode methodInsnNode, String bootstrapName) {
@@ -174,13 +180,13 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
         return methodSignature;
     }
 
-    private ClassNode findDeclaringClass(FieldInsnNode fieldInsnNode) {
-        ClassNode current = getJar().getClassNode(fieldInsnNode.owner);
+    private ClassNode findDeclaringClass(JarArchive jar, FieldInsnNode fieldInsnNode) {
+        ClassNode current = jar.getClassNode(fieldInsnNode.owner);
         while (current != null) {
             boolean declared = current.fields.stream()
                     .anyMatch(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc));
             if (declared) return current;
-            current = getJar().getClassNode(current.superName);
+            current = jar.getClassNode(current.superName);
         }
         return null;
     }
@@ -189,51 +195,6 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
         return fieldInsnNode.desc + "#" + this.getAccessCode(fieldInsnNode.getOpcode()) + "#" + fieldInsnNode.name + "#" + declaringClass.name;
     }
 
-    //    public static CallSite bootstrap(MethodHandles.Lookup lookup, String ignored, MethodType methodType, String methodSignature) {
-//        try {
-//            String memberDesc = methodSignature.split("#")[0];
-//            String accessCode = methodSignature.split("#")[1];
-//            String memberName = methodSignature.split("#")[2];
-//            String className = methodSignature.split("#")[3].replace("/", ".");
-//
-//            Class<?> clazz = Class.forName(className);
-//
-//            MethodHandle handle = null;
-//
-//            if (accessCode.equals("A") || accessCode.equals("S") || accessCode.equals("Z")) {
-//                MethodType correctType = MethodType.fromMethodDescriptorString(memberDesc,
-//                        clazz.getClassLoader());
-//                if (accessCode.equals("S")) {
-//                    handle = lookup.findStatic(clazz, memberName, correctType).asType(methodType);
-//                } else if (accessCode.equals("Z")) {
-//                    if (memberName.equals("<init>"))
-//                        handle = lookup.findConstructor(clazz, correctType.changeReturnType(void.class)).asType(methodType);
-//                    else
-//                        handle = lookup.findSpecial(clazz, memberName, correctType, Class.forName(methodSignature.split("#")[4].replace("/", "."))).asType(methodType);
-//                } else {
-//                    handle = lookup.findVirtual(clazz, memberName, correctType).asType(methodType);
-//                }
-//            } else {
-//                Class<?> fieldType = clazz.getDeclaredField(memberName).getType();
-//                if (accessCode.equals("C")) {
-//                    handle = lookup.findStaticGetter(clazz, memberName, fieldType).asType(methodType);
-//                } else if (accessCode.equals("F")) {
-//                    handle = lookup.findStaticSetter(clazz, memberName, fieldType).asType(methodType);
-//                } else if (accessCode.equals("D")) {
-//                    handle = lookup.findGetter(clazz, memberName, fieldType).asType(methodType);
-//                } else if (accessCode.equals("I")) {
-//                    handle = lookup.findSetter(clazz, memberName, fieldType).asType(methodType);
-//                }
-//            }
-//
-//            if (handle == null)
-//                return null;
-//
-//            return new MutableCallSite(handle);
-//        } catch (Exception e) {
-//            throw new RuntimeException("Bootstrap failed: " + e.getMessage(), e);
-//        }
-//    }
     private MethodNode makeBootstrapMethod(String bootstrapName) {
         MethodNode methodVisitor = new MethodNode(ACC_PUBLIC | ACC_STATIC, bootstrapName, BOOTSTRAP_DESC, null, null);
         methodVisitor.visitCode();

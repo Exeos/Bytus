@@ -59,11 +59,8 @@ public class StringEncryptionTransformer extends AbstractTransformer {
         DEC_CLASS_NAME = ClassUtil.getNoneCollidingClassName(context.jar(), RandomUtil::getString);
         DEC_METHOD_NAME = RandomUtil.getString(1);
 
-        ClassNode cryptClass = cryptClass();
-        context.pipeline().transform(new ClassContext(context, cryptClass), Set.of(StringEncryptionTransformer.class));
-        context.jar().classes().put(DEC_CLASS_NAME, cryptClass);
-
         super.transform(context);
+        context.pipeline().emit(new ClassContext(context, cryptClass()), Set.of(StringEncryptionTransformer.class));
     }
 
     @Override

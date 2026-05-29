@@ -27,6 +27,16 @@ public class Pipeline {
         transformers.forEach(transformer -> transformer.transform(context));
     }
 
+    public void emit(ClassContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
+        context.jarCtx().jar().classes().put(context.classNode().name, context.classNode());
+        transform(context, exclusions);
+    }
+
+    public void emit(MethodContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
+        context.ownerCtx().classNode().methods.add(context.methodNode());
+        transform(context, exclusions);
+    }
+
     public void transform(JarContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
         dispatchFiltered(t -> t.transform(context), exclusions);
     }
