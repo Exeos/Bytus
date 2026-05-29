@@ -7,16 +7,16 @@ import me.exeos.bytus.core.exceptions.BytusInitException;
 import me.exeos.bytus.core.exceptions.BytusPosTransformException;
 import me.exeos.bytus.core.transformer.Transformer;
 import me.exeos.bytus.core.transformer.TransformerPipeline;
-import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
+import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
+import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
-import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -53,7 +53,7 @@ public class Bytus {
         try {
             jar = JarLoader.load(inputFile, dependenciesPath);
         } catch (IOException e) {
-            throw new BytusInitException("Failed to load jar from input File", e);
+            throw new BytusInitException("Failed to load jarCtx from input File", e);
         }
 
         mapConfigToTransformers(jar).executeTransformers();
@@ -89,7 +89,7 @@ public class Bytus {
         }
 
         if (config.references.proxy().enable()) {
-                transformers.add(new ReferenceProxyTransformer(jar, config.exclusions, List.of(), config.references.proxy().minDepth(), config.references.proxy().maxDepth()));
+            transformers.add(new ReferenceProxyTransformer(jar, config.exclusions, List.of(), config.references.proxy().minDepth(), config.references.proxy().maxDepth()));
         }
         if (config.references.encryption().enable()) {
             transformers.add(new ReferenceEncryptionTransformer(jar, config.exclusions, List.of(), config.references.encryption().methodCalls(), config.references.encryption().fieldAccess()));

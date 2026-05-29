@@ -11,12 +11,13 @@ import java.util.stream.Collectors;
 public class TransformerManager {
 
     private final static List<AbstractTransformer> allTransformers = new ArrayList<>();
-    private final Pipeline configPipeline;
 
     static {
         allTransformers.addAll(List.of(
         ));
     }
+
+    private final Pipeline configPipeline;
 
     public TransformerManager(BytusConfig config) {
         // filer and order transformers
@@ -27,11 +28,8 @@ public class TransformerManager {
                 .sorted(Comparator.comparingInt(AbstractTransformer::priority))
                 .collect(Collectors.toList());
 
-        configPipeline = new Pipeline(transformers);;
-    }
-
-    public void transform(JarContext context) {
-        configPipeline.transform(context);
+        configPipeline = new Pipeline(transformers);
+        ;
     }
 
     public static <T extends AbstractTransformer> T getTransformer(Class<T> clazz) {
@@ -42,5 +40,9 @@ public class TransformerManager {
         }
 
         return null;
+    }
+
+    public void transform(JarContext context) {
+        configPipeline.transform(context);
     }
 }

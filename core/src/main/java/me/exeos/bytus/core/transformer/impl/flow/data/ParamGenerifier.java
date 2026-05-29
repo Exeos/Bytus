@@ -31,9 +31,9 @@ public class ParamGenerifier extends Transformer {
 
     @Override
     public void transform(TransformerPipeline pipeline) {
-        // owner + name + desc
+        // ownerCtx + name + desc
         Set<String> exclusionsByDesc = new HashSet<>();
-        // owner + name
+        // ownerCtx + name
         Set<String> exclusionsByName = new HashSet<>();
 
         buildExclusions(exclusionsByDesc, exclusionsByName);
@@ -124,6 +124,7 @@ public class ParamGenerifier extends Transformer {
 
     /**
      * Converts the way params are passed to Methods from normal passing to Object[] passing
+     *
      * @param methodNode
      * @param exclusionsByDesc
      * @param exclusionsByName
@@ -132,7 +133,7 @@ public class ParamGenerifier extends Transformer {
         int paramArrVarIndex = methodNode.maxLocals++;
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof MethodInsnNode methodInsnNode) {
-                // check if target method is included and if owner of target method belongs to jar
+                // check if target method is included and if ownerCtx of target method belongs to jarCtx
                 if (exclusionsByDesc.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)
                         || exclusionsByName.contains(methodInsnNode.owner + methodInsnNode.name)
                         || !getJar().classes().containsKey(methodInsnNode.owner)

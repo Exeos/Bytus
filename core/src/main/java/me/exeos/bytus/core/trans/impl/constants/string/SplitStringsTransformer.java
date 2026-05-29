@@ -1,28 +1,29 @@
 package me.exeos.bytus.core.trans.impl.constants.string;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.trans.AbstractTransformer;
+import me.exeos.bytus.core.trans.Pipeline;
+import me.exeos.bytus.core.trans.Priority;
 import me.exeos.bytus.core.trans.context.InsnListContext;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LdcInsnNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 
-import java.util.List;
+public final class SplitStringsTransformer extends AbstractTransformer {
 
-public final class SplitStringsTransformer implements AbstractTransformer {
+    public SplitStringsTransformer(Pipeline pipeline, BytusConfig config) {
+        super(pipeline, config);
+    }
 
     @Override
-    public boolean applies(BytusConfig config) {
-        return false;
+    public boolean applies() {
+        return config.constants.enable() && config.constants.splitStrings();
     }
 
     @Override
     public int priority() {
-        return 0;
+        return Priority.STR_SPLIT_STRINGS;
     }
 
     @Override

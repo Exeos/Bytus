@@ -13,7 +13,7 @@ public abstract class Transformer implements Opcodes {
     private final List<String> exclusions;
     private final List<String> inclusions;
 
-    // TODO supplying the jar to each transformer is kinda retarded
+    // TODO supplying the jarCtx to each transformer is kinda retarded
     public Transformer(JarArchive jar, List<String> exclusions, List<String> inclusions) {
         this.jar = jar;
         this.exclusions = exclusions;

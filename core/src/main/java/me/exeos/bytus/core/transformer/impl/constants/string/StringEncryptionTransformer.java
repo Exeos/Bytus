@@ -24,7 +24,7 @@ import java.util.*;
  *     </ul>
  *   </li>
  *   <li>Populate the int[] key array in the class' &lt;clinit&gt; (static initializer).</li>
- *   <li>Generate a single decryptor class (added to the jar) containing the decrypt method.</li>
+ *   <li>Generate a single decryptor class (added to the jarCtx) containing the decrypt method.</li>
  * </ul>
  */
 public class StringEncryptionTransformer extends Transformer {

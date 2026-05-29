@@ -5,29 +5,40 @@ import me.exeos.bytus.core.trans.context.ClassContext;
 import me.exeos.bytus.core.trans.context.InsnListContext;
 import me.exeos.bytus.core.trans.context.JarContext;
 import me.exeos.bytus.core.trans.context.MethodContext;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-public interface AbstractTransformer {
+public abstract class AbstractTransformer implements Opcodes {
 
-    default void transform(JarContext context) {
-        for (ClassNode classNode : context.classes().values()) {
+    protected final Pipeline pipeline;
+    protected final BytusConfig config;
+
+    public AbstractTransformer(Pipeline pipeline, BytusConfig config) {
+        this.pipeline = pipeline;
+        this.config = config;
+    }
+
+    public void transform(JarContext context) {
+        for (ClassNode classNode : context.jar().classes().values()) {
             transform(new ClassContext(context, classNode));
         }
     }
 
-    default void transform(ClassContext context) {
+    public void transform(ClassContext context) {
         for (MethodNode methodNode : context.classNode().methods) {
             transform(new MethodContext(context, methodNode));
         }
     }
 
-    default void transform(MethodContext context) {
+    public void transform(MethodContext context) {
         transform(new InsnListContext(context, context.methodNode().instructions));
     }
 
-    default void transform(InsnListContext context) {};
+    public void transform(InsnListContext context) {
+    }
 
-    boolean applies(BytusConfig config);
-    int priority();
+    public abstract boolean applies();
+
+    public abstract int priority();
 }

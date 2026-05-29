@@ -3,10 +3,14 @@ package me.exeos.bytus.core.trans.impl.constants.number;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.trans.AbstractTransformer;
+import me.exeos.bytus.core.trans.Pipeline;
+import me.exeos.bytus.core.trans.Priority;
 import me.exeos.bytus.core.trans.context.InsnListContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.InsnNode;
 
 import java.util.Optional;
 
@@ -14,7 +18,21 @@ import java.util.Optional;
  * This Transformer uses the fact that over and under -flowing int additions wrap
  * This can be used that calc 2 numbers that will wrap to the target
  */
-public class OverUnderFlowIntTransformer implements AbstractTransformer {
+public class OverUnderFlowIntTransformer extends AbstractTransformer {
+
+    public OverUnderFlowIntTransformer(Pipeline pipeline, BytusConfig config) {
+        super(pipeline, config);
+    }
+
+    @Override
+    public boolean applies() {
+        return config.constants.enable() && config.constants.numbers();
+    }
+
+    @Override
+    public int priority() {
+        return Priority.NUM_UNDER_OVER_FLOW;
+    }
 
     @Override
     public void transform(InsnListContext context) {
@@ -45,15 +63,5 @@ public class OverUnderFlowIntTransformer implements AbstractTransformer {
 
             current = next;
         }
-    }
-
-    @Override
-    public boolean applies(BytusConfig config) {
-        return config.constants.enable() && config.constants.numbers();
-    }
-
-    @Override
-    public int priority() {
-        return 1;
     }
 }
