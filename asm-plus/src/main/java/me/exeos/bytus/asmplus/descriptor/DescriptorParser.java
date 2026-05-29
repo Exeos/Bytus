@@ -38,7 +38,11 @@ public class DescriptorParser {
 
             switch (c) {
                 case 'L' -> {
-                    buildingClassName = true;
+                    if (buildingClassName) {
+                        classNameBuilder.append(c);
+                    } else {
+                        buildingClassName = true;
+                    }
                 }
                 case ';' -> {
                     members.add(new DescriptorMember(classNameBuilder.toString(), false, buildingArray, arrayDepth));
