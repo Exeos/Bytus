@@ -14,25 +14,36 @@ import java.util.Objects;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 
 public class JarLoader {
 
-    public static JarArchive load(File input, File dependencies) throws IOException {
-        JarArchive archive = new JarArchive(new HashMap<>(), new HashMap<>(), new HashMap<>());
+    public static JarArchive load(File input, File dependencyPath) throws IOException {
+        HashMap<String, ClassNode> classes = new HashMap<>();
+        HashMap<String, ClassNode> dependencies = new HashMap<>();
+        HashMap<String, byte[]> resources = new HashMap<>();
+
+        Manifest manifest = null;
 
         try (JarFile jarFile = new JarFile(input)) {
-            loadFiles(archive.classes(), archive.resources(), jarFile);
+            try {
+                manifest = jarFile.getManifest();
+            } catch (Exception e) {
+                System.out.println("Error reading manifest, skipping. Error: " + e.getMessage());
+            }
+
+            loadFiles(classes, resources, jarFile);
         }
 
-        if (dependencies != null && dependencies.exists() && dependencies.isDirectory()) {
-            for (File f : Objects.requireNonNull(dependencies.listFiles())) {
+        if (dependencyPath != null && dependencyPath.exists() && dependencyPath.isDirectory()) {
+            for (File f : Objects.requireNonNull(dependencyPath.listFiles())) {
                 try (JarFile jarFile = new JarFile(f)) {
-                    loadFiles(archive.dependencies(), archive.resources(), jarFile);
+                    loadFiles(dependencies, resources, jarFile);
                 }
             }
         }
 
-        return archive;
+        return new JarArchive(classes, dependencies, resources, manifest);
     }
 
     public static void loadFiles(HashMap<String, ClassNode> classes, HashMap<String, byte[]> resources, JarFile jarFile) throws IOException {

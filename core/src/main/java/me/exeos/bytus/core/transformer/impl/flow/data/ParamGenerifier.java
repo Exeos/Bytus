@@ -24,12 +24,8 @@ import java.util.*;
  */
 public class ParamGenerifier extends AbstractTransformer {
 
-    private final String mainClassName;
-
-
     public ParamGenerifier(BytusConfig config) {
         super(config);
-        mainClassName = config.mainClassName;
     }
 
     @Override
@@ -89,9 +85,13 @@ public class ParamGenerifier extends AbstractTransformer {
         }
 
         // exclude main method
-        exclusionsByDesc.add(mainClassName + "main" + "([Ljava/lang/String;)V");
+        if (jar.manifest() != null) {
+            String mainClassName = jar.manifest().getMainAttributes().getValue("Main-Class");
+            if (mainClassName != null) {
+                exclusionsByDesc.add(mainClassName.replace(".", "/") + "main" + "([Ljava/lang/String;)V");
+            }
+        }
     }
-
 
     private void expandExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, ClassNode classNode) {
         // Collect all ancestor methods that are excluded, so we can exclude overrides and calls in this class.
