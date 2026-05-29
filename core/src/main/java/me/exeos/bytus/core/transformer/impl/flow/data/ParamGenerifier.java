@@ -258,7 +258,7 @@ public class ParamGenerifier extends Transformer {
             prologue.add(new VarInsnNode(ALOAD, paramsStartIndex));
             prologue.add(InsnUtil.getIntPush(paramArrayIndexBySlot.get(entry.getKey())));
             prologue.add(new InsnNode(AALOAD));
-            prologue.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).getType()));
+            prologue.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toDesc()));
             // if param was primitive convert it to primitive
             if (param.isPrimitive() && !param.isArray()) {
                 char primitive = param.value().charAt(0);
@@ -296,7 +296,7 @@ public class ParamGenerifier extends Transformer {
                     // load param from array
                     loadFromArr.add(new InsnNode(AALOAD));
                     // cast to correct type
-                    loadFromArr.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).getType()));
+                    loadFromArr.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toDesc()));
                     // if param was primitive convert it to primitive
                     if (param.isPrimitive() && !param.isArray()) {
                         char primitive = param.value().charAt(0);
