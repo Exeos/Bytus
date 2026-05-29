@@ -5,6 +5,8 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
+import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -58,7 +60,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
                 ));
 
                 for (MethodNode proxyMethod : proxyMethods) {
-                    context.pipeline().emit(new MethodContext(context, proxyMethod), Set.of(ReferenceProxyTransformer.class));
+                    context.pipeline().emit(new MethodContext(context, proxyMethod), Set.of(FlowFlattening.class, ReferenceProxyTransformer.class));
                 }
             }
         }
