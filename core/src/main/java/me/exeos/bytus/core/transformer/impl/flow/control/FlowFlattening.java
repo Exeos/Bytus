@@ -1,18 +1,19 @@
 package me.exeos.bytus.core.transformer.impl.flow.control;
 
-import me.exeos.bytus.asmplus.analysis.flow.block.BasicBlock;
 import me.exeos.bytus.asmplus.analysis.flow.FlowAnalyzer;
+import me.exeos.bytus.asmplus.analysis.flow.block.BasicBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.FallTroughBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.JumpBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.SwitchBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.TerminalBlock;
 import me.exeos.bytus.asmplus.codegen.lookupswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.lookupswitch.SwitchCase;
-import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
@@ -43,65 +44,65 @@ import java.util.*;
  *       {@code state} and jumping back to the dispatcher entry.</li>
  * </ul>
  */
-public class FlowFlattening extends Transformer {
+public class FlowFlattening extends AbstractTransformer {
 
-
-    /**
-     * Maximal path length to reach actual block handler
-     */
-    private final int minDispatcherChainLength, maxDispatcherChainLength;
-
-    public FlowFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int minDispatcherChainLength, int maxDispatcherChainLength) {
-        super(jar, exclusions, inclusions);
-        this.minDispatcherChainLength = minDispatcherChainLength;
-        this.maxDispatcherChainLength = maxDispatcherChainLength;
+    public FlowFlattening(BytusConfig config) {
+        super(config);
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
-        for (ClassNode classNode : getIncludedClasses()) {
-            for (MethodNode methodNode : classNode.methods) {
-                if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
-                    continue;
-                }
+    public boolean applies() {
+        return config.flow.controlFlow().enable();
+    }
 
-                List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode);
-                if (blocks.isEmpty()) {
-                    continue;
-                }
+    @Override
+    public int priority() {
+        return Priority.FLOW_CTRL_FLATTENING;
+    }
 
-                // shuffle blocks, keep first at same pos
-                BasicBlock first = blocks.getFirst();
-                Collections.shuffle(blocks);
-                blocks.remove(first);
-                blocks.addFirst(first);
+    @Override
+    public void transform(MethodContext context) {
+        MethodNode methodNode = context.methodNode();
 
-                // locals mapping needs to be removed as it will be invalid
-                methodNode.localVariables = null;
-
-                // Remove all original instructions. We rebuild method from scratch.
-                for (AbstractInsnNode insn : methodNode.instructions.toArray()) {
-                    methodNode.instructions.remove(insn);
-                }
-
-                Map<BasicBlock, int[]> blockPathMap = genBlockKeys(blocks);
-                int stateVarIndex = methodNode.maxLocals++;
-
-                InsnList flattened = new InsnList();
-
-                // Initialize state to the first block's path entry
-                flattened.add(InsnUtil.getIntPush(blockPathMap.get(blocks.getFirst())[0]));
-                flattened.add(new VarInsnNode(Opcodes.ISTORE, stateVarIndex));
-
-                LabelNode dispatcherEntry = new LabelNode();
-                flattened.add(dispatcherEntry);
-                flattened.add(new VarInsnNode(Opcodes.ILOAD, stateVarIndex));
-                flattened.add(createDispatcher(blocks, blockPathMap, stateVarIndex, dispatcherEntry));
-
-                // replace method instructions with flattened instructions
-                methodNode.instructions = flattened;
-            }
+        if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
+            return;
         }
+
+        List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode);
+        if (blocks.isEmpty()) {
+            return;
+        }
+
+        // shuffle blocks, keep first at same pos
+        BasicBlock first = blocks.getFirst();
+        Collections.shuffle(blocks);
+        blocks.remove(first);
+        blocks.addFirst(first);
+
+        // locals mapping needs to be removed as it will be invalid
+        methodNode.localVariables = null;
+
+        // Remove all original instructions. We rebuild method from scratch.
+        for (AbstractInsnNode insn : methodNode.instructions.toArray()) {
+            methodNode.instructions.remove(insn);
+        }
+
+        Map<BasicBlock, int[]> blockPathMap = genBlockKeys(blocks);
+        int stateVarIndex = methodNode.maxLocals++;
+
+        InsnList flattened = new InsnList();
+
+        // Initialize state to the first block's path entry
+        flattened.add(InsnUtil.getIntPush(blockPathMap.get(blocks.getFirst())[0]));
+        flattened.add(new VarInsnNode(Opcodes.ISTORE, stateVarIndex));
+
+        LabelNode dispatcherEntry = new LabelNode();
+        flattened.add(dispatcherEntry);
+        flattened.add(new VarInsnNode(Opcodes.ILOAD, stateVarIndex));
+        flattened.add(createDispatcher(blocks, blockPathMap, stateVarIndex, dispatcherEntry));
+
+        // replace method instructions with flattened instructions
+        methodNode.instructions = flattened;
     }
 
     /**
@@ -179,13 +180,11 @@ public class FlowFlattening extends Transformer {
                     InsnUtil.addToInsnList(block.instructions, handlerInsns);
                     handlerInsns.add(updateStateMachine(blockPathMap.get(fallTroughBlock.fallTroughBlock)[0], stateVarIndex, dispatcherEntry));
                 }
-                case TerminalBlock terminalBlock -> {
+                case TerminalBlock _ -> {
                     // Ends method. Just copy insn.
                     InsnUtil.addToInsnList(block.instructions, handlerInsns);
                 }
-                default -> {
-                    throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
-                }
+                default -> throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
             }
 
             // Add path chain of this block
@@ -231,11 +230,11 @@ public class FlowFlattening extends Transformer {
      * @return mapping block -> array of path states (first is entry state for that block)
      */
     private Map<BasicBlock, int[]> genBlockKeys(List<BasicBlock> blocks) {
-       Map<BasicBlock, int[]> result = new HashMap<>();
-       Set<Integer> usedKeys = new HashSet<>();
+        Map<BasicBlock, int[]> result = new HashMap<>();
+        Set<Integer> usedKeys = new HashSet<>();
 
         for (BasicBlock block : blocks) {
-            int[] pathKeys = new int[RandomUtil.getInt(Math.max(1, minDispatcherChainLength), Math.max(1, maxDispatcherChainLength + 1))];
+            int[] pathKeys = new int[RandomUtil.getInt(Math.max(1, config.flow.controlFlow().minDispatcherChainLength()), Math.max(1, config.flow.controlFlow().maxDispatcherChainLength() + 1))];
 
             for (int i = 0; i < pathKeys.length; i++) {
                 do {

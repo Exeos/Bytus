@@ -39,9 +39,9 @@ public class DescriptorParser {
             switch (c) {
                 case 'L' -> {
                     if (buildingClassName) {
-                        classNameBuilder.append(c); // L in the name of a class
+                        classNameBuilder.append(c);
                     } else {
-                        buildingClassName = true; // start of a classname
+                        buildingClassName = true;
                     }
                 }
                 case ';' -> {

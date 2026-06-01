@@ -2,11 +2,12 @@ package me.exeos.bytus.core.transformer.impl.flow.control;
 
 import me.exeos.bytus.asmplus.codegen.lookupswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.lookupswitch.SwitchCase;
-import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
@@ -36,42 +37,50 @@ import java.util.*;
  *   </li>
  * </ol>
  */
-public class JumpFlattening extends Transformer {
+public class JumpFlattening extends AbstractTransformer {
 
     private final int minDispatcherChainLength, maxDispatcherChainLength;
 
-    public JumpFlattening(JarArchive jar, List<String> exclusions, List<String> inclusions, int minDispatcherChainLength, int maxDispatcherChainLength) {
-        super(jar, exclusions, inclusions);
-        this.minDispatcherChainLength = minDispatcherChainLength;
-        this.maxDispatcherChainLength = maxDispatcherChainLength;
+    public JumpFlattening(BytusConfig config) {
+        super(config);
+        minDispatcherChainLength = config.flow.controlFlow().minDispatcherChainLength();
+        maxDispatcherChainLength = config.flow.controlFlow().maxDispatcherChainLength();
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
-        for (ClassNode classNode : getIncludedClasses()) {
-            for (MethodNode methodNode : classNode.methods) {
-                if (methodNode.instructions.size() == 0) {
-                    continue;
-                }
+    public boolean applies() {
+        return config.flow.controlFlow().enable();
+    }
 
-                // create label to key mapping
-                Map<LabelNode, int[]> labelPathMap = assignLabelsToPaths(methodNode.instructions);
-                LabelNode dispatcherEntry = new LabelNode();
-                int keyVarIndex = methodNode.maxLocals++;
+    @Override
+    public int priority() {
+        return Priority.FLOW_JUMP_FLATTENING;
+    }
 
-                // update target label of each JumpInsn node to dispatcher entry and assign key
-                boolean didUpdateAnyJumps = rewriteJumpsToDispatcher(
-                        methodNode,
-                        dispatcherEntry,
-                        labelPathMap,
-                        keyVarIndex
-                );
+    @Override
+    public void transform(MethodContext context) {
+        MethodNode methodNode = context.methodNode();
 
-                if (didUpdateAnyJumps) {
-                    // insert dispatcher
-                    methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex));
-                }
-            }
+        if (methodNode.instructions.size() == 0) {
+            return;
+        }
+
+        // create label to key mapping
+        Map<LabelNode, int[]> labelPathMap = assignLabelsToPaths(methodNode.instructions);
+        LabelNode dispatcherEntry = new LabelNode();
+        int keyVarIndex = methodNode.maxLocals++;
+
+        // update target label of each JumpInsn node to dispatcher entry and assign key
+        boolean didUpdateAnyJumps = rewriteJumpsToDispatcher(
+                methodNode,
+                dispatcherEntry,
+                labelPathMap,
+                keyVarIndex
+        );
+
+        if (didUpdateAnyJumps) {
+            // insert dispatcher
+            methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex));
         }
     }
 

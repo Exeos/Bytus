@@ -2,7 +2,8 @@ package me.exeos.bytus.core.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import me.exeos.bytus.core.config.members.*;
+import me.exeos.bytus.core.config.members.ConstantsConfigMember;
+import me.exeos.bytus.core.config.members.IOConfigMember;
 import me.exeos.bytus.core.config.members.flow.FlowConfigMember;
 import me.exeos.bytus.core.config.members.reference.ReferencesConfigMember;
 import tools.jackson.core.JacksonException;
@@ -17,7 +18,6 @@ public class BytusConfig {
     public final IOConfigMember io;
     public final List<String> exclusions;
     public final String mainClassName;
-    public final PackerConfigMember packer;
     public final ConstantsConfigMember constants;
     public final FlowConfigMember flow;
     public final ReferencesConfigMember references;
@@ -27,14 +27,12 @@ public class BytusConfig {
             @JsonProperty("io") IOConfigMember io,
             @JsonProperty("exclusions") List<String> exclusions,
             @JsonProperty("mainClassName") String mainClassName,
-            @JsonProperty("packer") PackerConfigMember packer,
             @JsonProperty("constants") ConstantsConfigMember constants,
             @JsonProperty("flow") FlowConfigMember flow,
             @JsonProperty("references") ReferencesConfigMember references) {
         this.io = io;
         this.exclusions = exclusions;
         this.mainClassName = mainClassName;
-        this.packer = packer;
         this.constants = constants;
         this.flow = flow;
         this.references = references;

@@ -30,13 +30,18 @@ public record DescriptorMember(String value, boolean isPrimitive, boolean isArra
 
     public String getType() {
         StringBuilder typeBuilder = new StringBuilder();
+        StringBuilder suffix = new StringBuilder();
 
         if (isArray) {
             typeBuilder.repeat("[", arrayDepth);
+            if (!isPrimitive) {
+                typeBuilder.append("L");
+                suffix.append(";");
+            }
         }
 
         typeBuilder.append(value);
-        return typeBuilder.toString();
+        return typeBuilder.toString() + suffix;
     }
 
     public DescriptorMember toNonePrimitive() {

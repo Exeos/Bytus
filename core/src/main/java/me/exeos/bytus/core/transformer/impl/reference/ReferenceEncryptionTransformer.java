@@ -2,105 +2,119 @@ package me.exeos.bytus.core.transformer.impl.reference;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.ClassContext;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public final class ReferenceEncryptionTransformer extends Transformer {
+public final class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     public static final String BOOTSTRAP_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;)Ljava/lang/invoke/CallSite;";
 
     private final boolean methodCall, fieldAccess;
 
-    public ReferenceEncryptionTransformer(JarArchive jar, List<String> exclusions, List<String> inclusions, boolean methodCall, boolean fieldAccess) {
-        super(jar, exclusions, inclusions);
-        this.methodCall = methodCall;
-        this.fieldAccess = fieldAccess;
+    public ReferenceEncryptionTransformer(BytusConfig config) {
+        super(config);
+        this.methodCall = config.references.encryption().methodCalls();
+        this.fieldAccess = config.references.encryption().fieldAccess();
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
+    public boolean applies() {
+        return config.references.encryption().enable();
+    }
+
+    @Override
+    public int priority() {
+        return Priority.REF_ENC;
+    }
+
+    @Override
+    public void transform(ClassContext context) {
+        ClassNode classNode = context.classNode();
+
         AtomicInteger methodCount = new AtomicInteger();
         AtomicInteger fieldCount = new AtomicInteger();
 
-        for (ClassNode classNode : getIncludedClasses()) {
-            if ((classNode.access & ACC_INTERFACE) != 0) continue;
+        if ((classNode.access & ACC_INTERFACE) != 0) return;
 
-            String bootstrapMethodName = ClassUtil.getNoneCollidingMethodName(getJar(), classNode, RandomUtil::getString);
+        String bootstrapMethodName = ClassUtil.getNoneCollidingMethodName(context.jarCtx().jar(), classNode, RandomUtil::getString);
 
-            boolean anyCalls = false;
+        boolean anyCalls = false;
 
-            for (MethodNode methodNode : classNode.methods) {
-                if (methodNode.instructions.size() == 0) continue;
+        for (MethodNode methodNode : classNode.methods) {
+            if (methodNode.instructions.size() == 0) continue;
 
-                for (AbstractInsnNode abstractInsnNode : methodNode.instructions.toArray()) {
-                    if (abstractInsnNode instanceof MethodInsnNode methodInsnNode && this.methodCall) {
+            for (AbstractInsnNode abstractInsnNode : methodNode.instructions.toArray()) {
+                if (abstractInsnNode instanceof MethodInsnNode methodInsnNode && this.methodCall) {
 
-                        if (methodInsnNode.name.equals("<init>")) {
-                            if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName)) continue;
+                    if (methodInsnNode.name.equals("<init>")) {
+                        if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName))
+                            continue;
 
-                            ClassNode ownerClass = getJar().getClassNode(methodInsnNode.owner);
-                            if (ownerClass == null || (ownerClass.access & ACC_ABSTRACT) != 0) {
-                                continue; // doesnt work for abstract super call
-                            }
-
-                            AbstractInsnNode prev = abstractInsnNode.getPrevious();
-
-                            while (prev != null) {
-                                if (prev.getOpcode() == NEW) {
-                                    AbstractInsnNode next = prev.getNext();
-                                    if (next.getOpcode() == DUP) {
-                                        methodNode.instructions.remove(next);
-                                        methodNode.instructions.remove(prev);
-                                        break;
-                                    }
-                                }
-                                prev = prev.getPrevious();
-                            }
+                        ClassNode ownerClass = context.jarCtx().jar().getClassNode(methodInsnNode.owner);
+                        if (ownerClass == null || (ownerClass.access & ACC_ABSTRACT) != 0) {
+                            continue; // doesnt work for abstract super call
                         }
 
-                        InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeMethodInvokeDynamicInsn(classNode, methodInsnNode, bootstrapMethodName);
-                        methodNode.instructions.insert(methodInsnNode, invokeDynamicInsnNode);
-                        methodNode.instructions.remove(methodInsnNode);
+                        AbstractInsnNode prev = abstractInsnNode.getPrevious();
 
-                        anyCalls = true;
-
-                        methodCount.getAndIncrement();
+                        while (prev != null) {
+                            if (prev.getOpcode() == NEW) {
+                                AbstractInsnNode next = prev.getNext();
+                                if (next.getOpcode() == DUP) {
+                                    methodNode.instructions.remove(next);
+                                    methodNode.instructions.remove(prev);
+                                    break;
+                                }
+                            }
+                            prev = prev.getPrevious();
+                        }
                     }
-                    if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
 
-                        ClassNode declaringClass = this.findDeclaringClass(fieldInsnNode);
-                        if (declaringClass == null) continue;
+                    InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeMethodInvokeDynamicInsn(classNode, methodInsnNode, bootstrapMethodName);
+                    methodNode.instructions.insert(methodInsnNode, invokeDynamicInsnNode);
+                    methodNode.instructions.remove(methodInsnNode);
 
-                        // check if field is final
-                        boolean isFinal = declaringClass.fields.stream()
-                                .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
-                                .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
-                        if (isFinal) continue;
+                    anyCalls = true;
 
-                        InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, declaringClass, bootstrapMethodName);
-                        methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
-                        methodNode.instructions.remove(fieldInsnNode);
+                    methodCount.getAndIncrement();
+                }
+                if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
 
-                        anyCalls = true;
+                    ClassNode declaringClass = this.findDeclaringClass(context.jarCtx().jar(), fieldInsnNode);
+                    if (declaringClass == null) continue;
 
-                        fieldCount.getAndIncrement();
-                    }
+                    // check if field is final
+                    boolean isFinal = declaringClass.fields.stream()
+                            .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
+                            .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
+                    if (isFinal) continue;
+
+                    InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, declaringClass, bootstrapMethodName);
+                    methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
+                    methodNode.instructions.remove(fieldInsnNode);
+
+                    anyCalls = true;
+
+                    fieldCount.getAndIncrement();
                 }
             }
-
-            if (anyCalls)
-                classNode.methods.add(this.makeBootstrapMethod(bootstrapMethodName));
         }
 
-        System.out.println("Replaced " + methodCount.get() + " method calls and " + fieldCount.get() + " field calls with invokedynamic instructions.");
+        if (anyCalls) {
+            MethodNode bsm = makeBootstrapMethod(bootstrapMethodName);
+            context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class));
+        }
     }
 
     private InvokeDynamicInsnNode makeMethodInvokeDynamicInsn(ClassNode owner, MethodInsnNode methodInsnNode, String bootstrapName) {
@@ -165,13 +179,13 @@ public final class ReferenceEncryptionTransformer extends Transformer {
         return methodSignature;
     }
 
-    private ClassNode findDeclaringClass(FieldInsnNode fieldInsnNode) {
-        ClassNode current = getJar().getClassNode(fieldInsnNode.owner);
+    private ClassNode findDeclaringClass(JarArchive jar, FieldInsnNode fieldInsnNode) {
+        ClassNode current = jar.getClassNode(fieldInsnNode.owner);
         while (current != null) {
             boolean declared = current.fields.stream()
                     .anyMatch(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc));
             if (declared) return current;
-            current = getJar().getClassNode(current.superName);
+            current = jar.getClassNode(current.superName);
         }
         return null;
     }
@@ -180,51 +194,6 @@ public final class ReferenceEncryptionTransformer extends Transformer {
         return fieldInsnNode.desc + "#" + this.getAccessCode(fieldInsnNode.getOpcode()) + "#" + fieldInsnNode.name + "#" + declaringClass.name;
     }
 
-//    public static CallSite bootstrap(MethodHandles.Lookup lookup, String ignored, MethodType methodType, String methodSignature) {
-//        try {
-//            String memberDesc = methodSignature.split("#")[0];
-//            String accessCode = methodSignature.split("#")[1];
-//            String memberName = methodSignature.split("#")[2];
-//            String className = methodSignature.split("#")[3].replace("/", ".");
-//
-//            Class<?> clazz = Class.forName(className);
-//
-//            MethodHandle handle = null;
-//
-//            if (accessCode.equals("A") || accessCode.equals("S") || accessCode.equals("Z")) {
-//                MethodType correctType = MethodType.fromMethodDescriptorString(memberDesc,
-//                        clazz.getClassLoader());
-//                if (accessCode.equals("S")) {
-//                    handle = lookup.findStatic(clazz, memberName, correctType).asType(methodType);
-//                } else if (accessCode.equals("Z")) {
-//                    if (memberName.equals("<init>"))
-//                        handle = lookup.findConstructor(clazz, correctType.changeReturnType(void.class)).asType(methodType);
-//                    else
-//                        handle = lookup.findSpecial(clazz, memberName, correctType, Class.forName(methodSignature.split("#")[4].replace("/", "."))).asType(methodType);
-//                } else {
-//                    handle = lookup.findVirtual(clazz, memberName, correctType).asType(methodType);
-//                }
-//            } else {
-//                Class<?> fieldType = clazz.getDeclaredField(memberName).getType();
-//                if (accessCode.equals("C")) {
-//                    handle = lookup.findStaticGetter(clazz, memberName, fieldType).asType(methodType);
-//                } else if (accessCode.equals("F")) {
-//                    handle = lookup.findStaticSetter(clazz, memberName, fieldType).asType(methodType);
-//                } else if (accessCode.equals("D")) {
-//                    handle = lookup.findGetter(clazz, memberName, fieldType).asType(methodType);
-//                } else if (accessCode.equals("I")) {
-//                    handle = lookup.findSetter(clazz, memberName, fieldType).asType(methodType);
-//                }
-//            }
-//
-//            if (handle == null)
-//                return null;
-//
-//            return new MutableCallSite(handle);
-//        } catch (Exception e) {
-//            throw new RuntimeException("Bootstrap failed: " + e.getMessage(), e);
-//        }
-//    }
     private MethodNode makeBootstrapMethod(String bootstrapName) {
         MethodNode methodVisitor = new MethodNode(ACC_PUBLIC | ACC_STATIC, bootstrapName, BOOTSTRAP_DESC, null, null);
         methodVisitor.visitCode();

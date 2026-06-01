@@ -1,29 +1,38 @@
 package me.exeos.bytus.core.transformer.impl;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.core.transformer.Transformer;
-import me.exeos.bytus.core.transformer.TransformerPipeline;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
+import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
+import me.exeos.bytus.core.transformer.context.ClassContext;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 
-import java.util.List;
+public class PreProcessor extends AbstractTransformer {
 
-public class PreProcessor extends Transformer {
-
-    public PreProcessor(JarArchive jar, List<String> exclusions, List<String> inclusions) {
-        super(jar, exclusions, inclusions);
+    public PreProcessor(BytusConfig config) {
+        super(config);
     }
 
     @Override
-    public void transform(TransformerPipeline pipeline) {
-        for (ClassNode classNode : getIncludedClasses()) {
-            classNode.sourceDebug = null;
-            classNode.sourceFile = null;
+    public boolean applies() {
+        return true;
+    }
 
-            for (MethodNode method : classNode.methods) {
-                method.localVariables = null;
-                method.parameters = null;
-            }
-        }
+    @Override
+    public int priority() {
+        return Priority.PRE_PROCESSOR;
+    }
+
+    @Override
+    public void transform(ClassContext context) {
+        context.classNode().sourceDebug = null;
+        context.classNode().sourceFile = null;
+
+        super.transform(context);
+    }
+
+    @Override
+    public void transform(MethodContext context) {
+        context.methodNode().localVariables = null;
+        context.methodNode().parameters = null;
     }
 }

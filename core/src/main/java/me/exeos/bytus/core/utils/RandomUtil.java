@@ -4,6 +4,7 @@ import java.util.Random;
 
 public class RandomUtil {
 
+    private static final String chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
     private static final Random rnd = new Random();
 
     public static int nextInt() {
@@ -39,7 +40,7 @@ public class RandomUtil {
     public static String getString(int length) {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < length; i++) {
-            builder.append((char) (getInt(Character.MIN_VALUE, Character.MAX_VALUE)));
+            builder.append(chars.charAt(getInt(0, chars.length() - 1)));
         }
         return builder.toString();
     }

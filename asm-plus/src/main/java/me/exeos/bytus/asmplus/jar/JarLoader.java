@@ -4,7 +4,10 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
@@ -14,25 +17,36 @@ import java.util.Objects;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.jar.Manifest;
 
 public class JarLoader {
 
-    public static JarArchive load(File input, File dependencies) throws IOException {
-        JarArchive archive = new JarArchive(new HashMap<>(), new HashMap<>(), new HashMap<>());
+    public static JarArchive load(File input, File dependencyPath) throws IOException {
+        HashMap<String, ClassNode> classes = new HashMap<>();
+        HashMap<String, ClassNode> dependencies = new HashMap<>();
+        HashMap<String, byte[]> resources = new HashMap<>();
+
+        Manifest manifest = null;
 
         try (JarFile jarFile = new JarFile(input)) {
-            loadFiles(archive.classes(), archive.resources(), jarFile);
+            try {
+                manifest = jarFile.getManifest();
+            } catch (Exception e) {
+                System.out.println("Error reading manifest, skipping. Error: " + e.getMessage());
+            }
+
+            loadFiles(classes, resources, jarFile);
         }
 
-        if (dependencies != null && dependencies.exists() && dependencies.isDirectory()) {
-            for (File f : Objects.requireNonNull(dependencies.listFiles())) {
+        if (dependencyPath != null && dependencyPath.exists() && dependencyPath.isDirectory()) {
+            for (File f : Objects.requireNonNull(dependencyPath.listFiles())) {
                 try (JarFile jarFile = new JarFile(f)) {
-                    loadFiles(archive.dependencies(), archive.resources(), jarFile);
+                    loadFiles(dependencies, resources, jarFile);
                 }
             }
         }
 
-        return archive;
+        return new JarArchive(classes, dependencies, resources, manifest);
     }
 
     public static void loadFiles(HashMap<String, ClassNode> classes, HashMap<String, byte[]> resources, JarFile jarFile) throws IOException {
@@ -49,7 +63,7 @@ public class JarLoader {
                     ClassReader classReader = new ClassReader(entryBytes);
                     ClassNode classNode = new ClassNode();
 
-                    classReader.accept(classNode, ClassReader.SKIP_FRAMES + ClassReader.SKIP_DEBUG);
+                    classReader.accept(classNode, ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
                     classes.put(classNode.name, classNode);
                 } else {
                     resources.put(entry.getName(), entryBytes);
@@ -86,6 +100,6 @@ public class JarLoader {
     private static boolean isClass(byte[] file) {
         if (file.length < 4)
             return false;
-        return new BigInteger(1, new byte[] { file[0], file[1], file[2], file[3] }).intValue() == -889275714;
+        return new BigInteger(1, new byte[]{file[0], file[1], file[2], file[3]}).intValue() == -889275714;
     }
 }
