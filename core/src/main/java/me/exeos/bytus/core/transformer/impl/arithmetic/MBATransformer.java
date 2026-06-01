@@ -6,10 +6,7 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.VarInsnNode;
+import org.objectweb.asm.tree.*;
 
 public class MBATransformer extends AbstractTransformer {
 
@@ -35,6 +32,14 @@ public class MBATransformer extends AbstractTransformer {
 
         for (int i = 0; i < RandomUtil.getInt(config.mba.minPasses(), config.mba.maxPasses()); i++) {
             InsnUtil.loop(methodNode.instructions, current -> {
+                if (current instanceof JumpInsnNode && current.getOpcode() >= IFEQ && current.getOpcode() <= IF_ICMPLE) {
+                    InsnList mba = new InsnList();
+                    mba.add(new InsnNode(ICONST_0));
+                    mba.add(new InsnNode(RandomUtil.chance(50) ? IOR : IXOR));
+                    methodNode.instructions.insertBefore(current, mba);
+                    return;
+                }
+
                 InsnList expression = new InsnList();
                 switch (current.getOpcode()) {
                     // +
