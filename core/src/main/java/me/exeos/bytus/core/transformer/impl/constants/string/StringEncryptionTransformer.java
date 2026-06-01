@@ -63,7 +63,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(InsnListContext context) {
-        for (AbstractInsnNode insnNode : context.insnList()) {
+        InsnUtil.loop(context.insnList(), insnNode -> {
             if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
                 int key = RandomUtil.getInt(1, 100);
 
@@ -77,7 +77,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
                 ldcInsnNode.cst = crypt(cstString, key);
                 context.insnList().insert(insnNode, callToDecrypt);
             }
-        }
+        });
     }
 
     /**

@@ -1,12 +1,12 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
+import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
-import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -39,13 +39,13 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
         if ((classNode.access & ACC_INTERFACE) != 0) return;
 
         for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
-            for (AbstractInsnNode insnNode : methodNode.instructions.toArray()) {
-                if (!(insnNode instanceof MethodInsnNode methodInsnNode)) continue;
+            InsnUtil.loop(methodNode.instructions, insnNode -> {
+                if (!(insnNode instanceof MethodInsnNode methodInsnNode)) return;
 
                 if (methodInsnNode.getOpcode() != INVOKESTATIC
                         && methodInsnNode.getOpcode() != INVOKEVIRTUAL
                         && methodInsnNode.getOpcode() != INVOKEINTERFACE)
-                    continue;
+                    return;
 
                 MethodNode[] proxyMethods = this.generateProxyMethods(classNode, methodInsnNode);
                 MethodNode firstProxy = proxyMethods[0];
@@ -62,7 +62,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
                 for (MethodNode proxyMethod : proxyMethods) {
                     context.pipeline().emit(new MethodContext(context, proxyMethod), Set.of(FlowFlattening.class, ReferenceProxyTransformer.class));
                 }
-            }
+            });
         }
     }
 

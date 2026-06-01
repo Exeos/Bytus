@@ -30,7 +30,7 @@ public class MBATransformer extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
-        int var1 = methodNode.maxLocals + 2;
+        int var1 = methodNode.maxLocals += 2;
         int var2 = methodNode.maxLocals += 2;
 
         for (int i = 0; i < RandomUtil.getInt(config.mba.minPasses(), config.mba.maxPasses()); i++) {
@@ -49,8 +49,8 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(IADD));
                     }
                     case LADD -> {
-                        expression.add(new VarInsnNode(LSTORE, var1));
                         expression.add(new VarInsnNode(LSTORE, var2));
+                        expression.add(new VarInsnNode(LSTORE, var1));
 
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));
@@ -77,8 +77,8 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(ISUB));
                     }
                     case LSUB -> {
-                        expression.add(new VarInsnNode(LSTORE, var1));
                         expression.add(new VarInsnNode(LSTORE, var2));
+                        expression.add(new VarInsnNode(LSTORE, var1));
 
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));
@@ -105,8 +105,8 @@ public class MBATransformer extends AbstractTransformer {
                     }
                     // &
                     case LAND -> {
-                        expression.add(new VarInsnNode(LSTORE, var1));
                         expression.add(new VarInsnNode(LSTORE, var2));
+                        expression.add(new VarInsnNode(LSTORE, var1));
 
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));
@@ -129,8 +129,8 @@ public class MBATransformer extends AbstractTransformer {
                     }
                     // |
                     case LOR -> {
-                        expression.add(new VarInsnNode(LSTORE, var1));
                         expression.add(new VarInsnNode(LSTORE, var2));
+                        expression.add(new VarInsnNode(LSTORE, var1));
 
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));
@@ -153,8 +153,8 @@ public class MBATransformer extends AbstractTransformer {
                     }
                     // ^
                     case LXOR -> {
-                        expression.add(new VarInsnNode(LSTORE, var1));
                         expression.add(new VarInsnNode(LSTORE, var2));
+                        expression.add(new VarInsnNode(LSTORE, var1));
 
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));

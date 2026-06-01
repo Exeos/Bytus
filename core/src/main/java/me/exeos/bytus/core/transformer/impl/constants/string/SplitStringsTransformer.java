@@ -1,5 +1,6 @@
 package me.exeos.bytus.core.transformer.impl.constants.string;
 
+import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -27,7 +28,7 @@ public final class SplitStringsTransformer extends AbstractTransformer {
 
     @Override
     public void transform(InsnListContext context) {
-        context.insnList().forEach(insnNode -> {
+        InsnUtil.loop(context.insnList(), insnNode -> {
             if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String string) {
                 String[] split = string.split("(?<=\\G.{10})"); // split into strings with length 10
                 if (split.length > 1) {

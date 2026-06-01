@@ -58,19 +58,21 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
 
     private void replaceConstants(ClassNode classNode, Map<Object, Integer> constants, String constantFieldName) {
         classNode.methods.forEach(methodNode -> {
-            for (AbstractInsnNode abstractInsnNode : methodNode.instructions.toArray()) {
+            InsnUtil.loop(methodNode.instructions, insnNode -> {
                 Object cst = null;
 
-                if (abstractInsnNode instanceof LdcInsnNode ldcNode && constants.containsKey(ldcNode.cst)) {
+                if (insnNode instanceof LdcInsnNode ldcNode && constants.containsKey(ldcNode.cst)) {
                     cst = ldcNode.cst;
                 } else {
-                    Optional<Integer> intVal = InsnUtil.getIntValue(abstractInsnNode);
+                    Optional<Integer> intVal = InsnUtil.getIntValue(insnNode);
                     if (intVal.isPresent() && constants.containsKey(intVal.get())) {
                         cst = intVal.get();
                     }
                 }
 
-                if (cst == null) continue;
+                if (cst == null) {
+                    return;
+                }
 
                 int index = constants.get(cst);
                 InsnList replacement = new InsnList();
@@ -101,9 +103,9 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
                             replacement.add(new TypeInsnNode(CHECKCAST, cst.getClass().getName().replace('.', '/')));
                 }
 
-                methodNode.instructions.insertBefore(abstractInsnNode, replacement);
-                methodNode.instructions.remove(abstractInsnNode);
-            }
+                methodNode.instructions.insertBefore(insnNode, replacement);
+                methodNode.instructions.remove(insnNode);
+            });
         });
     }
 
@@ -119,7 +121,6 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
         MethodNode currentMethod = null;
 
         for (Map.Entry<Object, Integer> entry : constants.entrySet()) {
-
             if (currentMethod == null || current > maxPerMethod) {
                 if (currentMethod != null) {
                     // insert return at the end
@@ -157,7 +158,7 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
 
         if (currentMethod != null && currentMethod.instructions.getLast().getOpcode() != RETURN) {
             currentMethod.instructions.add(new InsnNode(RETURN));
-            classNode.methods.add(currentMethod);
+//            classNode.methods.add(currentMethod);
             list.add(new MethodInsnNode(INVOKESTATIC, classNode.name, currentMethod.name, currentMethod.desc, false));
         }
 

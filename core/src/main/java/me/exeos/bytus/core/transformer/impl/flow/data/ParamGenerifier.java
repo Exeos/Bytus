@@ -15,7 +15,10 @@ import me.exeos.bytus.core.transformer.context.JarContext;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Transforms argument passing to Object[]
@@ -145,68 +148,70 @@ public class ParamGenerifier extends AbstractTransformer {
      */
     private void convertParamPassing(JarArchive jar, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
         int paramArrVarIndex = methodNode.maxLocals++;
-        for (AbstractInsnNode insnNode : methodNode.instructions) {
-            if (insnNode instanceof MethodInsnNode methodInsnNode) {
-                // check if target method is included and if ownerCtx of target method belongs to jarCtx
-                if (exclusionsByDesc.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)
-                        || exclusionsByName.contains(methodInsnNode.owner + methodInsnNode.name)
-                        || !jar.classes().containsKey(methodInsnNode.owner)
-                ) {
-                    continue;
-                }
-
-                MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
-                int paramLength = descriptor.params().size();
-                if (paramLength == 0) {
-                    continue;
-                }
-
-                // tmp variables to avoid stack swapping as it can lead to issues with doubles and longs
-                // each param gets a local assigned
-                int[] tmpLocal = new int[paramLength];
-                for (int i = 0; i < paramLength; i++) {
-                    tmpLocal[i] = methodNode.maxLocals;
-                    methodNode.maxLocals += descriptor.params().get(i).getSlotWidth();
-                }
-
-                InsnList arrBuilder = new InsnList();
-
-                // store params stored on stack into temps in reverse (stack top is last argument)
-                for (int i = paramLength - 1; i >= 0; i--) {
-                    arrBuilder.add(new VarInsnNode(TypeUtil.storeOpcodeForType(descriptor.params().get(i)), tmpLocal[i]));
-                }
-
-                // create Object[] and store at paramArrVarIndex
-                arrBuilder.add(InsnUtil.getIntPush(paramLength));
-                arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
-                arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
-
-                // store each param in the Object[]
-                for (int i = 0; i < paramLength; i++) {
-                    DescriptorMember param = descriptor.params().get(i);
-
-                    // load Object[]
-                    arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
-                    // param index for Object[]
-                    arrBuilder.add(InsnUtil.getIntPush(i));
-                    // load actual param from its tempLocal
-                    arrBuilder.add(new VarInsnNode(TypeUtil.loadOpcodeForType(param), tmpLocal[i]));
-                    // convert to object if it's a primitive
-                    if (param.isPrimitive() && !param.isArray()) {
-                        String primClassName = TypeUtil.primitiveToClass(param.value().charAt(0));
-
-                        arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.value() + ")L" + primClassName + ";"));
-                    }
-                    // store in Object[]
-                    arrBuilder.add(new InsnNode(AASTORE));
-                }
-                // load finalized Object[] for passing to method
-                arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
-
-                methodNode.instructions.insertBefore(insnNode, arrBuilder);
-                methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType().toDesc();
+        InsnUtil.loop(methodNode.instructions, insnNode -> {
+            if (!(insnNode instanceof MethodInsnNode methodInsnNode)) {
+                return;
             }
-        }
+
+            // check if target method is included and if ownerCtx of target method belongs to jarCtx
+            if (exclusionsByDesc.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)
+                    || exclusionsByName.contains(methodInsnNode.owner + methodInsnNode.name)
+                    || !jar.classes().containsKey(methodInsnNode.owner)
+            ) {
+                return;
+            }
+
+            MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
+            int paramLength = descriptor.params().size();
+            if (paramLength == 0) {
+                return;
+            }
+
+            // tmp variables to avoid stack swapping as it can lead to issues with doubles and longs
+            // each param gets a local assigned
+            int[] tmpLocal = new int[paramLength];
+            for (int i = 0; i < paramLength; i++) {
+                tmpLocal[i] = methodNode.maxLocals;
+                methodNode.maxLocals += descriptor.params().get(i).getSlotWidth();
+            }
+
+            InsnList arrBuilder = new InsnList();
+
+            // store params stored on stack into temps in reverse (stack top is last argument)
+            for (int i = paramLength - 1; i >= 0; i--) {
+                arrBuilder.add(new VarInsnNode(TypeUtil.storeOpcodeForType(descriptor.params().get(i)), tmpLocal[i]));
+            }
+
+            // create Object[] and store at paramArrVarIndex
+            arrBuilder.add(InsnUtil.getIntPush(paramLength));
+            arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
+            arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
+
+            // store each param in the Object[]
+            for (int i = 0; i < paramLength; i++) {
+                DescriptorMember param = descriptor.params().get(i);
+
+                // load Object[]
+                arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+                // param index for Object[]
+                arrBuilder.add(InsnUtil.getIntPush(i));
+                // load actual param from its tempLocal
+                arrBuilder.add(new VarInsnNode(TypeUtil.loadOpcodeForType(param), tmpLocal[i]));
+                // convert to object if it's a primitive
+                if (param.isPrimitive() && !param.isArray()) {
+                    String primClassName = TypeUtil.primitiveToClass(param.value().charAt(0));
+
+                    arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.value() + ")L" + primClassName + ";"));
+                }
+                // store in Object[]
+                arrBuilder.add(new InsnNode(AASTORE));
+            }
+            // load finalized Object[] for passing to method
+            arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+
+            methodNode.instructions.insertBefore(insnNode, arrBuilder);
+            methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType().toDesc();
+        });
     }
 
     private void convertParamUsage(ClassNode ownerNode, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
@@ -288,18 +293,17 @@ public class ParamGenerifier extends AbstractTransformer {
             prologue.add(new VarInsnNode(TypeUtil.storeOpcodeForType(param), entry.getValue()));
         }
 
-        for (ListIterator<AbstractInsnNode> it = methodNode.instructions.iterator(); it.hasNext(); ) {
-            AbstractInsnNode insnNode = it.next();
+        InsnUtil.loop(methodNode.instructions, insnNode -> {
             if (insnNode instanceof VarInsnNode loadInsn && InsnUtil.isLoad(insnNode)) {
                 // check if param is written to, if yes: load from local, else load from Object[]
                 if (writtenSlots.contains(loadInsn.var)) {
                     DescriptorMember param = paramBySlot.get(loadInsn.var);
                     methodNode.instructions.insertBefore(insnNode, new VarInsnNode(TypeUtil.loadOpcodeForType(param), localBySlot.get(loadInsn.var)));
-                    it.remove();
+                    methodNode.instructions.remove(insnNode);
                 } else {
                     DescriptorMember param = paramBySlot.get(loadInsn.var);
                     if (param == null) {
-                        continue;
+                        return;
                     }
 
                     InsnList loadFromArr = new InsnList();
@@ -325,7 +329,7 @@ public class ParamGenerifier extends AbstractTransformer {
                     }
 
                     methodNode.instructions.insertBefore(insnNode, loadFromArr);
-                    it.remove();
+                    methodNode.instructions.remove(insnNode);
                 }
             }
             // update each insn that writes to param to write to corresponding local
@@ -336,7 +340,7 @@ public class ParamGenerifier extends AbstractTransformer {
             } else if (insnNode instanceof IincInsnNode iincInsnNode && writtenSlots.contains(iincInsnNode.var)) {
                 iincInsnNode.var = localBySlot.get(iincInsnNode.var);
             }
-        }
+        });
 
         // insert prologue (storing params in locals if required) and update this methods descriptor
         methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), prologue);

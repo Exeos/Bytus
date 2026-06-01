@@ -17,7 +17,7 @@ public class Priority {
     public static final int STR_SPLIT_STRINGS = 5;
     public static final int REF_PROXY = 6;
     public static final int REF_ENC = 7;
-    public static final int MBA = 8;
+    public static final int MBA = 11;
     public static final int CONST_ARRAY = 9;
     public static final int NUM_UNDER_OVER_FLOW = 10;
 }

@@ -2,6 +2,7 @@ package me.exeos.bytus.core.transformer.impl.reference;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
+import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -14,6 +15,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class ReferenceEncryptionTransformer extends AbstractTransformer {
@@ -49,21 +51,21 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
 
         String bootstrapMethodName = ClassUtil.getNoneCollidingMethodName(context.jarCtx().jar(), classNode, RandomUtil::getString);
 
-        boolean anyCalls = false;
+        AtomicBoolean anyCalls = new AtomicBoolean(false);
 
         for (MethodNode methodNode : classNode.methods) {
             if (methodNode.instructions.size() == 0) continue;
 
-            for (AbstractInsnNode abstractInsnNode : methodNode.instructions.toArray()) {
+            InsnUtil.loop(methodNode.instructions, abstractInsnNode -> {
                 if (abstractInsnNode instanceof MethodInsnNode methodInsnNode && this.methodCall) {
 
                     if (methodInsnNode.name.equals("<init>")) {
                         if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName))
-                            continue;
+                            return;
 
                         ClassNode ownerClass = context.jarCtx().jar().getClassNode(methodInsnNode.owner);
                         if (ownerClass == null || (ownerClass.access & ACC_ABSTRACT) != 0) {
-                            continue; // doesnt work for abstract super call
+                            return; // doesnt work for abstract super call
                         }
 
                         AbstractInsnNode prev = abstractInsnNode.getPrevious();
@@ -85,33 +87,33 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
                     methodNode.instructions.insert(methodInsnNode, invokeDynamicInsnNode);
                     methodNode.instructions.remove(methodInsnNode);
 
-                    anyCalls = true;
+                    anyCalls.set(true);
 
                     methodCount.getAndIncrement();
                 }
                 if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
 
                     ClassNode declaringClass = this.findDeclaringClass(context.jarCtx().jar(), fieldInsnNode);
-                    if (declaringClass == null) continue;
+                    if (declaringClass == null) return;
 
                     // check if field is final
                     boolean isFinal = declaringClass.fields.stream()
                             .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
                             .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
-                    if (isFinal) continue;
+                    if (isFinal) return;
 
                     InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, declaringClass, bootstrapMethodName);
                     methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
                     methodNode.instructions.remove(fieldInsnNode);
 
-                    anyCalls = true;
+                    anyCalls.set(true);
 
                     fieldCount.getAndIncrement();
                 }
-            }
+            });
         }
 
-        if (anyCalls) {
+        if (anyCalls.get()) {
             MethodNode bsm = makeBootstrapMethod(bootstrapMethodName);
             context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class));
         }

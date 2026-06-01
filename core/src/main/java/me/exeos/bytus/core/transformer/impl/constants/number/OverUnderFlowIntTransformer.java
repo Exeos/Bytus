@@ -7,7 +7,6 @@ import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.InsnNode;
 
@@ -35,14 +34,10 @@ public class OverUnderFlowIntTransformer extends AbstractTransformer {
 
     @Override
     public void transform(InsnListContext context) {
-        AbstractInsnNode current = context.insnList().getFirst();
-        while (current != null) {
-            AbstractInsnNode next = current.getNext();
-
+        InsnUtil.loop(context.insnList(), current -> {
             Optional<Integer> value = InsnUtil.getIntValue(current);
             if (value.isEmpty()) {
-                current = next;
-                continue;
+                return;
             }
 
             int intVal = value.get();
@@ -59,8 +54,6 @@ public class OverUnderFlowIntTransformer extends AbstractTransformer {
 
             context.insnList().insert(current, obfInsn);
             context.insnList().remove(current);
-
-            current = next;
-        }
+        });
     }
 }
