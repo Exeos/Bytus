@@ -15,7 +15,7 @@ public class ClassUtil implements Opcodes {
     private final static int MAX_GENERATION_TIES = 50;
 
     public static String getNoneCollidingClassName(JarArchive archive, Function<Integer, String> nameGeneration) {
-        return getNonCollidingName(archive.classes().keySet(), nameGeneration);
+        return getNonCollidingName(archive.getClasses().keySet(), nameGeneration);
     }
 
     public static String getNoneCollidingFieldName(JarArchive archive, ClassNode classNode, Function<Integer, String> nameGeneration) {

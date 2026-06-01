@@ -20,6 +20,10 @@ public class DescriptorParser {
         return new MethodDescriptor(args, returnType);
     }
 
+    public static DescriptorMember parseFieldDesc(String descriptor) {
+        return parseMembers(descriptor).getFirst();
+    }
+
     public static List<DescriptorMember> parseMembers(String container) {
         return parseMembers(container, 0, container.length());
     }

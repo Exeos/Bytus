@@ -51,7 +51,7 @@ public class ParamGenerifier extends AbstractTransformer {
 
         buildExclusions(context.jar(), exclusionsByDesc, exclusionsByName);
 
-        for (ClassNode classNode : context.jar().classes().values()) {
+        for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 convertParamPassing(context.jar(), methodNode, exclusionsByDesc, exclusionsByName);
             }
@@ -63,7 +63,7 @@ public class ParamGenerifier extends AbstractTransformer {
     }
 
     private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
-        for (ClassNode classNode : jar.classes().values()) {
+        for (ClassNode classNode : jar.getClasses().values()) {
             // map tracking amount of methods declared by their ower + name
             Map<String, Integer> methodDeclarationMap = new HashMap<>();
             for (MethodNode methodNode : classNode.methods) {
@@ -83,13 +83,13 @@ public class ParamGenerifier extends AbstractTransformer {
             }
         }
 
-        for (ClassNode classNode : jar.classes().values()) {
+        for (ClassNode classNode : jar.getClasses().values()) {
             expandExclusions(jar, exclusionsByDesc, exclusionsByName, classNode);
         }
 
         // exclude main method
-        if (jar.manifest() != null) {
-            String mainClassName = jar.manifest().getMainAttributes().getValue("Main-Class");
+        if (jar.getManifest() != null) {
+            String mainClassName = jar.getManifest().getMainAttributes().getValue("Main-Class");
             if (mainClassName != null) {
                 exclusionsByDesc.add(mainClassName.replace(".", "/") + "main" + "([Ljava/lang/String;)V");
             }
@@ -156,13 +156,13 @@ public class ParamGenerifier extends AbstractTransformer {
             // check if target method is included and if ownerCtx of target method belongs to jarCtx
             if (exclusionsByDesc.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)
                     || exclusionsByName.contains(methodInsnNode.owner + methodInsnNode.name)
-                    || !jar.classes().containsKey(methodInsnNode.owner)
+                    || !jar.getClasses().containsKey(methodInsnNode.owner)
             ) {
                 return;
             }
 
             MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
-            int paramLength = descriptor.params().size();
+            int paramLength = descriptor.getParams().size();
             if (paramLength == 0) {
                 return;
             }
@@ -172,14 +172,14 @@ public class ParamGenerifier extends AbstractTransformer {
             int[] tmpLocal = new int[paramLength];
             for (int i = 0; i < paramLength; i++) {
                 tmpLocal[i] = methodNode.maxLocals;
-                methodNode.maxLocals += descriptor.params().get(i).getSlotWidth();
+                methodNode.maxLocals += descriptor.getParams().get(i).getSlotWidth();
             }
 
             InsnList arrBuilder = new InsnList();
 
             // store params stored on stack into temps in reverse (stack top is last argument)
             for (int i = paramLength - 1; i >= 0; i--) {
-                arrBuilder.add(new VarInsnNode(TypeUtil.storeOpcodeForType(descriptor.params().get(i)), tmpLocal[i]));
+                arrBuilder.add(new VarInsnNode(TypeUtil.storeOpcodeForType(descriptor.getParams().get(i)), tmpLocal[i]));
             }
 
             // create Object[] and store at paramArrVarIndex
@@ -189,7 +189,7 @@ public class ParamGenerifier extends AbstractTransformer {
 
             // store each param in the Object[]
             for (int i = 0; i < paramLength; i++) {
-                DescriptorMember param = descriptor.params().get(i);
+                DescriptorMember param = descriptor.getParams().get(i);
 
                 // load Object[]
                 arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
@@ -199,9 +199,9 @@ public class ParamGenerifier extends AbstractTransformer {
                 arrBuilder.add(new VarInsnNode(TypeUtil.loadOpcodeForType(param), tmpLocal[i]));
                 // convert to object if it's a primitive
                 if (param.isPrimitive() && !param.isArray()) {
-                    String primClassName = TypeUtil.primitiveToClass(param.value().charAt(0));
+                    String primClassName = TypeUtil.primitiveToClass(param.getValue().charAt(0));
 
-                    arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.value() + ")L" + primClassName + ";"));
+                    arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.getValue() + ")L" + primClassName + ";"));
                 }
                 // store in Object[]
                 arrBuilder.add(new InsnNode(AASTORE));
@@ -210,7 +210,7 @@ public class ParamGenerifier extends AbstractTransformer {
             arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
 
             methodNode.instructions.insertBefore(insnNode, arrBuilder);
-            methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType().toDesc();
+            methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
         });
     }
 
@@ -220,7 +220,7 @@ public class ParamGenerifier extends AbstractTransformer {
         }
 
         MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodNode.desc);
-        if (descriptor.params().isEmpty()) {
+        if (descriptor.getParams().isEmpty()) {
             return;
         }
 
@@ -240,7 +240,7 @@ public class ParamGenerifier extends AbstractTransformer {
         // index of param in Object[]
         int paramArrayIndex = 0;
         // map slots to (params and index of param in Object[])
-        for (DescriptorMember param : descriptor.params()) {
+        for (DescriptorMember param : descriptor.getParams()) {
             paramBySlot.put(paramSlot, param);
             paramArrayIndexBySlot.put(paramSlot, paramArrayIndex);
 
@@ -261,7 +261,7 @@ public class ParamGenerifier extends AbstractTransformer {
 
         // map slots that are written to, to new local variable
         paramSlot = paramsStartIndex;
-        for (DescriptorMember param : descriptor.params()) {
+        for (DescriptorMember param : descriptor.getParams()) {
             if (writtenSlots.contains(paramSlot)) {
                 localBySlot.put(paramSlot, methodNode.maxLocals);
                 methodNode.maxLocals += param.getSlotWidth();
@@ -278,10 +278,10 @@ public class ParamGenerifier extends AbstractTransformer {
             prologue.add(new VarInsnNode(ALOAD, paramsStartIndex));
             prologue.add(InsnUtil.getIntPush(paramArrayIndexBySlot.get(entry.getKey())));
             prologue.add(new InsnNode(AALOAD));
-            prologue.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toDesc()));
+            prologue.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toType()));
             // if param was primitive convert it to primitive
             if (param.isPrimitive() && !param.isArray()) {
-                char primitive = param.value().charAt(0);
+                char primitive = param.getValue().charAt(0);
 
                 prologue.add(new MethodInsnNode(
                         INVOKEVIRTUAL,
@@ -315,10 +315,10 @@ public class ParamGenerifier extends AbstractTransformer {
                     // load param from array
                     loadFromArr.add(new InsnNode(AALOAD));
                     // cast to correct type
-                    loadFromArr.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toDesc()));
+                    loadFromArr.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toType()));
                     // if param was primitive convert it to primitive
                     if (param.isPrimitive() && !param.isArray()) {
-                        char primitive = param.value().charAt(0);
+                        char primitive = param.getValue().charAt(0);
 
                         loadFromArr.add(new MethodInsnNode(
                                 INVOKEVIRTUAL,
@@ -344,7 +344,7 @@ public class ParamGenerifier extends AbstractTransformer {
 
         // insert prologue (storing params in locals if required) and update this methods descriptor
         methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), prologue);
-        methodNode.desc = "([Ljava/lang/Object;)" + descriptor.returnType().toDesc();
+        methodNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
     }
 
     private Set<String> getMethodsTargetedByInvokedynamic(MethodNode methodNode) {

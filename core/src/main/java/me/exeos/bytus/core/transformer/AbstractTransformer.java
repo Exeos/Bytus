@@ -40,7 +40,7 @@ public abstract class AbstractTransformer implements Opcodes {
      * @param context jar context
      */
     public void transform(JarContext context) {
-        for (ClassNode classNode : context.jar().classes().values()) {
+        for (ClassNode classNode : context.jar().getClasses().values()) {
             transform(new ClassContext(context, classNode));
         }
     }

@@ -22,9 +22,9 @@ import java.util.jar.Manifest;
 public class JarLoader {
 
     public static JarArchive load(File input, File dependencyPath) throws IOException {
-        HashMap<String, ClassNode> classes = new HashMap<>();
-        HashMap<String, ClassNode> dependencies = new HashMap<>();
-        HashMap<String, byte[]> resources = new HashMap<>();
+        Map<String, ClassNode> classes = new HashMap<>();
+        Map<String, ClassNode> dependencies = new HashMap<>();
+        Map<String, byte[]> resources = new HashMap<>();
 
         Manifest manifest = null;
 
@@ -49,7 +49,7 @@ public class JarLoader {
         return new JarArchive(classes, dependencies, resources, manifest);
     }
 
-    public static void loadFiles(HashMap<String, ClassNode> classes, HashMap<String, byte[]> resources, JarFile jarFile) throws IOException {
+    public static void loadFiles(Map<String, ClassNode> classes, Map<String, byte[]> resources, JarFile jarFile) throws IOException {
         Enumeration<? extends JarEntry> entries = jarFile.entries();
         JarEntry entry;
 
@@ -74,14 +74,14 @@ public class JarLoader {
 
     public static void export(JarArchive jar, OutputStream output) throws IOException {
         JarOutputStream jarOut = new JarOutputStream(output);
-        for (Map.Entry<String, ClassNode> entry : jar.classes().entrySet()) {
+        for (Map.Entry<String, ClassNode> entry : jar.getClasses().entrySet()) {
             ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
             entry.getValue().accept(classWriter);
 
             writeJarEntry(jarOut, entry.getKey() + ".class", classWriter.toByteArray());
         }
 
-        for (Map.Entry<String, byte[]> e : jar.resources().entrySet()) {
+        for (Map.Entry<String, byte[]> e : jar.getResources().entrySet()) {
             writeJarEntry(jarOut, e.getKey(), e.getValue());
         }
 

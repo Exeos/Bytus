@@ -47,7 +47,7 @@ public class Pipeline {
      * @param exclusions transformer types to skip for this re-dispatch
      */
     public void emit(ClassContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
-        context.jarCtx().jar().classes().put(context.classNode().name, context.classNode());
+        context.jarCtx().jar().getClasses().put(context.classNode().name, context.classNode());
         transform(context, exclusions);
     }
 

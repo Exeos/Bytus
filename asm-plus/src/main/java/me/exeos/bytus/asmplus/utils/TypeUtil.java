@@ -38,11 +38,11 @@ public class TypeUtil implements Opcodes {
             return ALOAD;
         }
 
-        return switch (member.value().charAt(0)) {
+        return switch (member.getValue().charAt(0)) {
             case 'J' -> LLOAD;
             case 'D' -> DLOAD;
             case 'F' -> FLOAD;
-            default  -> ILOAD;
+            default -> ILOAD;
         };
     }
 
@@ -51,11 +51,11 @@ public class TypeUtil implements Opcodes {
             return ASTORE;
         }
 
-        return switch (member.value().charAt(0)) {
+        return switch (member.getValue().charAt(0)) {
             case 'J' -> LSTORE;
             case 'D' -> DSTORE;
             case 'F' -> FSTORE;
-            default  -> ISTORE;
+            default -> ISTORE;
         };
     }
 }

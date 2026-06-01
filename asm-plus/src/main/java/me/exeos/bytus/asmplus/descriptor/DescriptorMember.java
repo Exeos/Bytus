@@ -2,7 +2,19 @@ package me.exeos.bytus.asmplus.descriptor;
 
 import me.exeos.bytus.asmplus.utils.TypeUtil;
 
-public record DescriptorMember(String value, boolean isPrimitive, boolean isArray, int arrayDepth) {
+public class DescriptorMember {
+
+    private String value;
+    private boolean isPrimitive;
+    private boolean isArray;
+    private int arrayDepth;
+
+    public DescriptorMember(String value, boolean isPrimitive, boolean isArray, int arrayDepth) {
+        this.value = value;
+        this.isPrimitive = isPrimitive;
+        this.isArray = isArray;
+        this.arrayDepth = arrayDepth;
+    }
 
     public int getSlotWidth() {
         if (!isArray && isPrimitive && (value.equals("D") || value.equals("J"))) {
@@ -28,7 +40,7 @@ public record DescriptorMember(String value, boolean isPrimitive, boolean isArra
         return prefix + value + suffix;
     }
 
-    public String getType() {
+    public String toType() {
         StringBuilder typeBuilder = new StringBuilder();
         StringBuilder suffix = new StringBuilder();
 
@@ -50,5 +62,37 @@ public record DescriptorMember(String value, boolean isPrimitive, boolean isArra
         }
 
         return new DescriptorMember(TypeUtil.primitiveToClass(value.toCharArray()[0]), false, isArray, arrayDepth);
+    }
+
+    public String getValue() {
+        return value;
+    }
+
+    public void setValue(String value) {
+        this.value = value;
+    }
+
+    public boolean isPrimitive() {
+        return isPrimitive;
+    }
+
+    public void setPrimitive(boolean primitive) {
+        isPrimitive = primitive;
+    }
+
+    public boolean isArray() {
+        return isArray;
+    }
+
+    public void setArray(boolean array) {
+        isArray = array;
+    }
+
+    public int getArrayDepth() {
+        return arrayDepth;
+    }
+
+    public void setArrayDepth(int arrayDepth) {
+        this.arrayDepth = arrayDepth;
     }
 }
