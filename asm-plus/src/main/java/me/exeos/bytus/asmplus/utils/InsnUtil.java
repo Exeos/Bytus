@@ -5,6 +5,7 @@ import org.objectweb.asm.tree.*;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 public class InsnUtil implements Opcodes {
 
@@ -71,6 +72,14 @@ public class InsnUtil implements Opcodes {
         return new LdcInsnNode(value);
     }
 
+    public static AbstractInsnNode getLongPush(long value) {
+        if (value == 0 || value == 1) {
+            return new InsnNode((int) (LCONST_0 + value));
+        }
+
+        return new LdcInsnNode(value);
+    }
+
     public static Optional<Integer> getIntValue(AbstractInsnNode insnNode) {
         if (isIConstPush(insnNode.getOpcode())) {
             return Optional.of(insnNode.getOpcode() - 3);
@@ -94,6 +103,22 @@ public class InsnUtil implements Opcodes {
     public static void addToInsnList(List<AbstractInsnNode> source, InsnList target) {
         for (AbstractInsnNode insnNode : source) {
             target.add(insnNode);
+        }
+    }
+
+    /**
+     * Safely loop trough instructions, you can insert, delete, etc without breaking iteration
+     *
+     * @param insnList
+     * @param visitor
+     */
+    public static void loop(InsnList insnList, Consumer<AbstractInsnNode> visitor) {
+        AbstractInsnNode current = insnList.getFirst();
+
+        while (current != null) {
+            AbstractInsnNode next = current.getNext();
+            visitor.accept(current);
+            current = next;
         }
     }
 }

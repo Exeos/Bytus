@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import me.exeos.bytus.core.config.members.ConstantsConfigMember;
 import me.exeos.bytus.core.config.members.IOConfigMember;
+import me.exeos.bytus.core.config.members.MbaConfigMember;
 import me.exeos.bytus.core.config.members.flow.FlowConfigMember;
 import me.exeos.bytus.core.config.members.reference.ReferencesConfigMember;
 import tools.jackson.core.JacksonException;
@@ -19,6 +20,7 @@ public class BytusConfig {
     public final List<String> exclusions;
     public final String mainClassName;
     public final ConstantsConfigMember constants;
+    public final MbaConfigMember mba;
     public final FlowConfigMember flow;
     public final ReferencesConfigMember references;
 
@@ -28,12 +30,14 @@ public class BytusConfig {
             @JsonProperty("exclusions") List<String> exclusions,
             @JsonProperty("mainClassName") String mainClassName,
             @JsonProperty("constants") ConstantsConfigMember constants,
+            @JsonProperty("mba") MbaConfigMember mba,
             @JsonProperty("flow") FlowConfigMember flow,
             @JsonProperty("references") ReferencesConfigMember references) {
         this.io = io;
         this.exclusions = exclusions;
         this.mainClassName = mainClassName;
         this.constants = constants;
+        this.mba = mba;
         this.flow = flow;
         this.references = references;
     }

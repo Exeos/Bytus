@@ -17,6 +17,11 @@
     "strings": false,
     "numbers": false
   },
+  "mba": {
+    "enable": false,
+    "minPasses": 1,
+    "maxPasses": 3
+  },
   "flow": {
     "controlFlow": {
       "enable": true,

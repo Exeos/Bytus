@@ -4,6 +4,7 @@ import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
+import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
 import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
@@ -33,6 +34,7 @@ public class TransformerManager {
     private static final List<Function<BytusConfig, AbstractTransformer>> REGISTRY = new ArrayList<>();
 
     static {
+        REGISTRY.add(MBATransformer::new);
         REGISTRY.add(OverUnderFlowIntTransformer::new);
         REGISTRY.add(SplitStringsTransformer::new);
         REGISTRY.add(StringEncryptionTransformer::new);
