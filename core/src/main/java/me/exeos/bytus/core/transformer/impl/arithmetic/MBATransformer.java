@@ -36,6 +36,12 @@ public class MBATransformer extends AbstractTransformer {
                     InsnList mba = new InsnList();
                     mba.add(new InsnNode(ICONST_0));
                     mba.add(new InsnNode(RandomUtil.chance(50) ? IOR : IXOR));
+                    if (current.getOpcode() >= IF_ICMPEQ && current.getOpcode() <= IF_ICMPLE) {
+                        mba.add(new InsnNode(SWAP));
+                        mba.add(new InsnNode(ICONST_0));
+                        mba.add(new InsnNode(RandomUtil.chance(50) ? IOR : IXOR));
+                        mba.add(new InsnNode(SWAP));
+                    }
                     methodNode.instructions.insertBefore(current, mba);
                     return;
                 }
