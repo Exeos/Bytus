@@ -180,13 +180,11 @@ public class FlowFlattening extends AbstractTransformer {
                     InsnUtil.addToInsnList(block.instructions, handlerInsns);
                     handlerInsns.add(updateStateMachine(blockPathMap.get(fallTroughBlock.fallTroughBlock)[0], stateVarIndex, dispatcherEntry));
                 }
-                case TerminalBlock terminalBlock -> {
+                case TerminalBlock _ -> {
                     // Ends method. Just copy insn.
                     InsnUtil.addToInsnList(block.instructions, handlerInsns);
                 }
-                default -> {
-                    throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
-                }
+                default -> throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
             }
 
             // Add path chain of this block

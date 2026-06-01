@@ -4,7 +4,10 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
@@ -60,7 +63,7 @@ public class JarLoader {
                     ClassReader classReader = new ClassReader(entryBytes);
                     ClassNode classNode = new ClassNode();
 
-                    classReader.accept(classNode, ClassReader.SKIP_FRAMES + ClassReader.SKIP_DEBUG);
+                    classReader.accept(classNode, ClassReader.SKIP_FRAMES | ClassReader.SKIP_DEBUG);
                     classes.put(classNode.name, classNode);
                 } else {
                     resources.put(entry.getName(), entryBytes);
@@ -97,6 +100,6 @@ public class JarLoader {
     private static boolean isClass(byte[] file) {
         if (file.length < 4)
             return false;
-        return new BigInteger(1, new byte[] { file[0], file[1], file[2], file[3] }).intValue() == -889275714;
+        return new BigInteger(1, new byte[]{file[0], file[1], file[2], file[3]}).intValue() == -889275714;
     }
 }
