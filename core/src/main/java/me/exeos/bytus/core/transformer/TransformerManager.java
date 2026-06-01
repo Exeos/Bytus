@@ -20,27 +20,40 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/**
+ * Builds and runs the {@link Pipeline} of {@link AbstractTransformer transformers}.
+ * <p>
+ * The manager instantiates all registered transformer factories for a given {@link BytusConfig},
+ * filters out transformers that do not {@link AbstractTransformer#applies() apply} to the current
+ * configuration, sorts them by {@link AbstractTransformer#priority() priority} and then executes
+ * them against a {@link JarArchive} via {@link #transform(JarArchive)}.
+ */
 public class TransformerManager {
 
-    private static final List<Function<BytusConfig, AbstractTransformer>> registry = new ArrayList<>();
+    private static final List<Function<BytusConfig, AbstractTransformer>> REGISTRY = new ArrayList<>();
 
     static {
-        registry.add(OverUnderFlowIntTransformer::new);
-        registry.add(SplitStringsTransformer::new);
-        registry.add(StringEncryptionTransformer::new);
-        registry.add(ConstantArrayTransformer::new);
-        registry.add(FlowFlattening::new);
-        registry.add(JumpFlattening::new);
-        registry.add(ParamGenerifier::new);
-        registry.add(ReferenceEncryptionTransformer::new);
-        registry.add(ReferenceProxyTransformer::new);
-        registry.add(PreProcessor::new);
+        REGISTRY.add(OverUnderFlowIntTransformer::new);
+        REGISTRY.add(SplitStringsTransformer::new);
+        REGISTRY.add(StringEncryptionTransformer::new);
+        REGISTRY.add(ConstantArrayTransformer::new);
+        REGISTRY.add(FlowFlattening::new);
+        REGISTRY.add(JumpFlattening::new);
+        REGISTRY.add(ParamGenerifier::new);
+        REGISTRY.add(ReferenceEncryptionTransformer::new);
+        REGISTRY.add(ReferenceProxyTransformer::new);
+        REGISTRY.add(PreProcessor::new);
     }
 
     private final Pipeline pipeline;
 
+    /**
+     * Creates a new {@link TransformerManager} for the provided configuration.
+     *
+     * @param config configuration used to instantiate and enable/disable transformers
+     */
     public TransformerManager(BytusConfig config) {
-        List<AbstractTransformer> active = registry.stream()
+        List<AbstractTransformer> active = REGISTRY.stream()
                 .map(factory -> factory.apply(config))
                 .filter(AbstractTransformer::applies)
                 .sorted(Comparator.comparingInt(AbstractTransformer::priority))
@@ -49,6 +62,11 @@ public class TransformerManager {
         pipeline = new Pipeline(active);
     }
 
+    /**
+     * Runs the configured transformer pipeline against the provided jar.
+     *
+     * @param jar jar archive to transform
+     */
     public void transform(JarArchive jar) {
         pipeline.run(new JarContext(jar, pipeline));
     }

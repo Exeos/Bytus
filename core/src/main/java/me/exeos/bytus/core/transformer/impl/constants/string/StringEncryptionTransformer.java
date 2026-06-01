@@ -18,15 +18,13 @@ import java.util.Set;
  *
  * <h2>Overview</h2>
  * <ul>
- *   <li>For each included class, create a private static int[] field that stores per-string XOR keys.</li>
  *   <li>For each LDC String constant:
  *     <ul>
  *       <li>Generate a random key.</li>
- *       <li>Replace the constant with an XOR-encrypted version of that String.</li>
+ *       <li>Encrypt constant with key</li>
  *       <li>Insert a static call to a generated decryptor method that XOR-decrypts it at runtime.</li>
  *     </ul>
  *   </li>
- *   <li>Populate the int[] key array in the class' &lt;clinit&gt; (static initializer).</li>
  *   <li>Generate a single decryptor class (added to the jarCtx) containing the decrypt method.</li>
  * </ul>
  */
@@ -69,7 +67,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
             if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
                 int key = RandomUtil.getInt(1, 100);
 
-                // stack goes from: plain_str -> encrypted_str, keyArr_reference, string_id
+                // stack goes from: plain_str -> encrypted_str, key
                 // then decrypt method is called
                 // stack after: plain_str
                 InsnList callToDecrypt = new InsnList();

@@ -1,5 +1,12 @@
 package me.exeos.bytus.core.transformer;
 
+/**
+ * Shared numeric priority values for transformers.
+ * <p>
+ * Lower values run earlier.
+ *
+ * @see AbstractTransformer#priority()
+ */
 public class Priority {
 
     public static final int PRE_PROCESSOR = 0;
