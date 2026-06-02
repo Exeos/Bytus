@@ -27,8 +27,14 @@ public class ClassUtil implements Opcodes {
         return getNonCollidingName(collidingNames, nameGeneration);
     }
 
+
     public static String getNoneCollidingMethodName(JarArchive archive, ClassNode classNode, Function<Integer, String> nameGeneration) {
-        Set<String> collidingNames = new HashSet<>();
+        return getNoneCollidingMethodName(archive, classNode, Set.of(), nameGeneration);
+    }
+
+    public static String getNoneCollidingMethodName(JarArchive archive, ClassNode classNode, Set<String> exclusions, Function<Integer, String> nameGeneration) {
+        Set<String> collidingNames = new HashSet<>(exclusions);
+
         HierarchyUtil.forEachAncestorClass(archive, classNode, true, true, cn -> {
             cn.methods.forEach(methodNode -> collidingNames.add(methodNode.name));
         });
