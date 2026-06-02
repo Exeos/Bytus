@@ -30,9 +30,18 @@ public class ClassRemapper {
             classNode.superName = getMapped(classNode.superName);
             classNode.interfaces.replaceAll(this::getMapped);
             classNode.signature = null;
-
+            if (classNode.visibleAnnotations != null) {
+                classNode.visibleAnnotations.replaceAll(this::remapAnnotation);
+            }
+            if (classNode.invisibleAnnotations != null) {
+                classNode.invisibleAnnotations.replaceAll(this::remapAnnotation);
+            }
             classNode.fields.forEach(this::remapFieldNode);
             classNode.methods.forEach(this::remapMethodNode);
+        }
+
+        for (Map.Entry<String, String> entry : mapping.entrySet()) {
+            System.out.println(entry.getKey() + " -> " + entry.getValue());
         }
     }
 
@@ -57,7 +66,8 @@ public class ClassRemapper {
             switch (insnNode) {
                 case FieldInsnNode fieldInsnNode -> remapFieldInsnNode(fieldInsnNode);
                 case MethodInsnNode methodInsnNode -> remapMethodInsnNode(methodInsnNode);
-                case TypeInsnNode typeInsnNode -> typeInsnNode.desc = getMapped(typeInsnNode.desc);
+                case TypeInsnNode typeInsnNode ->
+                        typeInsnNode.desc = remapDescMember(DescriptorParser.parseType(typeInsnNode.desc)).toType();
                 case LdcInsnNode ldcInsnNode -> remapLdcInsnNode(ldcInsnNode);
                 case InvokeDynamicInsnNode indy -> {
                     MethodDescriptor remapped = remapMethodDesc(DescriptorParser.parseMethodDesc(indy.desc));
@@ -67,12 +77,8 @@ public class ClassRemapper {
                         Object bsmArg = indy.bsmArgs[i];
 
                         switch (bsmArg) {
-                            case Handle handle -> {
-                                indy.bsmArgs[i] = remapHandle(handle);
-                            }
-                            case Type type -> {
-                                indy.bsmArgs[i] = remapType(type);
-                            }
+                            case Handle handle -> indy.bsmArgs[i] = remapHandle(handle);
+                            case Type type -> indy.bsmArgs[i] = remapType(type);
                             default -> System.out.println("Ignored BSM-Arg");
                         }
                     }
@@ -114,24 +120,57 @@ public class ClassRemapper {
         }
     }
 
+    private AnnotationNode remapAnnotation(AnnotationNode annotationNode) {
+        annotationNode.desc = remapDescMember(DescriptorParser.parseMember(annotationNode.desc)).toDesc();
+        if (annotationNode.values != null) {
+            annotationNode.values.replaceAll(this::remapAnnotationValue);
+        }
+
+        return annotationNode;
+    }
+
+    private Object remapAnnotationValue(Object value) {
+        switch (value) {
+            case Type type -> {
+                return remapType(type);
+            }
+            case AnnotationNode inner -> {
+                return remapAnnotation(inner);
+            }
+            case List list -> {
+                for (int i1 = 0; i1 < list.size(); i1++) {
+                    list.set(i1, remapAnnotationValue(list.get(i1)));
+                }
+                return value;
+            }
+            default -> {
+                return value;
+            }
+        }
+    }
+
     private void remapFieldInsnNode(FieldInsnNode target) {
-        target.owner = getMapped(target.owner);
+        target.owner = remapDescMember(DescriptorParser.parseType(target.owner)).toType();
         target.desc = remapDescMember(DescriptorParser.parseFieldDesc(target.desc)).toDesc();
     }
 
     private void remapMethodInsnNode(MethodInsnNode target) {
-        target.owner = getMapped(target.owner);
+        target.owner = remapDescMember(DescriptorParser.parseType(target.owner)).toType();
         target.desc = remapMethodDesc(DescriptorParser.parseMethodDesc(target.desc)).toDesc();
     }
 
     private Handle remapHandle(Handle target) {
+        Type t = Type.getType(target.getDesc());
+        String remappedDesc = t.getSort() == Type.METHOD ?
+                remapMethodDesc(DescriptorParser.parseMethodDesc(target.getDesc())).toDesc()
+                :
+                remapDescMember(DescriptorParser.parseMembers(target.getDesc()).getFirst()).toDesc();
+
         return new Handle(
                 target.getTag(),
                 getMapped(target.getOwner()),
                 target.getName(),
-                remapMethodDesc(
-                        DescriptorParser.parseMethodDesc(target.getDesc())
-                ).toDesc(),
+                remappedDesc,
                 target.isInterface()
         );
     }

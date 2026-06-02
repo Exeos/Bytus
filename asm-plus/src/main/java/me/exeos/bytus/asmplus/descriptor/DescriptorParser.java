@@ -21,6 +21,10 @@ public class DescriptorParser {
     }
 
     public static DescriptorMember parseFieldDesc(String descriptor) {
+        return parseMember(descriptor);
+    }
+
+    public static DescriptorMember parseMember(String descriptor) {
         return parseMembers(descriptor).getFirst();
     }
 
@@ -84,5 +88,13 @@ public class DescriptorParser {
         }
 
         return members;
+    }
+
+    public static DescriptorMember parseType(String type) {
+        if (type.startsWith("[")) {
+            return parseMember(type);
+        }
+
+        return parseMember('L' + type + ';');
     }
 }
