@@ -14,50 +14,82 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Remaps class names across an entire {@link JarArchive} using a provided name mapping.
+ *
+ * <p>Handles remapping of:
+ * <ul>
+ *   <li>Class names, superclasses, and interfaces</li>
+ *   <li>Field and method descriptors</li>
+ *   <li>Instruction operands (field/method/type/LDC/invokedynamic)</li>
+ *   <li>Annotations (visible, invisible, type)</li>
+ *   <li>Bootstrap method handles and arguments</li>
+ * </ul>
+ *
+ * <p>The mapping uses internal JVM names (e.g. {@code com/example/Foo}).
+ */
+
 public class ClassRemapper {
 
     private final Map<String, String> mapping;
 
+    /**
+     * @param mapping a map from old internal class name to new internal class name
+     */
     public ClassRemapper(Map<String, String> mapping) {
         this.mapping = mapping;
     }
 
+
+    /**
+     * Applies the remapping to all classes in the given archive.
+     * Also updates the archive's internal class map so keys reflect the new names.
+     *
+     * @param archive the jar archive to remap in-place
+     */
     public void remap(JarArchive archive) {
-        updateArchiveMap(archive);
-
-        for (ClassNode classNode : archive.getClasses().values()) {
-            classNode.name = getMapped(classNode.name);
-            classNode.superName = getMapped(classNode.superName);
-            classNode.interfaces.replaceAll(this::getMapped);
-            classNode.signature = null;
-            if (classNode.visibleAnnotations != null) {
-                classNode.visibleAnnotations.replaceAll(this::remapAnnotation);
-            }
-            if (classNode.invisibleAnnotations != null) {
-                classNode.invisibleAnnotations.replaceAll(this::remapAnnotation);
-            }
-            if (classNode.visibleTypeAnnotations != null) {
-                classNode.visibleTypeAnnotations.replaceAll(this::remapTypeAnnotation);
-            }
-            if (classNode.invisibleTypeAnnotations != null) {
-                classNode.invisibleTypeAnnotations.replaceAll(this::remapTypeAnnotation);
-            }
-
-            classNode.fields.forEach(this::remapFieldNode);
-            classNode.methods.forEach(this::remapMethodNode);
-        }
-
-        for (Map.Entry<String, String> entry : mapping.entrySet()) {
-            System.out.println(entry.getKey() + " -> " + entry.getValue());
-        }
+        rebuildArchiveMap(archive);
+        archive.getClasses().values().forEach(this::remapClassNode);
     }
 
-    private void updateArchiveMap(JarArchive archive) {
+    /**
+     * Class level remapping
+     *
+     * @param classNode ClassNode to be remapped
+     */
+    private void remapClassNode(ClassNode classNode) {
+        classNode.name = getMapped(classNode.name);
+        classNode.superName = getMapped(classNode.superName);
+        classNode.interfaces.replaceAll(this::getMapped);
+        classNode.signature = null;
+
+        remapAnnotationList(classNode.visibleAnnotations);
+        remapAnnotationList(classNode.invisibleAnnotations);
+        remapTypeAnnotationList(classNode.visibleTypeAnnotations);
+        remapTypeAnnotationList(classNode.invisibleTypeAnnotations);
+
+        classNode.fields.forEach(this::remapFieldNode);
+        classNode.methods.forEach(this::remapMethodNode);
+    }
+
+    private void rebuildArchiveMap(JarArchive archive) {
         Map<String, ClassNode> newMap = new HashMap<>();
         for (Map.Entry<String, String> entry : mapping.entrySet()) {
             newMap.put(entry.getValue(), archive.getClasses().get(entry.getKey()));
         }
         archive.setClasses(newMap);
+    }
+
+    private void remapAnnotationList(List<AnnotationNode> annotations) {
+        if (annotations != null) {
+            annotations.replaceAll(this::remapAnnotation);
+        }
+    }
+
+    private void remapTypeAnnotationList(List<TypeAnnotationNode> annotations) {
+        if (annotations != null) {
+            annotations.replaceAll(this::remapTypeAnnotation);
+        }
     }
 
     private void remapFieldNode(FieldNode target) {
@@ -67,7 +99,7 @@ public class ClassRemapper {
     }
 
     private void remapMethodNode(MethodNode target) {
-        target.desc = remapMethodDesc(DescriptorParser.parseMethodDesc(target.desc)).toDesc();
+        target.desc = remapMethodDescStr(DescriptorParser.parseMethodDesc(target.desc));
 
         for (AbstractInsnNode insnNode : target.instructions) {
             switch (insnNode) {
@@ -77,13 +109,11 @@ public class ClassRemapper {
                         typeInsnNode.desc = remapDescMember(DescriptorParser.parseType(typeInsnNode.desc)).toType();
                 case LdcInsnNode ldcInsnNode -> remapLdcInsnNode(ldcInsnNode);
                 case InvokeDynamicInsnNode indy -> {
-                    MethodDescriptor remapped = remapMethodDesc(DescriptorParser.parseMethodDesc(indy.desc));
-                    indy.desc = remapped.toDesc();
+                    indy.desc = remapMethodDescStr(DescriptorParser.parseMethodDesc(indy.desc));
+                    indy.bsm = remapHandle(indy.bsm);
 
                     for (int i = 0; i < indy.bsmArgs.length; i++) {
-                        Object bsmArg = indy.bsmArgs[i];
-
-                        switch (bsmArg) {
+                        switch (indy.bsmArgs[i]) {
                             case Handle handle -> indy.bsmArgs[i] = remapHandle(handle);
                             case Type type -> indy.bsmArgs[i] = remapType(type);
                             default -> System.out.println("Ignored BSM-Arg");
@@ -114,6 +144,7 @@ public class ClassRemapper {
         return annotationNode;
     }
 
+    @SuppressWarnings("unchecked")
     private Object remapAnnotationValue(Object value) {
         switch (value) {
             case Type type -> {
@@ -205,6 +236,10 @@ public class ClassRemapper {
                         DescriptorParser.parseMembers(target.getDescriptor()).getFirst()
                 ).toDesc()
         );
+    }
+
+    private String remapMethodDescStr(MethodDescriptor target) {
+        return remapMethodDesc(target).toDesc();
     }
 
     private MethodDescriptor remapMethodDesc(MethodDescriptor target) {
