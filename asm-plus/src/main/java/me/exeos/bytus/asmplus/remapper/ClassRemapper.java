@@ -36,6 +36,13 @@ public class ClassRemapper {
             if (classNode.invisibleAnnotations != null) {
                 classNode.invisibleAnnotations.replaceAll(this::remapAnnotation);
             }
+            if (classNode.visibleTypeAnnotations != null) {
+                classNode.visibleTypeAnnotations.replaceAll(this::remapTypeAnnotation);
+            }
+            if (classNode.invisibleTypeAnnotations != null) {
+                classNode.invisibleTypeAnnotations.replaceAll(this::remapTypeAnnotation);
+            }
+
             classNode.fields.forEach(this::remapFieldNode);
             classNode.methods.forEach(this::remapMethodNode);
         }
@@ -89,35 +96,13 @@ public class ClassRemapper {
         }
     }
 
-    private void remapLdcInsnNode(LdcInsnNode ldcInsnNode) {
-        switch (ldcInsnNode.cst) {
-            case Handle handle -> ldcInsnNode.cst = remapHandle(handle);
-            case Type type -> ldcInsnNode.cst = remapType(type);
-            case ConstantDynamic constantDynamic -> {
-                Handle bsm = remapHandle(constantDynamic.getBootstrapMethod());
-                List<Object> bsmArgs = new ArrayList<>();
-                for (int i = 0; i < constantDynamic.getBootstrapMethodArgumentCount(); i++) {
-                    switch (constantDynamic.getBootstrapMethodArgument(i)) {
-                        case Handle handle -> {
-                            bsmArgs.add(remapHandle(handle));
-                        }
-                        case Type type -> {
-                            bsmArgs.add(remapType(type));
-                        }
-                        default -> System.out.println("Ignored BSM-Argument");
-                    }
-                }
-
-                ldcInsnNode.cst = new ConstantDynamic(
-                        constantDynamic.getName(),
-                        remapMethodDesc(DescriptorParser.parseMethodDesc(constantDynamic.getDescriptor())).toDesc(),
-                        bsm,
-                        bsmArgs
-                );
-            }
-            default -> {
-            }
+    private TypeAnnotationNode remapTypeAnnotation(TypeAnnotationNode annotationNode) {
+        annotationNode.desc = remapDescMember(DescriptorParser.parseMember(annotationNode.desc)).toDesc();
+        if (annotationNode.values != null) {
+            annotationNode.values.replaceAll(this::remapAnnotationValue);
         }
+
+        return annotationNode;
     }
 
     private AnnotationNode remapAnnotation(AnnotationNode annotationNode) {
@@ -145,6 +130,37 @@ public class ClassRemapper {
             }
             default -> {
                 return value;
+            }
+        }
+    }
+
+    private void remapLdcInsnNode(LdcInsnNode ldcInsnNode) {
+        switch (ldcInsnNode.cst) {
+            case Handle handle -> ldcInsnNode.cst = remapHandle(handle);
+            case Type type -> ldcInsnNode.cst = remapType(type);
+            case ConstantDynamic constantDynamic -> {
+                Handle bsm = remapHandle(constantDynamic.getBootstrapMethod());
+                List<Object> bsmArgs = new ArrayList<>();
+                for (int i = 0; i < constantDynamic.getBootstrapMethodArgumentCount(); i++) {
+                    switch (constantDynamic.getBootstrapMethodArgument(i)) {
+                        case Handle handle -> {
+                            bsmArgs.add(remapHandle(handle));
+                        }
+                        case Type type -> {
+                            bsmArgs.add(remapType(type));
+                        }
+                        default -> System.out.println("Ignored BSM-Argument");
+                    }
+                }
+
+                ldcInsnNode.cst = new ConstantDynamic(
+                        constantDynamic.getName(),
+                        remapMethodDesc(DescriptorParser.parseMethodDesc(constantDynamic.getDescriptor())).toDesc(),
+                        bsm,
+                        bsmArgs
+                );
+            }
+            default -> {
             }
         }
     }
