@@ -31,8 +31,6 @@ public class ClassRemapper {
             classNode.interfaces.replaceAll(this::getMapped);
             classNode.signature = null;
 
-            classNode.invisibleTypeAnnotations
-
             classNode.fields.forEach(this::remapFieldNode);
             classNode.methods.forEach(this::remapMethodNode);
         }
