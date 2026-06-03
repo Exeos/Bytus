@@ -19,6 +19,7 @@ public class BytusConfig {
     public final IOConfigMember io;
     public final List<String> exclusions;
     public final String mainClassName;
+    public final boolean rename;
     public final ConstantsConfigMember constants;
     public final MbaConfigMember mba;
     public final FlowConfigMember flow;
@@ -29,6 +30,7 @@ public class BytusConfig {
             @JsonProperty("io") IOConfigMember io,
             @JsonProperty("exclusions") List<String> exclusions,
             @JsonProperty("mainClassName") String mainClassName,
+            @JsonProperty("rename") boolean rename,
             @JsonProperty("constants") ConstantsConfigMember constants,
             @JsonProperty("mba") MbaConfigMember mba,
             @JsonProperty("flow") FlowConfigMember flow,
@@ -36,6 +38,7 @@ public class BytusConfig {
         this.io = io;
         this.exclusions = exclusions;
         this.mainClassName = mainClassName;
+        this.rename = rename;
         this.constants = constants;
         this.mba = mba;
         this.flow = flow;

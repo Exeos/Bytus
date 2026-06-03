@@ -31,38 +31,7 @@ public class ParamGenerifier extends AbstractTransformer {
         super(config);
     }
 
-    @Override
-    public boolean applies() {
-        return config.flow.dataFlow();
-    }
-
-    @Override
-    public int priority() {
-        return Priority.FLOW_PARAM_GENERIFY;
-    }
-
-
-    @Override
-    public void transform(JarContext context) {
-        // ownerCtx + name + desc
-        Set<String> exclusionsByDesc = new HashSet<>();
-        // ownerCtx + name
-        Set<String> exclusionsByName = new HashSet<>();
-
-        buildExclusions(context.jar(), exclusionsByDesc, exclusionsByName);
-
-        for (ClassNode classNode : context.jar().getClasses().values()) {
-            for (MethodNode methodNode : classNode.methods) {
-                convertParamPassing(context.jar(), methodNode, exclusionsByDesc, exclusionsByName);
-            }
-
-            for (MethodNode methodNode : classNode.methods) {
-                convertParamUsage(classNode, methodNode, exclusionsByDesc, exclusionsByName);
-            }
-        }
-    }
-
-    private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
+    public static void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
         for (ClassNode classNode : jar.getClasses().values()) {
             // map tracking amount of methods declared by their ower + name
             Map<String, Integer> methodDeclarationMap = new HashMap<>();
@@ -96,7 +65,7 @@ public class ParamGenerifier extends AbstractTransformer {
         }
     }
 
-    private void expandExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, ClassNode classNode) {
+    public static void expandExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, ClassNode classNode) {
         // Collect all ancestor methods that are excluded, so we can exclude overrides and calls in this class.
         Set<String> excludedAncestorByDesc = new HashSet<>();
         Set<String> excludedAncestorByName = new HashSet<>();
@@ -135,6 +104,51 @@ public class ParamGenerifier extends AbstractTransformer {
                         exclusionsByName.add(classNode.name + methodInsnNode.name);
                     }
                 }
+            }
+        }
+    }
+
+    public static Set<String> getMethodsTargetedByInvokedynamic(MethodNode methodNode) {
+        Set<String> targeted = new HashSet<>();
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            if (insnNode instanceof InvokeDynamicInsnNode indy) {
+                for (Object bsmArg : indy.bsmArgs) {
+                    if (bsmArg instanceof Handle handle) {
+                        targeted.add(handle.getOwner() + handle.getName() + handle.getDesc());
+                    }
+                }
+            }
+        }
+
+        return targeted;
+    }
+
+    @Override
+    public boolean applies() {
+        return config.flow.dataFlow();
+    }
+
+    @Override
+    public int priority() {
+        return Priority.FLOW_PARAM_GENERIFY;
+    }
+
+    @Override
+    public void transform(JarContext context) {
+        // ownerCtx + name + desc
+        Set<String> exclusionsByDesc = new HashSet<>();
+        // ownerCtx + name
+        Set<String> exclusionsByName = new HashSet<>();
+
+        buildExclusions(context.jar(), exclusionsByDesc, exclusionsByName);
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                convertParamPassing(context.jar(), methodNode, exclusionsByDesc, exclusionsByName);
+            }
+
+            for (MethodNode methodNode : classNode.methods) {
+                convertParamUsage(classNode, methodNode, exclusionsByDesc, exclusionsByName);
             }
         }
     }
@@ -233,7 +247,7 @@ public class ParamGenerifier extends AbstractTransformer {
         // set of original slots that are written to
         Set<Integer> writtenSlots = new HashSet<>();
 
-        int paramsStartIndex = MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
+        int paramsStartIndex = MethodUtil.getParamSlotStart(methodNode);
 
         // slot of param
         int paramSlot = paramsStartIndex;
@@ -345,20 +359,5 @@ public class ParamGenerifier extends AbstractTransformer {
         // insert prologue (storing params in locals if required) and update this methods descriptor
         methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), prologue);
         methodNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
-    }
-
-    private Set<String> getMethodsTargetedByInvokedynamic(MethodNode methodNode) {
-        Set<String> targeted = new HashSet<>();
-        for (AbstractInsnNode insnNode : methodNode.instructions) {
-            if (insnNode instanceof InvokeDynamicInsnNode indy) {
-                for (Object bsmArg : indy.bsmArgs) {
-                    if (bsmArg instanceof Handle handle) {
-                        targeted.add(handle.getOwner() + handle.getName() + handle.getDesc());
-                    }
-                }
-            }
-        }
-
-        return targeted;
     }
 }

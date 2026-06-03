@@ -4,6 +4,7 @@ import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.remapper.ClassRemapper;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.ClassNode;
@@ -19,12 +20,12 @@ public class Renamor extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return config.rename;
     }
 
     @Override
     public int priority() {
-        return 0;
+        return Priority.RENAME;
     }
 
     @Override

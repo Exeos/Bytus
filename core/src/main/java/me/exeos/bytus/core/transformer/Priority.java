@@ -9,7 +9,8 @@ package me.exeos.bytus.core.transformer;
  */
 public class Priority {
 
-    public static final int PRE_PROCESSOR = 0;
+    public static final int PRE_PROCESSOR = -1;
+    public static final int RENAME = 0;
     public static final int FLOW_PARAM_GENERIFY = 1;
     public static final int FLOW_CTRL_FLATTENING = 2;
     public static final int FLOW_JUMP_FLATTENING = 3;

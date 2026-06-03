@@ -25,6 +25,26 @@ public class MethodDescriptor {
         return descBuilder.toString();
     }
 
+    public int getRelativeSlot(DescriptorMember of) {
+        return getAbsoluteSlot(of, 0);
+    }
+
+    public int getAbsoluteSlot(DescriptorMember of, int offset) {
+        int slot = offset;
+        for (DescriptorMember descriptorMember : getParams()) {
+            if (descriptorMember == of) {
+                break;
+            }
+            slot += descriptorMember.getSlotWidth();
+        }
+
+        return slot;
+    }
+
+    public void addParam(DescriptorMember param) {
+        params.add(param);
+    }
+
     public List<DescriptorMember> getParams() {
         return params;
     }

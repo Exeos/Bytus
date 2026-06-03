@@ -5,6 +5,8 @@
     "dependenciesPath": "./libs"
   },
   "exclusions": [],
+  "mainClassName": "Main",
+  "rename": false,
   "packer": {
     "enable": false,
     "mainClassName": "",
