@@ -14,6 +14,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -70,16 +71,24 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
 
                         AbstractInsnNode prev = abstractInsnNode.getPrevious();
 
+                        boolean found = false;
                         while (prev != null) {
-                            if (prev.getOpcode() == NEW) {
+                            if (prev.getOpcode() == NEW
+                                    && prev instanceof TypeInsnNode typeInsnNode
+                                    && Objects.equals(typeInsnNode.desc, methodInsnNode.owner)) {
                                 AbstractInsnNode next = prev.getNext();
                                 if (next.getOpcode() == DUP) {
                                     methodNode.instructions.remove(next);
                                     methodNode.instructions.remove(prev);
+                                    found = true;
                                     break;
                                 }
                             }
                             prev = prev.getPrevious();
+                        }
+                        if (!found) {
+                            System.out.println("didnt find new + dup for constructor call " + methodInsnNode.owner + "." + methodInsnNode.name + "." + methodInsnNode.desc);
+                            return; // what happened?
                         }
                     }
 

@@ -50,4 +50,22 @@ public class ReferenceTransformerTest {
         }
     }
 
+    static class Test {
+        Object object;
+        public Test(Object object) {
+            this.object = object;
+        }
+    }
+
+    static class Test2 {
+        Object object;
+        public Test2(Test object) {
+            this.object = object;
+        }
+    }
+
+    static {
+        Test2 test = new Test2(new Test(null));
+    }
+
 }
