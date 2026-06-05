@@ -66,9 +66,19 @@ public class InsnUtil implements Opcodes {
     }
 
     public static InsnList getIntPushSalted(int value, int salt, int saltSlot) {
-        int diff = salt - value;
+        return getIntPushSalted(value, true, salt, saltSlot);
+    }
+
+    public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot) {
         InsnList pushInsn = new InsnList();
+
+        if (!hasSalt) {
+            pushInsn.add(getIntPush(value));
+            return pushInsn;
+        }
+
         pushInsn.add(new VarInsnNode(ILOAD, saltSlot));
+        int diff = salt - value;
         if (diff != 0) {
             pushInsn.add(getIntPush(diff));
             pushInsn.add(new InsnNode(ISUB));

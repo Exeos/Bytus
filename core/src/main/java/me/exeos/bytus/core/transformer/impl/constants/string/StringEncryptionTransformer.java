@@ -9,6 +9,7 @@ import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
@@ -64,23 +65,15 @@ public class StringEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(MethodContext context) {
-        context.pipeline().getExtension(context.methodNode()).ifPresentOrElse(
-                extension -> applyTransformation(
-                        context.methodNode().instructions,
-                        extension.hasSalt(),
-                        extension.hasSalt() ? extension.getSalt() : 0,
-                        extension.hasSalt() ? extension.getSaltSlot() : 0
-                ),
-                () -> super.transform(context)
-        );
+        applyTransformation(context.methodNode().instructions, context.pipeline().getSaltInfo(context));
     }
 
     @Override
     public void transform(InsnListContext context) {
-        applyTransformation(context.insnList(), false, 0, 0);
+        applyTransformation(context.insnList(), new MethodExtension.SaltInfo());
     }
 
-    private void applyTransformation(InsnList target, boolean hasSalt, int salt, int saltSlot) {
+    private void applyTransformation(InsnList target, MethodExtension.SaltInfo saltInfo) {
         InsnUtil.loop(target, insnNode -> {
             if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
                 int key = RandomUtil.getInt(1, 100);
@@ -89,12 +82,12 @@ public class StringEncryptionTransformer extends AbstractTransformer {
                 // then decrypt method is called
                 // stack after: plain_str
                 InsnList callToDecrypt = new InsnList();
-                System.out.println(salt);
-                if (hasSalt) {
-                    callToDecrypt.add(InsnUtil.getIntPushSalted(key, salt, saltSlot));
-                } else {
-                    callToDecrypt.add(InsnUtil.getIntPush(key));
-                }
+                callToDecrypt.add(InsnUtil.getIntPushSalted(
+                        key,
+                        saltInfo.hasSalt(),
+                        saltInfo.getSaltOrDefault(0),
+                        saltInfo.getSaltSlotOrDefault(0)
+                ));
                 callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, DEC_CLASS_NAME, DEC_METHOD_NAME, DEC_METHOD_DESC));
 
                 ldcInsnNode.cst = crypt(cstString, key);

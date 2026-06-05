@@ -101,7 +101,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
                     int salt = methodSaltMap.get(methodIdentifier);
 
                     context.pipeline().getExtension(methodNode).ifPresentOrElse(
-                            extension -> extension.setSalt(salt, saltSlot),
+                            extension -> extension.saltInfo.setSalt(salt, saltSlot),
                             () -> context.pipeline().assignExtension(methodNode, new MethodExtension(salt, saltSlot))
                     );
 

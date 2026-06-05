@@ -10,6 +10,7 @@ import me.exeos.bytus.core.transformer.context.MethodContext;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -116,5 +117,15 @@ public class Pipeline {
         }
 
         methodExtensions.put(methodNode, extension);
+    }
+
+    public MethodExtension.SaltInfo getSaltInfo(MethodContext context) {
+        return getSaltInfo(context.methodNode());
+    }
+
+    public MethodExtension.SaltInfo getSaltInfo(MethodNode methodNode) {
+        return getExtension(methodNode)
+                .map(ext -> ext.saltInfo)
+                .orElseGet(MethodExtension.SaltInfo::new);
     }
 }
