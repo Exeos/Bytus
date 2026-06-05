@@ -41,7 +41,7 @@ public class TransformerManager {
         REGISTRY.add(SplitStringsTransformer::new);
         REGISTRY.add(StringEncryptionTransformer::new);
         REGISTRY.add(ConstantArrayTransformer::new);
-        REGISTRY.add(FlowFlattening::new);
+//        REGISTRY.add(FlowFlattening::new);
         REGISTRY.add(JumpFlattening::new);
         REGISTRY.add(ParamGenerifier::new);
         REGISTRY.add(ReferenceEncryptionTransformer::new);

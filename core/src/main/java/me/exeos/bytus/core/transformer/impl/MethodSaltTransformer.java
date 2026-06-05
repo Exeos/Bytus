@@ -3,9 +3,12 @@ package me.exeos.bytus.core.transformer.impl;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
+import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.utils.RandomUtil;
@@ -24,72 +27,125 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return config.salt;
     }
 
     @Override
     public int priority() {
-        return 1;
+        return Priority.SALT;
     }
 
     @Override
     public void transform(JarContext context) {
+        Map<String, Integer> methodSaltMap = new HashMap<>();
+        Map<String, Integer> methodSaltSlotMap = new HashMap<>();
+        mapMethods(context.jar(), methodSaltMap, methodSaltSlotMap);
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                String methodIdentifier = classNode.name + methodNode.name + methodNode.desc;
+                MethodDescriptor newMethodDesc = DescriptorParser
+                        .parseMethodDesc(methodNode.desc)
+                        .addParam(new DescriptorMember("I", true, false, 0));
+
+                InsnUtil.loop(methodNode.instructions, insnNode -> {
+                    if (!(insnNode instanceof MethodInsnNode methodInsnNode)) {
+                        return;
+                    }
+
+                    String invokedIdentifier = methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc;
+                    if (!methodSaltMap.containsKey(invokedIdentifier)) {
+                        return;
+                    }
+
+                    int invokedSalt = methodSaltMap.get(invokedIdentifier);
+                    InsnList addSaltToCall = new InsnList();
+                    // if the method containing this instruction is salted as well, use its salt to create invoked salt
+                    if (methodSaltMap.containsKey(methodIdentifier)) {
+                        int methodSalt = methodSaltMap.get(methodIdentifier);
+                        int saltDiff = methodSalt - invokedSalt;
+
+                        addSaltToCall.add(new VarInsnNode(ILOAD,
+                                newMethodDesc.getAbsoluteSlot(
+                                        newMethodDesc.getParams().size() - 1,
+                                        MethodUtil.getParamSlotStart(methodNode)
+                                ))
+                        );
+                        if (saltDiff != 0) {
+                            addSaltToCall.add(InsnUtil.getIntPush(saltDiff));
+                            addSaltToCall.add(new InsnNode(ISUB));
+                        }
+                    } else {
+                        addSaltToCall.add(InsnUtil.getIntPush(invokedSalt));
+                    }
+
+                    methodNode.instructions.insertBefore(insnNode, addSaltToCall);
+                    // update the desc of the MethodInsn node to match targets new descriptor
+                    methodInsnNode.desc = DescriptorParser
+                            .parseMethodDesc(methodInsnNode.desc)
+                            .addParam(new DescriptorMember("I", true, false, 0))
+                            .toDesc();
+                });
+
+                if (methodSaltMap.containsKey(methodIdentifier)) {
+                    methodNode.desc = newMethodDesc.toDesc();
+                }
+            }
+        }
+    }
+
+    private void mapMethods(JarArchive jar, Map<String, Integer> methodSaltMap, Map<String, Integer> methodSaltSlotMap) {
         // ownerCtx + name + desc
         Set<String> exclusionsByDesc = new HashSet<>();
         // ownerCtx + name
         Set<String> exclusionsByName = new HashSet<>();
-        ParamGenerifier.buildExclusions(context.jar(), exclusionsByDesc, exclusionsByName);
+        Set<String> exclusionsByOwner = new HashSet<>();
+        buildExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
 
-        Map<String, Integer> methodKeys = new HashMap<>();
-        Map<String, String> originalDesc = new HashMap<>();
-        Map<String, Integer> saltLocalIndex = new HashMap<>();
-        for (ClassNode classNode : context.jar().getClasses().values()) {
+        for (ClassNode classNode : jar.getClasses().values()) {
+            if (classNode.superName != null && classNode.superName.equals("java/lang/Enum")) {
+                continue;
+            }
             for (MethodNode methodNode : classNode.methods) {
-                String key = classNode.name + methodNode.name + methodNode.desc;
-                if (methodNode.name.equals("<init>") || methodNode.name.equals("<clinit>") || exclusionsByDesc.contains(key) || exclusionsByName.contains(classNode.name + methodNode.name)) {
+                String methodIdentifier = classNode.name + methodNode.name + methodNode.desc;
+                if (methodNode.name.equals("<init>")
+                        || methodNode.name.equals("<clinit>")
+                        || exclusionsByDesc.contains(methodIdentifier)
+                        || exclusionsByName.contains(classNode.name + methodNode.name)
+                        || exclusionsByOwner.contains(classNode.name)) {
                     continue;
                 }
 
-                MethodDescriptor methodDescriptor = DescriptorParser.parseMethodDesc(methodNode.desc);
-                methodDescriptor.addParam(new DescriptorMember("I", true, false, 0));
+                methodSaltMap.put(methodIdentifier, RandomUtil.getInt(0, 50000));
+                methodSaltSlotMap.put(methodIdentifier, methodNode.maxLocals++);
+            }
+        }
+    }
 
-                methodKeys.put(key, RandomUtil.getInt(0, Integer.MAX_VALUE / 2));
-                String org = methodNode.desc;
-                methodNode.desc = methodDescriptor.toDesc();
-                saltLocalIndex.put(key, methodNode.maxLocals++);
-                originalDesc.put(classNode.name + methodNode.name + methodNode.desc, org);
+    private static void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, Set<String> exclusionsByOwner) {
+        for (ClassNode classNode : jar.getClasses().values()) {
+            // map tracking amount of methods declared by their ower + name
+            for (MethodNode methodNode : classNode.methods) {
+                // exclude all methods declared in interfaces
+                if ((classNode.access & ACC_INTERFACE) != 0) {
+                    exclusionsByName.add(classNode.name + methodNode.name);
+                }
+                if (classNode.superName != null && classNode.superName.equals("java/lang/Enum")) {
+                    exclusionsByOwner.add(classNode.name);
+                }
+
+                // exclude all methods invoked by InvokeDynamic
+                exclusionsByDesc.addAll(ParamGenerifier.getMethodsTargetedByInvokedynamic(methodNode));
             }
         }
 
-        for (ClassNode classNode : context.jar().getClasses().values()) {
-            for (MethodNode methodNode : classNode.methods) {
-                InsnUtil.loop(methodNode.instructions, insnNode -> {
-                    if (insnNode instanceof MethodInsnNode methodInsnNode) {
-                        String key = methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc;
-                        if (methodKeys.containsKey(key)) {
-                            MethodDescriptor invokeDesc = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
-                            DescriptorMember saltParam = new DescriptorMember("I", true, false, 0);
-                            invokeDesc.addParam(saltParam);
+        ParamGenerifier.expandExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
 
-                            int targetKey = methodKeys.get(key);
-                            String k2 = classNode.name + methodNode.name + originalDesc.getOrDefault(classNode.name + methodNode.name + methodNode.desc, methodNode.desc);
-                            InsnList loadkey = new InsnList();
-                            if (methodKeys.containsKey(k2)) {
-                                int mKey = methodKeys.get(k2);
-                                int diff = mKey - targetKey;
-                                int slatLocal = saltLocalIndex.get(k2);
-                                loadkey.add(new VarInsnNode(ILOAD, slatLocal));
-                                loadkey.add(InsnUtil.getIntPush(diff));
-                                loadkey.add(new InsnNode(ISUB));
-                            } else {
-                                loadkey.add(InsnUtil.getIntPush(targetKey));
-                            }
-
-                            methodNode.instructions.insertBefore(insnNode, loadkey);
-                            methodInsnNode.desc = invokeDesc.toDesc();
-                        }
-                    }
-                });
+        // exclude main method
+        if (jar.getManifest() != null) {
+            String mainClassName = jar.getManifest().getMainAttributes().getValue("Main-Class");
+            if (mainClassName != null) {
+                exclusionsByDesc.add(mainClassName.replace(".", "/") + "main" + "([Ljava/lang/String;)V");
             }
         }
     }

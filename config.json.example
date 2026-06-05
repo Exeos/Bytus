@@ -7,11 +7,7 @@
   "exclusions": [],
   "mainClassName": "Main",
   "rename": false,
-  "packer": {
-    "enable": false,
-    "mainClassName": "",
-    "bootstrapClassName": ""
-  },
+  "salt": false,
   "constants": {
     "enable": false,
     "constantArray": false,
