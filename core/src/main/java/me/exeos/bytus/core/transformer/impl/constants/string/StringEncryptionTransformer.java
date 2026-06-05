@@ -64,9 +64,6 @@ public class StringEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(MethodContext context) {
-        if (context.methodNode().name.equals("getSecretEncryptionKey")) {
-            System.out.println();
-        }
         context.pipeline().getExtension(context.methodNode()).ifPresentOrElse(
                 extension -> applyTransformation(
                         context.methodNode().instructions,
@@ -92,6 +89,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
                 // then decrypt method is called
                 // stack after: plain_str
                 InsnList callToDecrypt = new InsnList();
+                System.out.println(salt);
                 if (hasSalt) {
                     callToDecrypt.add(InsnUtil.getIntPushSalted(key, salt, saltSlot));
                 } else {

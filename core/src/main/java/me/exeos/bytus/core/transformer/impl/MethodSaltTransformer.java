@@ -47,46 +47,58 @@ public class MethodSaltTransformer extends AbstractTransformer {
                         .parseMethodDesc(methodNode.desc)
                         .addParam(new DescriptorMember("I", true, false, 0));
 
+                int saltSlot =  newMethodDesc.getAbsoluteSlot(
+                        newMethodDesc.getParams().size() - 1,
+                        MethodUtil.getParamSlotStart(methodNode)
+                );
+
                 InsnUtil.loop(methodNode.instructions, insnNode -> {
-                    if (!(insnNode instanceof MethodInsnNode methodInsnNode)) {
-                        return;
-                    }
+                    switch (insnNode) {
+                        // update local variable indexes so they don't collide after growing param count
+                        case VarInsnNode varInsnNode -> {
+                            if (methodSaltMap.containsKey(methodIdentifier) && varInsnNode.var >= saltSlot) {
+                                varInsnNode.var += 1;
+                            }
+                        }
+                        // same for iinc
+                        case IincInsnNode iincInsnNode -> {
+                            if (methodSaltMap.containsKey(methodIdentifier) && iincInsnNode.var >= saltSlot) {
+                                iincInsnNode.var += 1;
+                            }
+                        }
+                        // update description of method calls and pass their salt
+                        case MethodInsnNode methodInsnNode -> {
+                            String invokedIdentifier = methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc;
+                            if (!methodSaltMap.containsKey(invokedIdentifier)) {
+                                return;
+                            }
 
-                    String invokedIdentifier = methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc;
-                    if (!methodSaltMap.containsKey(invokedIdentifier)) {
-                        return;
-                    }
+                            int invokedSalt = methodSaltMap.get(invokedIdentifier);
+                            InsnList addSaltToCall = new InsnList();
+                            // if the method containing this instruction is salted as well, use its salt to create invoked salt
+                            if (methodSaltMap.containsKey(methodIdentifier)) {
+                                addSaltToCall.add(InsnUtil.getIntPushSalted(
+                                        invokedSalt,
+                                        methodSaltMap.get(methodIdentifier),
+                                        saltSlot
+                                ));
+                            } else {
+                                addSaltToCall.add(InsnUtil.getIntPush(invokedSalt));
+                            }
 
-                    int invokedSalt = methodSaltMap.get(invokedIdentifier);
-                    InsnList addSaltToCall = new InsnList();
-                    // if the method containing this instruction is salted as well, use its salt to create invoked salt
-                    if (methodSaltMap.containsKey(methodIdentifier)) {
-                        addSaltToCall.add(InsnUtil.getIntPushSalted(
-                                invokedSalt,
-                                methodSaltMap.get(methodIdentifier),
-                                newMethodDesc.getAbsoluteSlot(
-                                        newMethodDesc.getParams().size() - 1,
-                                        MethodUtil.getParamSlotStart(methodNode)
-                                )
-                        ));
-                    } else {
-                        addSaltToCall.add(InsnUtil.getIntPush(invokedSalt));
+                            methodNode.instructions.insertBefore(insnNode, addSaltToCall);
+                            // update the desc of the MethodInsn node to match targets new descriptor
+                            methodInsnNode.desc = DescriptorParser
+                                    .parseMethodDesc(methodInsnNode.desc)
+                                    .addParam(new DescriptorMember("I", true, false, 0))
+                                    .toDesc();
+                        }
+                        default -> {}
                     }
-
-                    methodNode.instructions.insertBefore(insnNode, addSaltToCall);
-                    // update the desc of the MethodInsn node to match targets new descriptor
-                    methodInsnNode.desc = DescriptorParser
-                            .parseMethodDesc(methodInsnNode.desc)
-                            .addParam(new DescriptorMember("I", true, false, 0))
-                            .toDesc();
                 });
 
                 if (methodSaltMap.containsKey(methodIdentifier)) {
                     int salt = methodSaltMap.get(methodIdentifier);
-                    int saltSlot = newMethodDesc.getAbsoluteSlot(
-                            newMethodDesc.getParams().size() - 1,
-                            MethodUtil.getParamSlotStart(methodNode)
-                    );
 
                     context.pipeline().getExtension(methodNode).ifPresentOrElse(
                             extension -> extension.setSalt(salt, saltSlot),
