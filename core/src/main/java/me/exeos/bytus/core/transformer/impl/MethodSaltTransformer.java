@@ -4,6 +4,7 @@ import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.utils.HierarchyUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
@@ -11,7 +12,6 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
-import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
@@ -116,10 +116,9 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
         // ownerCtx + name + desc
         Set<String> exclusionsByDesc = new HashSet<>();
-        // ownerCtx + name
-        Set<String> exclusionsByName = new HashSet<>();
+        // owner
         Set<String> exclusionsByOwner = new HashSet<>();
-        buildExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
+        buildExclusions(jar, exclusionsByDesc, exclusionsByOwner);
 
         for (ClassNode classNode : jar.getClasses().values()) {
             if (classNode.superName != null && classNode.superName.equals("java/lang/Enum")) {
@@ -130,7 +129,6 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 if (methodNode.name.equals("<init>")
                         || methodNode.name.equals("<clinit>")
                         || exclusionsByDesc.contains(methodIdentifier)
-                        || exclusionsByName.contains(classNode.name + methodNode.name)
                         || exclusionsByOwner.contains(classNode.name)) {
                     continue;
                 }
@@ -142,24 +140,19 @@ public class MethodSaltTransformer extends AbstractTransformer {
         return methodSaltMap;
     }
 
-    private static void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, Set<String> exclusionsByOwner) {
+    private static void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByOwner) {
         for (ClassNode classNode : jar.getClasses().values()) {
-            // map tracking amount of methods declared by their ower + name
-            for (MethodNode methodNode : classNode.methods) {
-                // exclude all methods declared in interfaces
-                if ((classNode.access & ACC_INTERFACE) != 0) {
-                    exclusionsByName.add(classNode.name + methodNode.name);
-                }
-                if (classNode.superName != null && classNode.superName.equals("java/lang/Enum")) {
-                    exclusionsByOwner.add(classNode.name);
-                }
-
-                // exclude all methods invoked by InvokeDynamic
-                exclusionsByDesc.addAll(ParamGenerifier.getMethodsTargetedByInvokedynamic(methodNode));
+            // exclude all interfaces
+            if ((classNode.access & ACC_INTERFACE) != 0) {
+                exclusionsByOwner.add(classNode.name);
             }
+            if (classNode.superName != null && classNode.superName.equals("java/lang/Enum")) {
+                exclusionsByOwner.add(classNode.name);
+            }
+            classNode.methods.forEach(methodNode -> exclusionsByDesc.addAll(MethodUtil.getInvokeDynamicTargets(methodNode)));
         }
 
-        ParamGenerifier.expandExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
+        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, Set.of(), exclusionsByOwner);
 
         // exclude main method
         if (jar.getManifest() != null) {

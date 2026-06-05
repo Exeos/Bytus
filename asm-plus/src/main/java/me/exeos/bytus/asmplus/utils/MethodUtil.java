@@ -1,8 +1,12 @@
 package me.exeos.bytus.asmplus.utils;
 
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class MethodUtil implements Opcodes {
 
@@ -27,5 +31,20 @@ public class MethodUtil implements Opcodes {
 
     public static int getParamSlotStart(MethodNode methodNode) {
         return MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
+    }
+
+    public static Set<String> getInvokeDynamicTargets(MethodNode methodNode) {
+        Set<String> targeted = new HashSet<>();
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            if (insnNode instanceof InvokeDynamicInsnNode indy) {
+                for (Object bsmArg : indy.bsmArgs) {
+                    if (bsmArg instanceof Handle handle) {
+                        targeted.add(handle.getOwner() + handle.getName() + handle.getDesc());
+                    }
+                }
+            }
+        }
+
+        return targeted;
     }
 }
