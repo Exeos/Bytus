@@ -1,13 +1,15 @@
 package me.exeos.bytus.core.transformer;
 
 
+import me.exeos.bytus.core.exceptions.BytusTransformException;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import org.objectweb.asm.tree.MethodNode;
 
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -20,7 +22,7 @@ import java.util.function.Consumer;
 public class Pipeline {
 
     private final List<AbstractTransformer> transformers;
-
+    private final Map<MethodNode, MethodExtension> methodExtensions = new HashMap<>();
 
     /**
      * Creates a pipeline
@@ -96,5 +98,23 @@ public class Pipeline {
                 action.accept(t);
             }
         }
+    }
+
+    public Optional<MethodExtension> getExtension(MethodContext context) {
+        return getExtension(context.methodNode());
+    }
+
+    public Optional<MethodExtension> getExtension(MethodNode methodNode) {
+        MethodExtension extension = methodExtensions.getOrDefault(methodNode, null);
+
+        return extension == null ? Optional.empty() : Optional.of(extension);
+    }
+
+    public void assignExtension(MethodNode methodNode, MethodExtension extension) {
+        if (methodExtensions.containsKey(methodNode)) {
+            throw new BytusTransformException("Target already has an extension. Update it instead");
+        }
+
+        methodExtensions.put(methodNode, extension);
     }
 }

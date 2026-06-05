@@ -11,7 +11,6 @@ import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;

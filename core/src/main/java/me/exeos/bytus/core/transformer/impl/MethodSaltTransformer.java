@@ -10,6 +10,7 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
@@ -37,9 +38,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        Map<String, Integer> methodSaltMap = new HashMap<>();
-        Map<String, Integer> methodSaltSlotMap = new HashMap<>();
-        mapMethods(context.jar(), methodSaltMap, methodSaltSlotMap);
+        Map<String, Integer> methodSaltMap = mapMethods(context.jar());
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
@@ -62,19 +61,14 @@ public class MethodSaltTransformer extends AbstractTransformer {
                     InsnList addSaltToCall = new InsnList();
                     // if the method containing this instruction is salted as well, use its salt to create invoked salt
                     if (methodSaltMap.containsKey(methodIdentifier)) {
-                        int methodSalt = methodSaltMap.get(methodIdentifier);
-                        int saltDiff = methodSalt - invokedSalt;
-
-                        addSaltToCall.add(new VarInsnNode(ILOAD,
+                        addSaltToCall.add(InsnUtil.getIntPushSalted(
+                                invokedSalt,
+                                methodSaltMap.get(methodIdentifier),
                                 newMethodDesc.getAbsoluteSlot(
                                         newMethodDesc.getParams().size() - 1,
                                         MethodUtil.getParamSlotStart(methodNode)
-                                ))
-                        );
-                        if (saltDiff != 0) {
-                            addSaltToCall.add(InsnUtil.getIntPush(saltDiff));
-                            addSaltToCall.add(new InsnNode(ISUB));
-                        }
+                                )
+                        ));
                     } else {
                         addSaltToCall.add(InsnUtil.getIntPush(invokedSalt));
                     }
@@ -88,13 +82,26 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 });
 
                 if (methodSaltMap.containsKey(methodIdentifier)) {
+                    int salt = methodSaltMap.get(methodIdentifier);
+                    int saltSlot = newMethodDesc.getAbsoluteSlot(
+                            newMethodDesc.getParams().size() - 1,
+                            MethodUtil.getParamSlotStart(methodNode)
+                    );
+
+                    context.pipeline().getExtension(methodNode).ifPresentOrElse(
+                            extension -> extension.setSalt(salt, saltSlot),
+                            () -> context.pipeline().assignExtension(methodNode, new MethodExtension(salt, saltSlot))
+                    );
+
                     methodNode.desc = newMethodDesc.toDesc();
                 }
             }
         }
     }
 
-    private void mapMethods(JarArchive jar, Map<String, Integer> methodSaltMap, Map<String, Integer> methodSaltSlotMap) {
+    private Map<String, Integer> mapMethods(JarArchive jar) {
+        Map<String, Integer> methodSaltMap = new HashMap<>();
+
         // ownerCtx + name + desc
         Set<String> exclusionsByDesc = new HashSet<>();
         // ownerCtx + name
@@ -117,9 +124,10 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 }
 
                 methodSaltMap.put(methodIdentifier, RandomUtil.getInt(0, 50000));
-                methodSaltSlotMap.put(methodIdentifier, methodNode.maxLocals++);
             }
         }
+
+        return methodSaltMap;
     }
 
     private static void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, Set<String> exclusionsByOwner) {
