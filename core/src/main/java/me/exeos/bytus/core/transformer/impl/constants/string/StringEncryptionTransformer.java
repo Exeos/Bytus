@@ -85,8 +85,8 @@ public class StringEncryptionTransformer extends AbstractTransformer {
                 callToDecrypt.add(InsnUtil.getIntPushSalted(
                         key,
                         saltInfo.hasSalt(),
-                        saltInfo.getSaltOrDefault(0),
-                        saltInfo.getSaltSlotOrDefault(0)
+                        saltInfo.getSaltOrDefault(),
+                        saltInfo.getSaltSlotOrDefault()
                 ));
                 callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, DEC_CLASS_NAME, DEC_METHOD_NAME, DEC_METHOD_DESC));
 

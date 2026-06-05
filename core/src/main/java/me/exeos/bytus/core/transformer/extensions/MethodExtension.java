@@ -45,10 +45,18 @@ public class MethodExtension {
             return salt;
         }
 
+        public int getSaltSlotOrDefault() {
+            return getSaltSlotOrDefault(0);
+        }
+        
         public int getSaltSlotOrDefault(int defaultSlot) {
             return hasSalt ? saltSlot : defaultSlot;
         }
 
+        public int getSaltOrDefault() {
+            return getSaltOrDefault(0);
+        }
+        
         public int getSaltOrDefault(int defaultSalt) {
             return hasSalt ? salt : defaultSalt;
         }
