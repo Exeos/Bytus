@@ -10,7 +10,6 @@ import me.exeos.bytus.core.transformer.context.MethodContext;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -40,7 +39,11 @@ public class Pipeline {
      * @param context jar context
      */
     public void run(JarContext context) {
-        transformers.forEach(transformer -> transformer.transform(context));
+        transformers.forEach(transformer -> {
+            System.out.println("Running: " + transformer.getClass().getSimpleName());
+            transformer.transform(context);
+            System.out.println("Finished: " + transformer.getClass().getSimpleName());
+        });
     }
 
     /**

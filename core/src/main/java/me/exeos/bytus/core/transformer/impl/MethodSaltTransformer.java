@@ -106,6 +106,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
                     );
 
                     methodNode.desc = newMethodDesc.toDesc();
+                    methodNode.maxLocals++;
                 }
             }
         }
