@@ -7,6 +7,7 @@ import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -15,7 +16,7 @@ public class ClassUtil implements Opcodes {
     private final static int MAX_GENERATION_TIES = 50;
 
     public static String getNoneCollidingClassName(JarArchive archive, Function<Integer, String> nameGeneration) {
-        return getNonCollidingName(archive.classes().keySet(), nameGeneration);
+        return getNonCollidingName(archive.getClasses().keySet(), nameGeneration);
     }
 
     public static String getNoneCollidingFieldName(JarArchive archive, ClassNode classNode, Function<Integer, String> nameGeneration) {
@@ -27,8 +28,14 @@ public class ClassUtil implements Opcodes {
         return getNonCollidingName(collidingNames, nameGeneration);
     }
 
+
     public static String getNoneCollidingMethodName(JarArchive archive, ClassNode classNode, Function<Integer, String> nameGeneration) {
-        Set<String> collidingNames = new HashSet<>();
+        return getNoneCollidingMethodName(archive, classNode, Set.of(), nameGeneration);
+    }
+
+    public static String getNoneCollidingMethodName(JarArchive archive, ClassNode classNode, Set<String> exclusions, Function<Integer, String> nameGeneration) {
+        Set<String> collidingNames = new HashSet<>(exclusions);
+
         HierarchyUtil.forEachAncestorClass(archive, classNode, true, true, cn -> {
             cn.methods.forEach(methodNode -> collidingNames.add(methodNode.name));
         });
@@ -60,5 +67,24 @@ public class ClassUtil implements Opcodes {
         methodNode.instructions.add(new InsnNode(RETURN));
         classNode.methods.add(methodNode);
         return methodNode;
+    }
+
+    public static Optional<MethodNode> findMethod(JarArchive jar, String ownerName, String methodName, String methodDesc) {
+        Optional<ClassNode> owner = JarUtil.findClass(jar, ownerName);
+        if (owner.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return findMethod(owner.get(), methodName, methodDesc);
+    }
+
+    public static Optional<MethodNode> findMethod(ClassNode owner, String methodName, String methodDesc) {
+        for (MethodNode methodNode : owner.methods) {
+            if (methodNode.name.equals(methodName) && methodNode.desc.equals(methodDesc)) {
+                return Optional.of(methodNode);
+            }
+        }
+
+        return Optional.empty();
     }
 }

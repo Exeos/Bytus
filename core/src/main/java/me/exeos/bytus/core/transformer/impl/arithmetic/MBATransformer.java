@@ -5,8 +5,11 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MBATransformer extends AbstractTransformer {
 
@@ -30,15 +33,17 @@ public class MBATransformer extends AbstractTransformer {
         int var1 = methodNode.maxLocals += 2;
         int var2 = methodNode.maxLocals += 2;
 
+        MethodExtension.SaltInfo saltInfo = context.pipeline().getSaltInfo(methodNode);
+
         for (int i = 0; i < RandomUtil.getInt(config.mba.minPasses(), config.mba.maxPasses()); i++) {
             InsnUtil.loop(methodNode.instructions, current -> {
                 if (current instanceof JumpInsnNode && current.getOpcode() >= IFEQ && current.getOpcode() <= IF_ICMPLE) {
                     InsnList mba = new InsnList();
-                    mba.add(new InsnNode(ICONST_0));
+                    mba.add(InsnUtil.getIntPushSalted(0, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                     mba.add(new InsnNode(RandomUtil.chance(50) ? IOR : IXOR));
                     if (current.getOpcode() >= IF_ICMPEQ && current.getOpcode() <= IF_ICMPLE) {
                         mba.add(new InsnNode(SWAP));
-                        mba.add(new InsnNode(ICONST_0));
+                        mba.add(InsnUtil.getIntPushSalted(0, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         mba.add(new InsnNode(RandomUtil.chance(50) ? IOR : IXOR));
                         mba.add(new InsnNode(SWAP));
                     }
@@ -55,7 +60,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(DUP_X2));
                         expression.add(new InsnNode(POP));
                         expression.add(new InsnNode(IAND));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(ISHL));
                         expression.add(new InsnNode(IADD));
                     }
@@ -69,7 +74,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));
                         expression.add(new InsnNode(LAND));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(LSHL));
                         expression.add(new InsnNode(LADD));
                     }
@@ -80,10 +85,10 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(DUP_X2));
                         expression.add(new InsnNode(POP));
                         expression.add(new InsnNode(SWAP));
-                        expression.add(new InsnNode(ICONST_M1));
+                        expression.add(InsnUtil.getIntPushSalted(-1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(IXOR));
                         expression.add(new InsnNode(IAND));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(ISHL));
                         expression.add(new InsnNode(ISUB));
                     }
@@ -99,7 +104,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(LXOR));
                         expression.add(new VarInsnNode(LLOAD, var2));
                         expression.add(new InsnNode(LAND));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(LSHL));
                         expression.add(new InsnNode(LSUB));
                     }
@@ -111,7 +116,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(POP));
                         expression.add(new InsnNode(IXOR));
                         expression.add(new InsnNode(ISUB));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(ISHR));
                     }
                     // &
@@ -126,7 +131,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new VarInsnNode(LLOAD, var2));
                         expression.add(new InsnNode(LXOR));
                         expression.add(new InsnNode(LSUB));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(LSHR));
                     }
                     // |
@@ -158,7 +163,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(DUP_X2));
                         expression.add(new InsnNode(POP));
                         expression.add(new InsnNode(IAND));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(ISHL));
                         expression.add(new InsnNode(ISUB));
                     }
@@ -173,7 +178,7 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new VarInsnNode(LLOAD, var1));
                         expression.add(new VarInsnNode(LLOAD, var2));
                         expression.add(new InsnNode(LAND));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(0), saltInfo.getSaltSlotOrDefault(0)));
                         expression.add(new InsnNode(LSHL));
                         expression.add(new InsnNode(LSUB));
                     }

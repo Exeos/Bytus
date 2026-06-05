@@ -1,13 +1,16 @@
 package me.exeos.bytus.core.transformer;
 
 
+import me.exeos.bytus.core.exceptions.BytusTransformException;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import org.objectweb.asm.tree.MethodNode;
 
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -20,7 +23,7 @@ import java.util.function.Consumer;
 public class Pipeline {
 
     private final List<AbstractTransformer> transformers;
-
+    private final Map<MethodNode, MethodExtension> methodExtensions = new HashMap<>();
 
     /**
      * Creates a pipeline
@@ -47,7 +50,7 @@ public class Pipeline {
      * @param exclusions transformer types to skip for this re-dispatch
      */
     public void emit(ClassContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
-        context.jarCtx().jar().classes().put(context.classNode().name, context.classNode());
+        context.jarCtx().jar().getClasses().put(context.classNode().name, context.classNode());
         transform(context, exclusions);
     }
 
@@ -96,5 +99,33 @@ public class Pipeline {
                 action.accept(t);
             }
         }
+    }
+
+    public Optional<MethodExtension> getExtension(MethodContext context) {
+        return getExtension(context.methodNode());
+    }
+
+    public Optional<MethodExtension> getExtension(MethodNode methodNode) {
+        MethodExtension extension = methodExtensions.getOrDefault(methodNode, null);
+
+        return extension == null ? Optional.empty() : Optional.of(extension);
+    }
+
+    public void assignExtension(MethodNode methodNode, MethodExtension extension) {
+        if (methodExtensions.containsKey(methodNode)) {
+            throw new BytusTransformException("Target already has an extension. Update it instead");
+        }
+
+        methodExtensions.put(methodNode, extension);
+    }
+
+    public MethodExtension.SaltInfo getSaltInfo(MethodContext context) {
+        return getSaltInfo(context.methodNode());
+    }
+
+    public MethodExtension.SaltInfo getSaltInfo(MethodNode methodNode) {
+        return getExtension(methodNode)
+                .map(ext -> ext.saltInfo)
+                .orElseGet(MethodExtension.SaltInfo::new);
     }
 }

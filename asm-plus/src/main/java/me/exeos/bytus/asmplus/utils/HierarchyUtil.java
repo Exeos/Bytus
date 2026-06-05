@@ -38,9 +38,10 @@ public class HierarchyUtil {
             String name = work.removeFirst();
             if (!seen.add(name)) {
                 continue;
-            };
+            }
+            ;
 
-            ClassNode cn = jar.classes().get(name);
+            ClassNode cn = jar.getClasses().get(name);
             if (cn == null) {
                 continue;
             }

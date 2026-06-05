@@ -1,5 +1,7 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
+import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -11,6 +13,7 @@ import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 public final class ReferenceProxyTransformer extends AbstractTransformer {
@@ -47,7 +50,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
                         && methodInsnNode.getOpcode() != INVOKEINTERFACE)
                     return;
 
-                MethodNode[] proxyMethods = this.generateProxyMethods(classNode, methodInsnNode);
+                MethodNode[] proxyMethods = this.generateProxyMethods(context.jarCtx().jar(), classNode, methodInsnNode);
                 MethodNode firstProxy = proxyMethods[0];
 
                 // replace the methodInsnNode with the call to the first proxy
@@ -67,7 +70,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
     }
 
     // TODO: add more stuff into the proxy methods, maybe move more logic into instead of just the actual call
-    private MethodNode[] generateProxyMethods(ClassNode classNode, MethodInsnNode methodInsnNode) {
+    private MethodNode[] generateProxyMethods(JarArchive archive, ClassNode classNode, MethodInsnNode methodInsnNode) {
         int proxyAmount = RandomUtil.getInt(Math.max(1, this.minDepth), Math.max(1, this.maxDepth + 1));
         MethodNode[] proxyMethods = new MethodNode[proxyAmount];
 
@@ -80,14 +83,16 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
         Type[] argumentTypes = Type.getArgumentTypes(proxyDesc);
 
         // build call chain: proxy[0] -> proxy[1] -> ... -> proxy[n-1] -> original
+        Set<String> usedNames = new HashSet<>();
         for (int i = proxyAmount - 1; i >= 0; i--) {
             MethodNode proxyMethod = new MethodNode(
                     ACC_PRIVATE | ACC_STATIC,
-                    RandomUtil.getString(RandomUtil.getInt(12, 32)),
+                    ClassUtil.getNoneCollidingMethodName(archive, classNode, usedNames, RandomUtil::getString),
                     proxyDesc,
                     null,
                     null
             );
+            usedNames.add(proxyMethod.name);
 
             int var = 0;
             for (Type argType : argumentTypes) {

@@ -3,13 +3,14 @@ package me.exeos.bytus.core.transformer;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.impl.MethodSaltTransformer;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
+import me.exeos.bytus.core.transformer.impl.Renamor;
 import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
 import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
@@ -39,12 +40,14 @@ public class TransformerManager {
         REGISTRY.add(SplitStringsTransformer::new);
         REGISTRY.add(StringEncryptionTransformer::new);
         REGISTRY.add(ConstantArrayTransformer::new);
-        REGISTRY.add(FlowFlattening::new);
+//        REGISTRY.add(FlowFlattening::new);
         REGISTRY.add(JumpFlattening::new);
         REGISTRY.add(ParamGenerifier::new);
         REGISTRY.add(ReferenceEncryptionTransformer::new);
         REGISTRY.add(ReferenceProxyTransformer::new);
+        REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);
+        REGISTRY.add(Renamor::new);
     }
 
     private final Pipeline pipeline;

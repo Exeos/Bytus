@@ -5,11 +5,9 @@
     "dependenciesPath": "./libs"
   },
   "exclusions": [],
-  "packer": {
-    "enable": false,
-    "mainClassName": "",
-    "bootstrapClassName": ""
-  },
+  "mainClassName": "Main",
+  "rename": false,
+  "salt": false,
   "constants": {
     "enable": false,
     "constantArray": false,
