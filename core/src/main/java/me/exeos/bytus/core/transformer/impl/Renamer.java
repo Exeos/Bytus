@@ -56,7 +56,6 @@ public class Renamer extends AbstractTransformer {
     }
 
     private boolean isEntrypoint(JarArchive archive, String className) {
-        System.out.println("Checking if class " + className);
         if (config.entryPoints.fromManifest()) {
             Optional<String> mainMethod = JarUtil.getMainMethodFromManifest(archive);
             if (mainMethod.isPresent()) {
