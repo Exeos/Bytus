@@ -26,6 +26,7 @@ public class PreProcessor extends AbstractTransformer {
     public void transform(ClassContext context) {
         context.classNode().sourceDebug = null;
         context.classNode().sourceFile = null;
+        context.classNode().signature = null;
 
         super.transform(context);
     }
@@ -34,5 +35,6 @@ public class PreProcessor extends AbstractTransformer {
     public void transform(MethodContext context) {
         context.methodNode().localVariables = null;
         context.methodNode().parameters = null;
+        context.methodNode().signature = null;
     }
 }

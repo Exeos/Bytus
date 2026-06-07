@@ -1,5 +1,8 @@
 package me.exeos.bytus.asmplus.utils;
 
+import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
+import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
+import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -29,6 +32,33 @@ public class MethodUtil implements Opcodes {
         return (methodNode.access & accessCode) != 0;
     }
 
+    /**
+     * Adds a Parameter to the method, by updating its descriptor, remapping locals and increasing maxLocals
+     *
+     * @param to    Method to add param to
+     * @param param Param to add to method
+     * @return Local slot of the newly added Param
+     */
+    public static int addParam(MethodNode to, DescriptorMember param) {
+        MethodDescriptor newMethodDesc = DescriptorParser.parseMethodDesc(to.desc).addParam(param);
+        int newParamSlot = newMethodDesc.getAbsoluteSlot(
+                newMethodDesc.getParams().size() - 1,
+                MethodUtil.getParamSlotStart(to));
+
+        // loop trough each insn and update target var if it collides
+        InsnUtil.loop(to.instructions, insnNode -> {
+            if (insnNode instanceof VarInsnNode varInsnNode && varInsnNode.var >= newParamSlot) {
+                varInsnNode.var++;
+            } else if (insnNode instanceof IincInsnNode iincInsnNode && iincInsnNode.var >= newParamSlot) {
+                iincInsnNode.var++;
+            }
+        });
+
+        to.desc = newMethodDesc.toDesc();
+        to.maxLocals += param.getSlotWidth();
+        return newParamSlot;
+    }
+
     public static int getParamSlotStart(MethodNode methodNode) {
         return MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
     }
@@ -46,5 +76,9 @@ public class MethodUtil implements Opcodes {
         }
 
         return targeted;
+    }
+
+    public static boolean isSpecial(MethodNode methodNode) {
+        return methodNode.name.equals("<init>") || methodNode.name.equals("<clinit>");
     }
 }

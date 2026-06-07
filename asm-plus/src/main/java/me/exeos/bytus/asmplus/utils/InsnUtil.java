@@ -80,8 +80,8 @@ public class InsnUtil implements Opcodes {
         pushInsn.add(new VarInsnNode(ILOAD, saltSlot));
         int diff = salt - value;
         if (diff != 0) {
-            pushInsn.add(getIntPush(diff));
-            pushInsn.add(new InsnNode(ISUB));
+            pushInsn.add(getIntPush(Math.abs(diff)));
+            pushInsn.add(new InsnNode(diff < 0 ? IADD : ISUB));
         }
 
         return pushInsn;

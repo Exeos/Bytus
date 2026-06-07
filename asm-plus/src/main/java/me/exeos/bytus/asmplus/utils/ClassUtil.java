@@ -87,4 +87,8 @@ public class ClassUtil implements Opcodes {
 
         return Optional.empty();
     }
+
+    public static boolean isEnum(ClassNode classNode) {
+        return classNode.superName != null && classNode.superName.equals("java/lang/Enum");
+    }
 }
