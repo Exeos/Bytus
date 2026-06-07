@@ -5,7 +5,10 @@
     "dependenciesPath": "./libs"
   },
   "exclusions": [],
-  "mainClassName": "Main",
+  "entryPoints": {
+    "fromManifest": true,
+    "custom": {}
+  },
   "rename": false,
   "salt": false,
   "constants": {

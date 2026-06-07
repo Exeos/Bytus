@@ -11,4 +11,15 @@ public class JarUtil {
         ClassNode cn = jar.getClasses().getOrDefault(name, null);
         return cn == null ? Optional.empty() : Optional.of(cn);
     }
+
+    public static Optional<String> getMainMethodFromManifest(JarArchive jar) {
+        if (jar.getManifest() != null) {
+            String mainClassName = jar.getManifest().getMainAttributes().getValue("Main-Class");
+            if (mainClassName != null) {
+                return Optional.of(mainClassName.replace(".", "/") + "main" + "([Ljava/lang/String;)V");
+            }
+        }
+        return Optional.empty();
+    }
+
 }

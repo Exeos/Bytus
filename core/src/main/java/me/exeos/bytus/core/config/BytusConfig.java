@@ -3,6 +3,7 @@ package me.exeos.bytus.core.config;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import me.exeos.bytus.core.config.members.ConstantsConfigMember;
+import me.exeos.bytus.core.config.members.EntryPointsConfigMember;
 import me.exeos.bytus.core.config.members.IOConfigMember;
 import me.exeos.bytus.core.config.members.MbaConfigMember;
 import me.exeos.bytus.core.config.members.flow.FlowConfigMember;
@@ -18,7 +19,7 @@ public class BytusConfig {
 
     public final IOConfigMember io;
     public final List<String> exclusions;
-    public final String mainClassName;
+    public final EntryPointsConfigMember entryPoints;
     public final boolean rename;
     public final boolean salt;
     public final ConstantsConfigMember constants;
@@ -30,7 +31,7 @@ public class BytusConfig {
     public BytusConfig(
             @JsonProperty("io") IOConfigMember io,
             @JsonProperty("exclusions") List<String> exclusions,
-            @JsonProperty("mainClassName") String mainClassName,
+            @JsonProperty("entryPoints") EntryPointsConfigMember entryPoints,
             @JsonProperty("rename") boolean rename,
             @JsonProperty("salt") boolean salt,
             @JsonProperty("constants") ConstantsConfigMember constants,
@@ -39,7 +40,7 @@ public class BytusConfig {
             @JsonProperty("references") ReferencesConfigMember references) {
         this.io = io;
         this.exclusions = exclusions;
-        this.mainClassName = mainClassName;
+        this.entryPoints = entryPoints;
         this.rename = rename;
         this.salt = salt;
         this.constants = constants;

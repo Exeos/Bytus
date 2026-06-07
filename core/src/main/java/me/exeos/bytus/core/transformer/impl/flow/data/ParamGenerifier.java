@@ -4,21 +4,14 @@ import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
-import me.exeos.bytus.asmplus.utils.TypeUtil;
+import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
-import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Transforms argument passing to Object[]
@@ -52,15 +45,15 @@ public class ParamGenerifier extends AbstractTransformer {
             }
         }
 
-        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName, Set.of());
+        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName, new HashSet<>());
 
-        // exclude main method
-        if (jar.getManifest() != null) {
-            String mainClassName = jar.getManifest().getMainAttributes().getValue("Main-Class");
-            if (mainClassName != null) {
-                exclusionsByDesc.add(mainClassName.replace(".", "/") + "main" + "([Ljava/lang/String;)V");
-            }
-        }
+        // exclude entry points
+        if (config.entryPoints.fromManifest())
+            JarUtil.getMainMethodFromManifest(jar).ifPresent(exclusionsByDesc::add);
+
+        config.entryPoints.custom().forEach((className, methodName) -> {
+            exclusionsByName.add(className.replace(".", "/") + methodName);
+        });
     }
 
     @Override

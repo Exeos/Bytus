@@ -3,10 +3,7 @@ package me.exeos.bytus.core.transformer.impl;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
+import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -143,8 +140,9 @@ public class MethodSaltTransformer extends AbstractTransformer {
         Map<String, Integer> methodSaltMap = new HashMap<>();
 
         Set<String> exclusionsByDesc = new HashSet<>();
+        Set<String> exclusionsByName = new HashSet<>();
         Set<String> exclusionsByOwner = new HashSet<>();
-        buildExclusions(jar, exclusionsByDesc, exclusionsByOwner);
+        buildExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
 
         for (ClassNode classNode : jar.getClasses().values()) {
             if (ClassUtil.isEnum(classNode) || exclusionsByOwner.contains(classNode.name)) {
@@ -152,9 +150,10 @@ public class MethodSaltTransformer extends AbstractTransformer {
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                String id = classNode.name + methodNode.name + methodNode.desc;
-                if (!MethodUtil.isSpecial(methodNode) && !exclusionsByDesc.contains(id)) {
-                    methodSaltMap.put(id, RandomUtil.getInt(SALT_MIN, SALT_MAX));
+                String name = classNode.name + methodNode.name;
+                String desc = classNode.name + methodNode.name + methodNode.desc;
+                if (!MethodUtil.isSpecial(methodNode) && !exclusionsByDesc.contains(desc) && !exclusionsByName.contains(name)) {
+                    methodSaltMap.put(desc, RandomUtil.getInt(SALT_MIN, SALT_MAX));
                 }
             }
         }
@@ -162,7 +161,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
         return methodSaltMap;
     }
 
-    private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByOwner) {
+    private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, Set<String> exclusionsByOwner) {
         for (ClassNode classNode : jar.getClasses().values()) {
             // exclude all interfaces
             if ((classNode.access & ACC_INTERFACE) != 0) {
@@ -174,9 +173,14 @@ public class MethodSaltTransformer extends AbstractTransformer {
             classNode.methods.forEach(methodNode -> exclusionsByDesc.addAll(MethodUtil.getInvokeDynamicTargets(methodNode)));
         }
 
-        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, Set.of(), exclusionsByOwner);
+        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
 
-        // exclude main method
-        exclusionsByDesc.add(config.mainClassName + "main" + "([Ljava/lang/String;)V");
+        // exclude entry points
+        if (config.entryPoints.fromManifest())
+            JarUtil.getMainMethodFromManifest(jar).ifPresent(exclusionsByDesc::add);
+
+        config.entryPoints.custom().forEach((className, methodName) -> {
+            exclusionsByName.add(className.replace(".", "/") + methodName);
+        });
     }
 }
