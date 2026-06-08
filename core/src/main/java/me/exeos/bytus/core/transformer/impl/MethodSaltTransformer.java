@@ -11,6 +11,7 @@ import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
+import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -19,6 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class MethodSaltTransformer extends AbstractTransformer {
 
@@ -26,6 +28,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
     private static final int SALT_MIN = 0;
     private static final int SALT_MAX = 50000;
     private static Map<String, Integer> SALT_BY_METHOD = null;
+    private static final Set<AbstractInsnNode> rewrittenCallees = new HashSet<>();
 
     public MethodSaltTransformer(BytusConfig config) {
         super(config);
@@ -49,7 +52,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                processMethod(context, classNode, methodNode, SALT_BY_METHOD);
+                processMethod(context, classNode, methodNode);
             }
         }
     }
@@ -65,14 +68,14 @@ public class MethodSaltTransformer extends AbstractTransformer {
      * rewrites every call site inside it to pass the appropriate salt argument.
      * Salt is then registered in the MethodExtension
      */
-    private void processMethod(JarContext context, ClassNode classNode, MethodNode methodNode, Map<String, Integer> methodSaltMap) {
+    private void processMethod(JarContext context, ClassNode classNode, MethodNode methodNode) {
         String methodId = classNode.name + methodNode.name + methodNode.desc;
-        boolean isSalted = methodSaltMap.containsKey(methodId);
+        boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
         int saltSlot = isSalted
-                ? injectSaltParam(context, methodNode, methodSaltMap.get(methodId))
+                ? injectSaltParam(context, methodNode, SALT_BY_METHOD.get(methodId))
                 : 0;
 
-        rewriteCallSites(methodNode, methodId, saltSlot, isSalted, methodSaltMap);
+        rewriteCallSites(methodNode, methodId, saltSlot, isSalted);
     }
 
     /**
@@ -82,16 +85,24 @@ public class MethodSaltTransformer extends AbstractTransformer {
      * @return the local variable slot allocated for the salt parameter
      */
     private int injectSaltParam(JarContext context, MethodNode methodNode, int salt) {
-        int saltSlot = MethodUtil.addParam(methodNode, SALT_PARAM);
+        AtomicInteger saltSlot = new AtomicInteger();
 
         context.pipeline()
                 .getExtension(methodNode)
                 .ifPresentOrElse(
-                        ext -> ext.saltInfo.setSalt(salt, saltSlot),
-                        () -> context.pipeline().assignExtension(methodNode, new MethodExtension(salt, saltSlot))
+                        ext -> {
+                            if (!ext.saltInfo.hasSalt()) {
+                                ext.saltInfo.setSalt(salt, MethodUtil.addParam(methodNode, SALT_PARAM));
+                            }
+                            saltSlot.set(ext.saltInfo.getSaltSlot());
+                        },
+                        () -> {
+                            saltSlot.set(MethodUtil.addParam(methodNode, SALT_PARAM));
+                            context.pipeline().assignExtension(methodNode, new MethodExtension(salt, saltSlot.get()));
+                        }
                 );
 
-        return saltSlot;
+        return saltSlot.get();
     }
 
     /**
@@ -103,31 +114,35 @@ public class MethodSaltTransformer extends AbstractTransformer {
             MethodNode methodNode,
             String callerId,
             int callerSaltSlot,
-            boolean callerIsSalted,
-            Map<String, Integer> saltByMethod
+            boolean callerIsSalted
     ) {
         InsnUtil.loop(methodNode.instructions, insn -> {
-            if (!(insn instanceof MethodInsnNode callInsn)) {
+            if (rewrittenCallees.contains(insn) || !(insn instanceof MethodInsnNode callInsn)) {
                 return;
             }
 
             String calleeId = callInsn.owner + callInsn.name + callInsn.desc;
-            if (!saltByMethod.containsKey(calleeId)) {
+            if (!SALT_BY_METHOD.containsKey(calleeId)) {
                 return;
             }
 
+            // insert insn pushing salt onto stack before call
             methodNode.instructions.insertBefore(
                     callInsn,
                     InsnUtil.getIntPushSalted(
-                            saltByMethod.get(calleeId),
+                            SALT_BY_METHOD.get(calleeId),
                             callerIsSalted,
-                            saltByMethod.getOrDefault(callerId, 0),
+                            SALT_BY_METHOD.getOrDefault(callerId, 0),
                             callerSaltSlot
                     )
             );
+            // update call description to match salted descriptor
             callInsn.desc = DescriptorParser.parseMethodDesc(callInsn.desc)
                     .addParam(SALT_PARAM)
                     .toDesc();
+
+            // mark callInsn as rewritten, to avoid adding another salt when emitted
+            rewrittenCallees.add(insn);
         });
     }
 
