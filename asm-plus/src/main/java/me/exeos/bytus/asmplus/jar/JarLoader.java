@@ -75,7 +75,7 @@ public class JarLoader {
     public static void export(JarArchive jar, OutputStream output) throws IOException {
         JarOutputStream jarOut = new JarOutputStream(output);
         for (Map.Entry<String, ClassNode> entry : jar.getClasses().entrySet()) {
-            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
             entry.getValue().accept(classWriter);
 
             writeJarEntry(jarOut, entry.getKey() + ".class", classWriter.toByteArray());
