@@ -43,6 +43,10 @@ public class ClassEdge {
         });
     }
 
+    public Optional<MethodEdge> findNearestMethod(MethodNode methodNode) {
+        return findNearestMethod(methodNode.name, methodNode.desc);
+    }
+
     public Optional<MethodEdge> findNearestMethod(String name, String desc) {
         Optional<MethodEdge> firstLevel = getMethod(name, desc);
         if (firstLevel.isPresent()) {

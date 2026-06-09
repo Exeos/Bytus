@@ -42,7 +42,7 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
     private MethodEdge getRoot(MethodEdge start) {
         for (ClassEdge parent : start.owner.parents) {
             Optional<MethodEdge> maybe = parent.getMethod(start.methodNode);
-            if (maybe.isPresent()) {
+            if (maybe.isPresent() && overrides(maybe.get())) {
                 return getRoot(maybe.get());
             }
         }

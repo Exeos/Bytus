@@ -186,6 +186,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
         Set<MethodNode> excludedMethods = new HashSet<>();
         buildExclusions(jar, excludedClass, excludedMethods);
 
+
         for (ClassNode classNode : jar.getClasses().values()) {
             if (ClassUtil.isEnum(classNode) || excludedClass.contains(classNode)) {
                 continue;
@@ -202,9 +203,9 @@ public class MethodSaltTransformer extends AbstractTransformer {
     }
 
     private void buildExclusions(JarArchive jar, Set<ClassNode> excludedClasses, Set<MethodNode> excludedMethods) {
-        Map<ClassNode, Set<MethodNode>> excludedMethodMap = new HashMap<>();
+        Map<ClassNode, Set<MethodNode>> indyTargets = new HashMap<>();
         for (ClassNode classNode : jar.getClasses().values()) {
-            if (AsmUtil.hasAccess(classNode.access, ACC_ANNOTATION) || ClassUtil.isEnum(classNode)) {
+            if (AsmUtil.hasAccess(classNode.access, ACC_INTERFACE) || AsmUtil.hasAccess(classNode.access, ACC_ENUM)) {
                 excludedClasses.add(classNode);
             }
 
@@ -212,22 +213,35 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 Map<ClassNode, Set<MethodNode>> targets = MethodUtil.getInvokeDynamicTargets(jar, methodNode);
 
                 targets.forEach((node, methods) -> {
-                    excludedMethodMap.computeIfAbsent(node, k -> new HashSet<>()).addAll(methods);
+                    indyTargets.computeIfAbsent(node, k -> new HashSet<>()).addAll(methods);
                     excludedMethods.addAll(methods);
                 });
             });
         }
 
         Map<ClassNode, ClassEdge> hierarchy = HierarchyAnalyzer.analyze(jar);
+        for (Map.Entry<ClassNode, Set<MethodNode>> entry : indyTargets.entrySet()) {
+            ClassNode owner = entry.getKey();
 
-        for (Map.Entry<ClassNode, Set<MethodNode>> entry : excludedMethodMap.entrySet()) {
-            ClassNode cn = entry.getKey();
-            for (MethodNode methodNode : entry.getValue()) {
-                hierarchy.get(cn).getMethod(methodNode).ifPresent(methodEdge -> {
-                    MethodEdge root = methodEdge.getRoot();
-                    for (MethodEdge overrideEdge : root.getOverrides()) {
-                        excludedMethods.add(overrideEdge.methodNode());
+            for (MethodNode excludedMethod : entry.getValue()) {
+                hierarchy.get(owner).getMethod(excludedMethod).ifPresent(excludedEdge -> {
+                    MethodEdge root = excludedEdge.getRoot();
+                    for (MethodEdge override : root.getOverrides()) {
+                        excludedMethods.add(override.methodNode());
                     }
+                    excludedMethods.add(root.methodNode());
+                });
+            }
+        }
+
+        for (ClassNode excludedClass : excludedClasses) {
+            for (MethodNode methodNode : excludedClass.methods) {
+                hierarchy.get(excludedClass).getMethod(methodNode).ifPresent(excludedEdge -> {
+                    MethodEdge root = excludedEdge.getRoot();
+                    for (MethodEdge override : root.getOverrides()) {
+                        excludedMethods.add(override.methodNode());
+                    }
+                    excludedMethods.add(root.methodNode());
                 });
             }
         }
@@ -242,7 +256,6 @@ public class MethodSaltTransformer extends AbstractTransformer {
                                 && MethodUtil.hasAccess(methodNode, ACC_STATIC)).forEach(excludedMethods::add);
             });
         }
-
         config.entryPoints.custom().forEach((className, methodName) -> {
             JarUtil.findClass(jar, className).flatMap(classNode -> ClassUtil.findMethod(classNode, methodName, "([Ljava/lang/String;)V")).ifPresent(excludedMethods::add);
         });

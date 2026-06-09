@@ -109,9 +109,6 @@ public class MethodUtil implements Opcodes {
                 for (Object bsmArg : indy.bsmArgs) {
                     if (bsmArg instanceof Handle handle) {
                         JarUtil.findClass(jar, handle.getOwner()).ifPresent(classNode -> {
-                            if (methodNode.name.equals("<init>") && classNode.name.endsWith("/Variance")) {
-                                System.out.println();
-                            }
                             targeted.putIfAbsent(classNode, new HashSet<>());
                             ClassUtil.findMethod(classNode, handle.getName(), handle.getDesc()).ifPresent(targeted.get(classNode)::add);
                         });
