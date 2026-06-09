@@ -68,7 +68,6 @@ public class HierarchyUtil {
             Set<String> excludedAncestorByName = new HashSet<>();
 
             HierarchyUtil.forEachAncestorClass(jar, classNode, ancestor -> {
-                exclusionsByOwner.add(classNode.name);
                 for (MethodNode m : ancestor.methods) {
                     String keyByDesc = ancestor.name + m.name + m.desc;
                     if (exclusionsByDesc.contains(keyByDesc)) {

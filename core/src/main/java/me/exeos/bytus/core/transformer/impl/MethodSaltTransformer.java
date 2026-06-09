@@ -1,5 +1,8 @@
 package me.exeos.bytus.core.transformer.impl;
 
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.jar.JarArchive;
@@ -11,16 +14,11 @@ import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.*;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class MethodSaltTransformer extends AbstractTransformer {
 
@@ -55,6 +53,17 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 processMethod(context, classNode, methodNode);
             }
         }
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                String methodId = classNode.name + methodNode.name + methodNode.desc;
+                boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
+
+                if (isSalted) {
+                    injectSaltParam(context, methodNode, SALT_BY_METHOD.get(methodId));
+                }
+            }
+        }
     }
 
     @Override
@@ -72,10 +81,16 @@ public class MethodSaltTransformer extends AbstractTransformer {
         String methodId = classNode.name + methodNode.name + methodNode.desc;
         boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
         int saltSlot = isSalted
-                ? injectSaltParam(context, methodNode, SALT_BY_METHOD.get(methodId))
+                ? MethodUtil.getNewParamSlot(methodNode, SALT_PARAM)
                 : 0;
 
-        rewriteCallSites(methodNode, methodId, saltSlot, isSalted);
+        if (isSalted)
+            MethodUtil.fixVars(methodNode.instructions, saltSlot);
+
+        rewriteCallSites(HierarchyAnalyzer.analyzeNameMapped(context.jar()), methodNode, methodId, saltSlot, isSalted);
+
+//        if (isSalted)
+//            injectSaltParam(context, methodNode, SALT_BY_METHOD.get(methodId));
     }
 
     /**
@@ -92,12 +107,12 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 .ifPresentOrElse(
                         ext -> {
                             if (!ext.saltInfo.hasSalt()) {
-                                ext.saltInfo.setSalt(salt, MethodUtil.addParam(methodNode, SALT_PARAM));
+                                ext.saltInfo.setSalt(salt, MethodUtil.addParam(methodNode, SALT_PARAM, false));
                             }
                             saltSlot.set(ext.saltInfo.getSaltSlot());
                         },
                         () -> {
-                            saltSlot.set(MethodUtil.addParam(methodNode, SALT_PARAM));
+                            saltSlot.set(MethodUtil.addParam(methodNode, SALT_PARAM, false));
                             context.pipeline().assignExtension(methodNode, new MethodExtension(salt, saltSlot.get()));
                         }
                 );
@@ -111,6 +126,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
      * salt push instruction and updates the callee descriptor.
      */
     private void rewriteCallSites(
+            Map<String, ClassEdge> hierarchy,
             MethodNode methodNode,
             String callerId,
             int callerSaltSlot,
@@ -121,8 +137,19 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 return;
             }
 
-            String calleeId = callInsn.owner + callInsn.name + callInsn.desc;
-            if (!SALT_BY_METHOD.containsKey(calleeId)) {
+            if (!hierarchy.containsKey(callInsn.owner)) {
+                return;
+            }
+
+            AtomicReference<String> calleeId = new AtomicReference<>(null);
+            hierarchy.get(callInsn.owner).findNearestMethod(callInsn.name, callInsn.desc).ifPresent(methodEdge -> {
+                String id = methodEdge.owner().classNode.name + callInsn.name + callInsn.desc;
+                if (SALT_BY_METHOD.containsKey(id) && calleeId.get() == null) {
+                    calleeId.set(id);
+                }
+            });
+
+            if (calleeId.get() == null) {
                 return;
             }
 
@@ -130,7 +157,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
             methodNode.instructions.insertBefore(
                     callInsn,
                     InsnUtil.getIntPushSalted(
-                            SALT_BY_METHOD.get(calleeId),
+                            SALT_BY_METHOD.get(calleeId.get()),
                             callerIsSalted,
                             SALT_BY_METHOD.getOrDefault(callerId, 0),
                             callerSaltSlot
@@ -154,21 +181,19 @@ public class MethodSaltTransformer extends AbstractTransformer {
     private Map<String, Integer> buildSaltMap(JarArchive jar) {
         Map<String, Integer> methodSaltMap = new HashMap<>();
 
-        Set<String> exclusionsByDesc = new HashSet<>();
-        Set<String> exclusionsByName = new HashSet<>();
-        Set<String> exclusionsByOwner = new HashSet<>();
-        buildExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
+
+        Set<ClassNode> excludedClass = new HashSet<>();
+        Set<MethodNode> excludedMethods = new HashSet<>();
+        buildExclusions(jar, excludedClass, excludedMethods);
 
         for (ClassNode classNode : jar.getClasses().values()) {
-            if (ClassUtil.isEnum(classNode) || exclusionsByOwner.contains(classNode.name)) {
+            if (ClassUtil.isEnum(classNode) || excludedClass.contains(classNode)) {
                 continue;
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                String name = classNode.name + methodNode.name;
-                String desc = classNode.name + methodNode.name + methodNode.desc;
-                if (!MethodUtil.isSpecial(methodNode) && !exclusionsByDesc.contains(desc) && !exclusionsByName.contains(name)) {
-                    methodSaltMap.put(desc, RandomUtil.getInt(SALT_MIN, SALT_MAX));
+                if (!MethodUtil.isSpecial(methodNode) && !excludedMethods.contains(methodNode)) {
+                    methodSaltMap.put(classNode.name + methodNode.name + methodNode.desc, RandomUtil.getInt(SALT_MIN, SALT_MAX));
                 }
             }
         }
@@ -176,26 +201,50 @@ public class MethodSaltTransformer extends AbstractTransformer {
         return methodSaltMap;
     }
 
-    private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName, Set<String> exclusionsByOwner) {
+    private void buildExclusions(JarArchive jar, Set<ClassNode> excludedClasses, Set<MethodNode> excludedMethods) {
+        Map<ClassNode, Set<MethodNode>> excludedMethodMap = new HashMap<>();
         for (ClassNode classNode : jar.getClasses().values()) {
-            // exclude all interfaces
-            if ((classNode.access & ACC_INTERFACE) != 0) {
-                exclusionsByOwner.add(classNode.name);
+            if (AsmUtil.hasAccess(classNode.access, ACC_ANNOTATION) || ClassUtil.isEnum(classNode)) {
+                excludedClasses.add(classNode);
             }
-            if (classNode.superName != null && classNode.superName.equals("java/lang/Enum")) {
-                exclusionsByOwner.add(classNode.name);
-            }
-            classNode.methods.forEach(methodNode -> exclusionsByDesc.addAll(MethodUtil.getInvokeDynamicTargets(methodNode)));
+
+            classNode.methods.forEach(methodNode -> {
+                Map<ClassNode, Set<MethodNode>> targets = MethodUtil.getInvokeDynamicTargets(jar, methodNode);
+
+                targets.forEach((node, methods) -> {
+                    excludedMethodMap.computeIfAbsent(node, k -> new HashSet<>()).addAll(methods);
+                    excludedMethods.addAll(methods);
+                });
+            });
         }
 
-        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName, exclusionsByOwner);
+        Map<ClassNode, ClassEdge> hierarchy = HierarchyAnalyzer.analyze(jar);
+
+        for (Map.Entry<ClassNode, Set<MethodNode>> entry : excludedMethodMap.entrySet()) {
+            ClassNode cn = entry.getKey();
+            for (MethodNode methodNode : entry.getValue()) {
+                hierarchy.get(cn).getMethod(methodNode).ifPresent(methodEdge -> {
+                    MethodEdge root = methodEdge.getRoot();
+                    for (MethodEdge overrideEdge : root.getOverrides()) {
+                        excludedMethods.add(overrideEdge.methodNode());
+                    }
+                });
+            }
+        }
 
         // exclude entry points
-        if (config.entryPoints.fromManifest())
-            JarUtil.getMainMethodFromManifest(jar).ifPresent(exclusionsByDesc::add);
+        if (config.entryPoints.fromManifest()) {
+            JarUtil.getMainClass(jar).ifPresent(mainClass -> {
+                mainClass.methods.stream().filter(methodNode ->
+                        methodNode.name.equals("main")
+                                && methodNode.desc.equals("([Ljava/lang/String;)V")
+                                && MethodUtil.hasAccess(methodNode, ACC_PUBLIC)
+                                && MethodUtil.hasAccess(methodNode, ACC_STATIC)).forEach(excludedMethods::add);
+            });
+        }
 
         config.entryPoints.custom().forEach((className, methodName) -> {
-            exclusionsByName.add(className.replace(".", "/") + methodName);
+            JarUtil.findClass(jar, className).flatMap(classNode -> ClassUtil.findMethod(classNode, methodName, "([Ljava/lang/String;)V")).ifPresent(excludedMethods::add);
         });
     }
 }

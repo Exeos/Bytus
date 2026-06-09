@@ -69,15 +69,6 @@ public class ClassUtil implements Opcodes {
         return methodNode;
     }
 
-    public static Optional<MethodNode> findMethod(JarArchive jar, String ownerName, String methodName, String methodDesc) {
-        Optional<ClassNode> owner = JarUtil.findClass(jar, ownerName);
-        if (owner.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return findMethod(owner.get(), methodName, methodDesc);
-    }
-
     public static Optional<MethodNode> findMethod(ClassNode owner, String methodName, String methodDesc) {
         for (MethodNode methodNode : owner.methods) {
             if (methodNode.name.equals(methodName) && methodNode.desc.equals(methodDesc)) {

@@ -3,13 +3,13 @@ package me.exeos.bytus.asmplus.utils;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
+import me.exeos.bytus.asmplus.jar.JarArchive;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 public class MethodUtil implements Opcodes {
 
@@ -29,7 +29,11 @@ public class MethodUtil implements Opcodes {
     }
 
     public static boolean hasAccess(MethodNode methodNode, int accessCode) {
-        return (methodNode.access & accessCode) != 0;
+        return AsmUtil.hasAccess(methodNode.access, accessCode);
+    }
+
+    public static int addParam(MethodNode to, DescriptorMember param) {
+        return addParam(to, param, true);
     }
 
     /**
@@ -39,24 +43,44 @@ public class MethodUtil implements Opcodes {
      * @param param Param to add to method
      * @return Local slot of the newly added Param
      */
-    public static int addParam(MethodNode to, DescriptorMember param) {
+    public static int addParam(MethodNode to, DescriptorMember param, boolean fixVars) {
         MethodDescriptor newMethodDesc = DescriptorParser.parseMethodDesc(to.desc).addParam(param);
         int newParamSlot = newMethodDesc.getAbsoluteSlot(
                 newMethodDesc.getParams().size() - 1,
                 MethodUtil.getParamSlotStart(to));
 
         // loop trough each insn and update target var if it collides
-        InsnUtil.loop(to.instructions, insnNode -> {
-            if (insnNode instanceof VarInsnNode varInsnNode && varInsnNode.var >= newParamSlot) {
-                varInsnNode.var++;
-            } else if (insnNode instanceof IincInsnNode iincInsnNode && iincInsnNode.var >= newParamSlot) {
-                iincInsnNode.var++;
-            }
-        });
+        if (fixVars) {
+            InsnUtil.loop(to.instructions, insnNode -> {
+                if (insnNode instanceof VarInsnNode varInsnNode && varInsnNode.var >= newParamSlot) {
+                    varInsnNode.var++;
+                } else if (insnNode instanceof IincInsnNode iincInsnNode && iincInsnNode.var >= newParamSlot) {
+                    iincInsnNode.var++;
+                }
+            });
+        }
 
         to.desc = newMethodDesc.toDesc();
         to.maxLocals += param.getSlotWidth();
         return newParamSlot;
+    }
+
+    public static int getNewParamSlot(MethodNode to, DescriptorMember param) {
+        MethodDescriptor newMethodDesc = DescriptorParser.parseMethodDesc(to.desc).addParam(param);
+
+        return newMethodDesc.getAbsoluteSlot(
+                newMethodDesc.getParams().size() - 1,
+                MethodUtil.getParamSlotStart(to));
+    }
+
+    public static void fixVars(InsnList container, int threshold) {
+        InsnUtil.loop(container, insnNode -> {
+            if (insnNode instanceof VarInsnNode varInsnNode && varInsnNode.var >= threshold) {
+                varInsnNode.var++;
+            } else if (insnNode instanceof IincInsnNode iincInsnNode && iincInsnNode.var >= threshold) {
+                iincInsnNode.var++;
+            }
+        });
     }
 
     public static int getParamSlotStart(MethodNode methodNode) {
@@ -70,6 +94,27 @@ public class MethodUtil implements Opcodes {
                 for (Object bsmArg : indy.bsmArgs) {
                     if (bsmArg instanceof Handle handle) {
                         targeted.add(handle.getOwner() + handle.getName() + handle.getDesc());
+                    }
+                }
+            }
+        }
+
+        return targeted;
+    }
+
+    public static Map<ClassNode, Set<MethodNode>> getInvokeDynamicTargets(JarArchive jar, MethodNode methodNode) {
+        Map<ClassNode, Set<MethodNode>> targeted = new HashMap<>();
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            if (insnNode instanceof InvokeDynamicInsnNode indy) {
+                for (Object bsmArg : indy.bsmArgs) {
+                    if (bsmArg instanceof Handle handle) {
+                        JarUtil.findClass(jar, handle.getOwner()).ifPresent(classNode -> {
+                            if (methodNode.name.equals("<init>") && classNode.name.endsWith("/Variance")) {
+                                System.out.println();
+                            }
+                            targeted.putIfAbsent(classNode, new HashSet<>());
+                            ClassUtil.findMethod(classNode, handle.getName(), handle.getDesc()).ifPresent(targeted.get(classNode)::add);
+                        });
                     }
                 }
             }
