@@ -21,10 +21,24 @@ public class ClassEdge {
 
     public final ClassNode classNode;
 
+    /**
+     * Direct parent classes and interfaces in the hierarchy.
+     */
     public final List<ClassEdge> parents = new ArrayList<>();
+
+    /**
+     * Direct child classes and interfaces in the hierarchy.
+     */
     public final List<ClassEdge> children = new ArrayList<>();
 
+    /**
+     * Fields declared directly on this class.
+     */
     public final List<FieldEdge> fields = new ArrayList<>();
+
+    /**
+     * Methods declared directly on this class.
+     */
     public final List<MethodEdge> methods = new ArrayList<>();
 
     public ClassEdge(ClassNode classNode) {
@@ -39,18 +53,44 @@ public class ClassEdge {
         }
     }
 
-    public Optional<ClassEdge> findFieldsDeclaringClass(FieldNode fieldNode) {
-        return findFieldsDeclaringClass(fieldNode.name, fieldNode.desc);
+    /**
+     * Finds the class that declares the field matching the given field node.
+     *
+     * @param fieldNode The field node to match
+     * @return The declaring class, if found
+     */
+    public Optional<ClassEdge> findDeclaringClassOfField(FieldNode fieldNode) {
+        return findDeclaringClassOfField(fieldNode.name, fieldNode.desc);
     }
 
-    public Optional<ClassEdge> findFieldsDeclaringClass(String name, String desc) {
+    /**
+     * Finds the class that declares the field matching the given name and descriptor.
+     *
+     * @param name The field name
+     * @param desc The field descriptor
+     * @return The declaring class, if found
+     */
+    public Optional<ClassEdge> findDeclaringClassOfField(String name, String desc) {
         return findNearestField(name, desc).map(FieldEdge::owner);
     }
 
+    /**
+     * Finds the nearest field with the same name and descriptor as the given field node.
+     *
+     * @param fieldNode The field node to match
+     * @return The nearest matching field, if one exists
+     */
     public Optional<FieldEdge> findNearestField(FieldNode fieldNode) {
         return findNearestField(fieldNode.name, fieldNode.desc);
     }
 
+    /**
+     * Finds the nearest field with the given name and descriptor in this class hierarchy.
+     *
+     * @param name The field name
+     * @param desc The field descriptor
+     * @return The nearest matching field, if one exists
+     */
     public Optional<FieldEdge> findNearestField(String name, String desc) {
         Optional<FieldEdge> firstLevel = getField(name, desc);
         if (firstLevel.isPresent()) {
@@ -93,11 +133,24 @@ public class ClassEdge {
         });
     }
 
-    public Optional<ClassEdge> findMethodsDeclaringClass(MethodNode methodNode) {
-        return findMethodsDeclaringClass(methodNode.name, methodNode.desc);
+    /**
+     * Finds the class that declares the method matching the given method node.
+     *
+     * @param methodNode The method node to match
+     * @return The declaring class, if found
+     */
+    public Optional<ClassEdge> findDeclaringClassOfMethod(MethodNode methodNode) {
+        return findDeclaringClassOfMethod(methodNode.name, methodNode.desc);
     }
 
-    public Optional<ClassEdge> findMethodsDeclaringClass(String name, String desc) {
+    /**
+     * Finds the class that declares the method matching the given name and descriptor.
+     *
+     * @param name The method name
+     * @param desc The method descriptor
+     * @return The declaring class, if found
+     */
+    public Optional<ClassEdge> findDeclaringClassOfMethod(String name, String desc) {
         return findNearestMethod(name, desc).map(MethodEdge::owner);
     }
 
@@ -138,10 +191,23 @@ public class ClassEdge {
         return Optional.empty();
     }
 
+    /**
+     * Returns the field in this class matching the given field node.
+     *
+     * @param fieldNode The field node to match
+     * @return The matching field, if one exists
+     */
     public Optional<FieldEdge> getField(FieldNode fieldNode) {
         return getField(fieldNode.name, fieldNode.desc);
     }
 
+    /**
+     * Returns a field declared directly in this class, if one matches the given name and descriptor.
+     *
+     * @param name The field name
+     * @param desc The field descriptor
+     * @return The matching field, if one exists
+     */
     public Optional<FieldEdge> getField(String name, String desc) {
         for (FieldEdge fieldEdge : fields) {
             if (fieldEdge.fieldNode().name.equals(name) && fieldEdge.fieldNode().desc.equals(desc)) {

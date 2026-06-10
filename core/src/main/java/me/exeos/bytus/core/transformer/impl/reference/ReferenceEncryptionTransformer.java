@@ -2,7 +2,6 @@ package me.exeos.bytus.core.transformer.impl.reference;
 
 import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.FieldEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.AsmUtil;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
@@ -110,7 +109,7 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
                         return;
 
                      hierarchy.get(fieldInsnNode.owner)
-                             .findFieldsDeclaringClass(fieldInsnNode.name, fieldInsnNode.desc)
+                             .findDeclaringClassOfField(fieldInsnNode.name, fieldInsnNode.desc)
                              .ifPresent(declaringClass -> {
                                  // check if field is final
                                  boolean isFinal = declaringClass
