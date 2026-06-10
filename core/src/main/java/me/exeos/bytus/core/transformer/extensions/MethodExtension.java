@@ -136,7 +136,7 @@ public class MethodExtension {
                 return slot;
             }
 
-            return paramArrayIndexBySlot.get(slot);
+            return paramArrayIndexBySlot.getOrDefault(slot, slot);
         }
     }
 }

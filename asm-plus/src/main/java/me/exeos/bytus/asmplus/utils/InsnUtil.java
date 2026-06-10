@@ -76,9 +76,6 @@ public class InsnUtil implements Opcodes {
     public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot, boolean fromObjArr, int objArrSlot) {
         InsnList pushInsn = new InsnList();
 
-        if (saltSlot > 10) {
-            System.out.println();
-        }
         if (!hasSalt) {
             pushInsn.add(getIntPush(value));
             return pushInsn;
