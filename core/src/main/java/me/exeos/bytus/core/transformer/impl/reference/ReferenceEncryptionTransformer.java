@@ -140,7 +140,7 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
     private InvokeDynamicInsnNode makeMethodInvokeDynamicInsn(ClassNode owner, MethodInsnNode methodInsnNode, String bootstrapName) {
         Handle bsmHandle = new Handle(H_INVOKESTATIC, owner.name, bootstrapName, BOOTSTRAP_DESC, false);
         return new InvokeDynamicInsnNode(
-                "", // not needed
+                RandomUtil.getString(1), // not needed
                 this.fixMethodDescriptor(methodInsnNode.getOpcode(), methodInsnNode),
                 bsmHandle,
                 this.getMethodSignature(owner, methodInsnNode));
@@ -163,7 +163,7 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
     private InvokeDynamicInsnNode makeFieldInvokeDynamicInsn(ClassNode owner, FieldInsnNode fieldInsnNode, ClassNode declaringClass, String bootstrapName) {
         Handle bsmHandle = new Handle(H_INVOKESTATIC, owner.name, bootstrapName, BOOTSTRAP_DESC, false);
         return new InvokeDynamicInsnNode(
-                "", // not needed
+                RandomUtil.getString(1), // not needed
                 this.fixFieldDescriptor(fieldInsnNode),
                 bsmHandle,
                 this.getFieldSignature(fieldInsnNode, declaringClass));
