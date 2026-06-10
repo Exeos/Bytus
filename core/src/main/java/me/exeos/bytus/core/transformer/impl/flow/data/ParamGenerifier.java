@@ -9,6 +9,7 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import org.objectweb.asm.tree.*;
 
 import java.util.*;
@@ -17,6 +18,7 @@ import java.util.*;
  * Transforms argument passing to Object[]
  * Pure aids to implement because of unlimited edge cases.
  * TODO: handle interfaces better than just excluding them
+ * TODO: use Pipeline methods better so emitted methods can be obfuscated
  */
 public class ParamGenerifier extends AbstractTransformer {
 
@@ -77,23 +79,19 @@ public class ParamGenerifier extends AbstractTransformer {
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                convertParamPassing(context.jar(), methodNode, exclusionsByDesc, exclusionsByName);
+                convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(methodNode), exclusionsByDesc, exclusionsByName);
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                convertParamUsage(classNode, methodNode, exclusionsByDesc, exclusionsByName);
+                convertParamUsage(context, classNode, methodNode, exclusionsByDesc, exclusionsByName);
             }
         }
     }
 
     /**
      * Converts the way params are passed to Methods from normal passing to Object[] passing
-     *
-     * @param methodNode
-     * @param exclusionsByDesc
-     * @param exclusionsByName
      */
-    private void convertParamPassing(JarArchive jar, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
+    private void convertParamPassing(JarArchive jar, MethodNode methodNode, MethodExtension methodExtension, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
         int paramArrVarIndex = methodNode.maxLocals++;
         InsnUtil.loop(methodNode.instructions, insnNode -> {
             if (!(insnNode instanceof MethodInsnNode methodInsnNode)) {
@@ -130,7 +128,7 @@ public class ParamGenerifier extends AbstractTransformer {
             }
 
             // create Object[] and store at paramArrVarIndex
-            arrBuilder.add(InsnUtil.getIntPush(paramLength));
+            arrBuilder.add(methodExtension.getObfuscatedIntPush(paramLength));
             arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
             arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
 
@@ -141,7 +139,7 @@ public class ParamGenerifier extends AbstractTransformer {
                 // load Object[]
                 arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
                 // param index for Object[]
-                arrBuilder.add(InsnUtil.getIntPush(i));
+                arrBuilder.add(methodExtension.getObfuscatedIntPush(i));
                 // load actual param from its tempLocal
                 arrBuilder.add(new VarInsnNode(TypeUtil.loadOpcodeForType(param), tmpLocal[i]));
                 // convert to object if it's a primitive
@@ -161,7 +159,7 @@ public class ParamGenerifier extends AbstractTransformer {
         });
     }
 
-    private void convertParamUsage(ClassNode ownerNode, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
+    private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
         if (exclusionsByDesc.contains(ownerNode.name + methodNode.name + methodNode.desc) || exclusionsByName.contains(ownerNode.name + methodNode.name)) {
             return;
         }
@@ -292,5 +290,6 @@ public class ParamGenerifier extends AbstractTransformer {
         // insert prologue (storing params in locals if required) and update this methods descriptor
         methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), prologue);
         methodNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
+        context.pipeline().getExtension(methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
     }
 }

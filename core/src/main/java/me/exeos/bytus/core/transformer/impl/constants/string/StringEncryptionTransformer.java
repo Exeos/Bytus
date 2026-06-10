@@ -60,20 +60,21 @@ public class StringEncryptionTransformer extends AbstractTransformer {
         DEC_METHOD_NAME = RandomUtil.getString(1);
 
         super.transform(context);
+        ClassNode cn = cryptClass();
         context.pipeline().emit(new ClassContext(context, cryptClass()), Set.of(StringEncryptionTransformer.class));
     }
 
     @Override
     public void transform(MethodContext context) {
-        applyTransformation(context.methodNode().instructions, context.pipeline().getSaltInfo(context));
+        applyTransformation(context.methodNode().instructions, context.pipeline().getExtension(context));
     }
 
     @Override
     public void transform(InsnListContext context) {
-        applyTransformation(context.insnList(), new MethodExtension.SaltInfo());
+        applyTransformation(context.insnList(), new MethodExtension());
     }
 
-    private void applyTransformation(InsnList target, MethodExtension.SaltInfo saltInfo) {
+    private void applyTransformation(InsnList target, MethodExtension extension) {
         InsnUtil.loop(target, insnNode -> {
             if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
                 int key = RandomUtil.getInt(1, 100);
@@ -82,12 +83,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
                 // then decrypt method is called
                 // stack after: plain_str
                 InsnList callToDecrypt = new InsnList();
-                callToDecrypt.add(InsnUtil.getIntPushSalted(
-                        key,
-                        saltInfo.hasSalt(),
-                        saltInfo.getSaltOrDefault(),
-                        saltInfo.getSaltSlotOrDefault()
-                ));
+                callToDecrypt.add(extension.getObfuscatedIntPush(key));
                 callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, DEC_CLASS_NAME, DEC_METHOD_NAME, DEC_METHOD_DESC));
 
                 ldcInsnNode.cst = crypt(cstString, key);

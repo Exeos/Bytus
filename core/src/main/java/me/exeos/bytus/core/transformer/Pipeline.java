@@ -104,14 +104,14 @@ public class Pipeline {
         }
     }
 
-    public Optional<MethodExtension> getExtension(MethodContext context) {
+    public MethodExtension getExtension(MethodContext context) {
         return getExtension(context.methodNode());
     }
 
-    public Optional<MethodExtension> getExtension(MethodNode methodNode) {
-        MethodExtension extension = methodExtensions.getOrDefault(methodNode, null);
+    public MethodExtension getExtension(MethodNode methodNode) {
+        methodExtensions.putIfAbsent(methodNode, new MethodExtension());
 
-        return extension == null ? Optional.empty() : Optional.of(extension);
+        return methodExtensions.get(methodNode);
     }
 
     public void assignExtension(MethodNode methodNode, MethodExtension extension) {
@@ -122,13 +122,7 @@ public class Pipeline {
         methodExtensions.put(methodNode, extension);
     }
 
-    public MethodExtension.SaltInfo getSaltInfo(MethodContext context) {
-        return getSaltInfo(context.methodNode());
-    }
-
     public MethodExtension.SaltInfo getSaltInfo(MethodNode methodNode) {
-        return getExtension(methodNode)
-                .map(ext -> ext.saltInfo)
-                .orElseGet(MethodExtension.SaltInfo::new);
+        return getExtension(methodNode).saltInfo;
     }
 }

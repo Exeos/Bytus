@@ -9,8 +9,6 @@ import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
 public class MBATransformer extends AbstractTransformer {
 
     public MBATransformer(BytusConfig config) {
@@ -30,11 +28,6 @@ public class MBATransformer extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
-        int temp1 = methodNode.maxLocals + 2;
-        methodNode.maxLocals += 2;
-        int temp2 = methodNode.maxLocals;
-
-        MethodExtension.SaltInfo saltInfo = context.pipeline().getSaltInfo(methodNode);
 
         for (int i = 0; i < RandomUtil.getInt(config.mba.minPasses(), config.mba.maxPasses()); i++) {
             InsnUtil.loop(methodNode.instructions, current -> {
@@ -55,7 +48,7 @@ public class MBATransformer extends AbstractTransformer {
                         // a + (~b + 1)
                         expression.add(new InsnNode(ICONST_M1));
                         expression.add(new InsnNode(IXOR));
-                        expression.add(InsnUtil.getIntPushSalted(1, saltInfo.hasSalt(), saltInfo.getSaltOrDefault(), saltInfo.getSaltSlotOrDefault()));
+                        expression.add(context.pipeline().getExtension(methodNode).getObfuscatedIntPush(1));
                         expression.add(new InsnNode(IADD));
                         expression.add(new InsnNode(IADD));
                     }

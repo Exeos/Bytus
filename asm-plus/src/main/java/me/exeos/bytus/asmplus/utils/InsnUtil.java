@@ -70,14 +70,30 @@ public class InsnUtil implements Opcodes {
     }
 
     public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot) {
+        return getIntPushSalted(value, hasSalt, salt, saltSlot, false, 0);
+    }
+
+    public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot, boolean fromObjArr, int objArrSlot) {
         InsnList pushInsn = new InsnList();
 
+        if (saltSlot > 10) {
+            System.out.println();
+        }
         if (!hasSalt) {
             pushInsn.add(getIntPush(value));
             return pushInsn;
         }
 
-        pushInsn.add(new VarInsnNode(ILOAD, saltSlot));
+        if (fromObjArr) {
+            pushInsn.add(new VarInsnNode(ALOAD, objArrSlot));
+            pushInsn.add(InsnUtil.getIntPush(saltSlot));
+            pushInsn.add(new InsnNode(AALOAD));
+            pushInsn.add(new TypeInsnNode(CHECKCAST, "java/lang/Integer"));
+            pushInsn.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I"));
+        } else {
+            pushInsn.add(new VarInsnNode(ILOAD, saltSlot));
+        }
+
         int diff = salt - value;
         if (diff != 0) {
             pushInsn.add(getIntPush(Math.abs(diff)));

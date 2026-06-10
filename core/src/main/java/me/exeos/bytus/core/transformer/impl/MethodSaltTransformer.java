@@ -17,7 +17,6 @@ import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MethodSaltTransformer extends AbstractTransformer {
@@ -45,7 +44,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
     @Override
     public void transform(JarContext context) {
         if (SALT_BY_METHOD == null) {
-            SALT_BY_METHOD = buildSaltMap(context.jar());
+            SALT_BY_METHOD = buildSaltMap(context);
         }
 
         Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jar());
@@ -69,7 +68,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
     @Override
     public void transform(ClassContext context) {
-        buildSaltMap(context.jarCtx().jar()).forEach(SALT_BY_METHOD::putIfAbsent);
+        buildSaltMap(context.jarCtx()).forEach(SALT_BY_METHOD::putIfAbsent);
         transform(context.jarCtx());
     }
 
@@ -92,30 +91,15 @@ public class MethodSaltTransformer extends AbstractTransformer {
     }
 
     /**
-     * Adds the salt parameter to {@code methodNode} and registers the salt
-     * metadata in the pipeline extension for this method.
-     *
-     * @return the local variable slot allocated for the salt parameter
+     * Registers the salt metadata in the pipeline extension for this method.
      */
-    private int injectSaltParam(JarContext context, MethodNode methodNode, int salt) {
-        AtomicInteger saltSlot = new AtomicInteger();
+    private void injectSaltParam(JarContext context, MethodNode methodNode, int salt) {
+        MethodExtension extension = context.pipeline().getExtension(methodNode);
+        if (!extension.saltInfo.hasSalt()) {
+            extension.saltInfo.setSalt(salt, MethodUtil.addParam(methodNode, SALT_PARAM, false));
+        }
 
-        context.pipeline()
-                .getExtension(methodNode)
-                .ifPresentOrElse(
-                        ext -> {
-                            if (!ext.saltInfo.hasSalt()) {
-                                ext.saltInfo.setSalt(salt, MethodUtil.addParam(methodNode, SALT_PARAM, false));
-                            }
-                            saltSlot.set(ext.saltInfo.getSaltSlot());
-                        },
-                        () -> {
-                            saltSlot.set(MethodUtil.addParam(methodNode, SALT_PARAM, false));
-                            context.pipeline().assignExtension(methodNode, new MethodExtension(salt, saltSlot.get()));
-                        }
-                );
-
-        return saltSlot.get();
+        extension.saltInfo.getSaltSlot();
     }
 
     /**
@@ -176,22 +160,23 @@ public class MethodSaltTransformer extends AbstractTransformer {
      *
      * @return a map of {@code methodId -> salt}
      */
-    private Map<String, Integer> buildSaltMap(JarArchive jar) {
+    private Map<String, Integer> buildSaltMap(JarContext context) {
         Map<String, Integer> methodSaltMap = new HashMap<>();
-
 
         Set<ClassNode> excludedClass = new HashSet<>();
         Set<MethodNode> excludedMethods = new HashSet<>();
-        buildExclusions(jar, excludedClass, excludedMethods);
+        buildExclusions(context.jar(), excludedClass, excludedMethods);
 
-
-        for (ClassNode classNode : jar.getClasses().values()) {
+        for (ClassNode classNode : context.jar().getClasses().values()) {
             if (ClassUtil.isEnum(classNode) || excludedClass.contains(classNode)) {
                 continue;
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                if (!MethodUtil.isSpecial(methodNode) && !excludedMethods.contains(methodNode)) {
+                if (!context.pipeline().getSaltInfo(methodNode).hasSalt()
+                        && !MethodUtil.isSpecial(methodNode)
+                        && !excludedMethods.contains(methodNode)
+                ) {
                     methodSaltMap.put(classNode.name + methodNode.name + methodNode.desc, RandomUtil.getInt(SALT_MIN, SALT_MAX));
                 }
             }

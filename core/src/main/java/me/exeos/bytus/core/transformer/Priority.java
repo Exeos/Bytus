@@ -18,8 +18,8 @@ public class Priority {
     public static final int STR_SPLIT_STRINGS = 6;
     public static final int CONST_ARRAY = 7;
     public static final int NUM_UNDER_OVER_FLOW = 8;
-    public static final int MBA = 9;
-    public static final int FLOW_PARAM_GENERIFY = 10;
+    public static final int FLOW_PARAM_GENERIFY = 9;
+    public static final int MBA = 10;
     public static final int REF_PROXY = 11;
     public static final int REF_ENC = 12;
 }

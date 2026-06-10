@@ -61,7 +61,7 @@ public class JumpFlattening extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
-        MethodExtension.SaltInfo saltInfo = context.pipeline().getSaltInfo(methodNode);
+        MethodExtension methodExtension = context.pipeline().getExtension(methodNode);
 
         if (methodNode.instructions.size() == 0) {
             return;
@@ -78,12 +78,12 @@ public class JumpFlattening extends AbstractTransformer {
                 dispatcherEntry,
                 labelPathMap,
                 keyVarIndex,
-                saltInfo
+                methodExtension
         );
 
         if (didUpdateAnyJumps) {
             // insert dispatcher
-            methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex, saltInfo));
+            methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex, methodExtension));
         }
     }
 
@@ -136,7 +136,7 @@ public class JumpFlattening extends AbstractTransformer {
      *
      * <p>The initial {@code goto dispatcherEnd} ensures dispatcher doesn't get executed unless explicitly jumped to</p>
      */
-    private InsnList buildDispatcher(LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex, MethodExtension.SaltInfo saltInfo) {
+    private InsnList buildDispatcher(LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex, MethodExtension methodExtension) {
         InsnList insn = new InsnList();
 
         LabelNode dispatcherEnd = new LabelNode();
@@ -167,12 +167,7 @@ public class JumpFlattening extends AbstractTransformer {
             // entry -> chain -> .. -> handler
             for (int i = 0; i < path.length - 1; i++) {
                 InsnList pathInsn = new InsnList();
-                pathInsn.add(InsnUtil.getIntPushSalted(
-                        path[i + 1],
-                        saltInfo.hasSalt(),
-                        saltInfo.getSaltOrDefault(),
-                        saltInfo.getSaltSlotOrDefault()
-                ));
+                pathInsn.add(methodExtension.getObfuscatedIntPush(path[i + 1]));
                 pathInsn.add(new VarInsnNode(Opcodes.ISTORE, keyVarIndex));
                 pathInsn.add(new JumpInsnNode(Opcodes.GOTO, dispatcherEntry));
 
@@ -196,7 +191,7 @@ public class JumpFlattening extends AbstractTransformer {
      *
      * @return true if at least one jump was rewritten
      */
-    private boolean rewriteJumpsToDispatcher(MethodNode methodNode, LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex, MethodExtension.SaltInfo saltInfo) {
+    private boolean rewriteJumpsToDispatcher(MethodNode methodNode, LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex, MethodExtension methodExtension) {
         boolean updatedJumps = false;
 
         for (AbstractInsnNode insnNode : methodNode.instructions) {
@@ -207,12 +202,7 @@ public class JumpFlattening extends AbstractTransformer {
                 }
 
                 InsnList updateKeyInsn = new InsnList();
-                updateKeyInsn.add(InsnUtil.getIntPushSalted(
-                        path[0],
-                        saltInfo.hasSalt(),
-                        saltInfo.getSaltOrDefault(),
-                        saltInfo.getSaltSlotOrDefault()
-                ));
+                updateKeyInsn.add(methodExtension.getObfuscatedIntPush(path[0]));
                 updateKeyInsn.add(new VarInsnNode(Opcodes.ISTORE, keyVarIndex));
 
 

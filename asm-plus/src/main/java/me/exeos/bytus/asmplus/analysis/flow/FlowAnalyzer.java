@@ -9,6 +9,7 @@ import me.exeos.bytus.asmplus.utils.InsnUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.lang.classfile.instruction.DiscontinuedInstruction;
 import java.util.*;
 
 // TODO handle RET 
