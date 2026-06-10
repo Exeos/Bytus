@@ -9,11 +9,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Represents a method in the analyzed class hierarchy.
+ * <p>
+ * A {@code MethodEdge} wraps a method declared on a specific {@link ClassEdge} and provides helpers
+ * </p>
+ */
 public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
 
     /**
-     * Return a list of MethodEdges that override this MethodEdge
-     * @return
+     * Returns all methods in descendant classes that override this method.
+     *
+     * @return A list of overriding method edges
      */
     public List<MethodEdge> getOverrides() {
         List<MethodEdge> found = new ArrayList<>();
@@ -35,10 +42,25 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
         return found;
     }
 
+    /**
+     * Returns the root method in the override chain for this method.
+     * <p>
+     * The root is the highest ancestor method that this method overrides. If no parent method
+     * is overridden, this method returns itself.
+     * </p>
+     *
+     * @return The root method in the hierarchy chain
+     */
     public MethodEdge getRoot() {
         return getRoot(this);
     }
 
+    /**
+     * Recursively walks up the parent hierarchy to find the root method for the given start method.
+     *
+     * @param start The method edge to begin from
+     * @return The root method edge in the override chain
+     */
     private MethodEdge getRoot(MethodEdge start) {
         for (ClassEdge parent : start.owner.parents) {
             Optional<MethodEdge> maybe = parent.getMethod(start.methodNode);
@@ -50,6 +72,12 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
         return start;
     }
 
+    /**
+     * Determines whether this method overrides the given method.
+     *
+     * @param other The method to compare against
+     * @return {@code true} If this method overrides {@code other}; otherwise {@code false}
+     */
     public boolean overrides(MethodEdge other) {
         if (other == null) {
             return false;

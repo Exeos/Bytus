@@ -1,6 +1,10 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
+import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.FieldEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.utils.AsmUtil;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
@@ -14,9 +18,7 @@ import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -54,6 +56,8 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
         String bootstrapMethodName = ClassUtil.getNoneCollidingMethodName(context.jarCtx().jar(), classNode, RandomUtil::getString);
 
         AtomicBoolean anyCalls = new AtomicBoolean(false);
+
+        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jarCtx().jar());
 
         for (MethodNode methodNode : classNode.methods) {
             if (methodNode.instructions.size() == 0) continue;
@@ -102,23 +106,28 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
                     methodCount.getAndIncrement();
                 }
                 if (abstractInsnNode instanceof FieldInsnNode fieldInsnNode && this.fieldAccess) {
+                    if (!hierarchy.containsKey(fieldInsnNode.owner))
+                        return;
 
-                    ClassNode declaringClass = this.findDeclaringClass(context.jarCtx().jar(), fieldInsnNode);
-                    if (declaringClass == null) return;
+                     hierarchy.get(fieldInsnNode.owner)
+                             .findFieldsDeclaringClass(fieldInsnNode.name, fieldInsnNode.desc)
+                             .ifPresent(declaringClass -> {
+                                 // check if field is final
+                                 boolean isFinal = declaringClass
+                                         .getField(fieldInsnNode.name, fieldInsnNode.desc)
+                                         .map(fieldEdge -> AsmUtil.hasAccess(fieldEdge.fieldNode().access, ACC_FINAL))
+                                         .orElse(false);
 
-                    // check if field is final
-                    boolean isFinal = declaringClass.fields.stream()
-                            .filter(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc))
-                            .findFirst().map(f -> (f.access & ACC_FINAL) != 0).orElse(false);
-                    if (isFinal) return;
+                                 if (isFinal) return;
 
-                    InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, declaringClass, bootstrapMethodName);
-                    methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
-                    methodNode.instructions.remove(fieldInsnNode);
+                                 InvokeDynamicInsnNode invokeDynamicInsnNode = this.makeFieldInvokeDynamicInsn(classNode, fieldInsnNode, declaringClass.classNode, bootstrapMethodName);
+                                 methodNode.instructions.insert(fieldInsnNode, invokeDynamicInsnNode);
+                                 methodNode.instructions.remove(fieldInsnNode);
 
-                    anyCalls.set(true);
+                                 anyCalls.set(true);
 
-                    fieldCount.getAndIncrement();
+                                 fieldCount.getAndIncrement();
+                             });
                 }
             });
         }
@@ -191,16 +200,15 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
         return methodSignature;
     }
 
-    // TODO: REPLACE WITH HIERARCHY ANALYZER
-    private ClassNode findDeclaringClass(JarArchive jar, FieldInsnNode fieldInsnNode) {
-        Optional<ClassNode> current = jar.getClassNode(fieldInsnNode.owner);
-        while (current.isPresent()) {
-            boolean declared = current.get().fields.stream()
-                    .anyMatch(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc));
-            if (declared) return current.get();
-            current = jar.getClassNode(current.get().superName);
+    private ClassNode findDeclaringClass(JarArchive jar, Map<String, ClassEdge> hierarchy, FieldInsnNode fieldInsnNode) {
+        if (!hierarchy.containsKey(fieldInsnNode.owner)) {
+            return null;
         }
-        return null;
+
+        return hierarchy.get(fieldInsnNode.owner)
+                .findNearestField(fieldInsnNode.name, fieldInsnNode.desc)
+                .map(fieldEdge -> fieldEdge.owner().classNode)
+                .orElse(null);
     }
 
     private String getFieldSignature(FieldInsnNode fieldInsnNode, ClassNode declaringClass) {
