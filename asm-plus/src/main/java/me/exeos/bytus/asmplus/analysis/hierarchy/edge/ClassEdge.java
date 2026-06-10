@@ -63,10 +63,21 @@ public class ClassEdge {
         return Optional.empty();
     }
 
+    /**
+     * Returns MethodEdge contained in ClassEdge, if found by its name and descriptor
+     * @param methodNode MethodNode to get name and descriptor from
+     * @return Optional MethodEdge. Contains value if MethodEdge was found by name and desc
+     */
     public Optional<MethodEdge> getMethod(MethodNode methodNode) {
         return getMethod(methodNode.name, methodNode.desc);
     }
 
+    /**
+     * Returns MethodEdge contained in ClassEdge, if found by its name and descriptor
+     * @param name The name of the desired Method
+     * @param desc The descriptor of the desired Method
+     * @return Optional MethodEdge. Contains value if MethodEdge was found by name and desc
+     */
     public Optional<MethodEdge> getMethod(String name, String desc) {
         for (MethodEdge methodEdge : methods) {
             if (methodEdge.methodNode().name.equals(name) && methodEdge.methodNode().desc.equals(desc)) {

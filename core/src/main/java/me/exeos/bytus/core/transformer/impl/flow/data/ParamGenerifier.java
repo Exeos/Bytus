@@ -45,7 +45,7 @@ public class ParamGenerifier extends AbstractTransformer {
             }
         }
 
-        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName, new HashSet<>());
+        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName);
 
         // exclude entry points
         if (config.entryPoints.fromManifest())
