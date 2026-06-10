@@ -2,7 +2,9 @@ package me.exeos.bytus.asmplus.jar;
 
 import org.objectweb.asm.tree.ClassNode;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.jar.Manifest;
 
 public class JarArchive {
@@ -19,20 +21,31 @@ public class JarArchive {
         this.manifest = manifest;
     }
 
-    public ClassNode getClassNode(String className) {
+    public boolean isDependency(String name) {
+        return !classes.containsKey(name) && dependencies.containsKey(name);
+    }
+
+    public Optional<ClassNode> getClassNode(String className) {
         if (classes.containsKey(className)) {
-            return classes.get(className);
+            return Optional.of(classes.get(className));
         }
         if (dependencies.containsKey(className)) {
-            return dependencies.get(className);
+            return Optional.of(dependencies.get(className));
         }
 
         System.out.println("Class " + className + " not found in archive. Missing some dependencies?");
-        return null;
+        return Optional.empty();
     }
 
     public Map<String, ClassNode> getClasses() {
         return classes;
+    }
+
+    public Map<String, ClassNode> getClassesAndDependencies() {
+        Map<String, ClassNode> combined = new HashMap<>(getClasses());
+        getDependencies().forEach(combined::putIfAbsent);
+
+        return combined;
     }
 
     public void setClasses(Map<String, ClassNode> classes) {

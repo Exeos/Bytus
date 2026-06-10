@@ -24,7 +24,7 @@ public class HierarchyAnalyzer {
     public static Map<ClassNode, ClassEdge> analyze(JarArchive jar) {
         Map<ClassNode, ClassEdge> edgeMap = new HashMap<>();
 
-        for (ClassNode classNode : jar.getClasses().values()) {
+        for (ClassNode classNode : jar.getClassesAndDependencies().values()) {
             edgeMap.putIfAbsent(classNode, new ClassEdge(classNode));
             HierarchyUtil.forEachAncestorClass(jar, classNode, parent -> {
                 edgeMap.get(classNode).parents.add(edgeMap.computeIfAbsent(parent, ClassEdge::new));

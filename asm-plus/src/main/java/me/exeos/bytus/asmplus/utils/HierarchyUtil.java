@@ -6,10 +6,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class HierarchyUtil {
@@ -42,22 +39,18 @@ public class HierarchyUtil {
             if (!seen.add(name)) {
                 continue;
             }
-            ;
 
-            ClassNode cn = jar.getClasses().get(name);
-            if (cn == null) {
-                continue;
-            }
+            jar.getClassNode(name).ifPresent(cn -> {
+                visitor.accept(cn);
 
-            visitor.accept(cn);
+                if (cn.superName != null) {
+                    work.add(cn.superName);
+                }
 
-            if (cn.superName != null) {
-                work.add(cn.superName);
-            }
-
-            if (includeInterfaces) {
-                work.addAll(cn.interfaces);
-            }
+                if (includeInterfaces) {
+                    work.addAll(cn.interfaces);
+                }
+            });
         }
     }
 

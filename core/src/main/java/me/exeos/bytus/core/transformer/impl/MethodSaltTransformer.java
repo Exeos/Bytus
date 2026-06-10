@@ -48,9 +48,10 @@ public class MethodSaltTransformer extends AbstractTransformer {
             SALT_BY_METHOD = buildSaltMap(context.jar());
         }
 
+        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jar());
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                processMethod(context, classNode, methodNode);
+                processMethod(context, hierarchy, classNode, methodNode);
             }
         }
 
@@ -77,7 +78,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
      * rewrites every call site inside it to pass the appropriate salt argument.
      * Salt is then registered in the MethodExtension
      */
-    private void processMethod(JarContext context, ClassNode classNode, MethodNode methodNode) {
+    private void processMethod(JarContext context, Map<String, ClassEdge> hierarchy, ClassNode classNode, MethodNode methodNode) {
         String methodId = classNode.name + methodNode.name + methodNode.desc;
         boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
         int saltSlot = isSalted
@@ -87,10 +88,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
         if (isSalted)
             MethodUtil.fixVars(methodNode.instructions, saltSlot);
 
-        rewriteCallSites(HierarchyAnalyzer.analyzeNameMapped(context.jar()), methodNode, methodId, saltSlot, isSalted);
-
-//        if (isSalted)
-//            injectSaltParam(context, methodNode, SALT_BY_METHOD.get(methodId));
+        rewriteCallSites(hierarchy, methodNode, methodId, saltSlot, isSalted);
     }
 
     /**
@@ -205,8 +203,29 @@ public class MethodSaltTransformer extends AbstractTransformer {
     private void buildExclusions(JarArchive jar, Set<ClassNode> excludedClasses, Set<MethodNode> excludedMethods) {
         Map<ClassNode, Set<MethodNode>> indyTargets = new HashMap<>();
         for (ClassNode classNode : jar.getClasses().values()) {
+            // TODO: dont exclude all interfaces
             if (AsmUtil.hasAccess(classNode.access, ACC_INTERFACE) || AsmUtil.hasAccess(classNode.access, ACC_ENUM)) {
                 excludedClasses.add(classNode);
+            }
+
+            for (String anInterface : classNode.interfaces) {
+                if (jar.isDependency(anInterface)) {
+                    jar.getClassNode(anInterface).ifPresent(iNode -> {
+                        indyTargets.computeIfAbsent(iNode, k -> new HashSet<>()).addAll(iNode.methods);
+                    });
+                } else if (jar.getClassNode(anInterface).isEmpty()) {
+                    excludedClasses.add(classNode);
+                }
+            }
+
+            if (!classNode.superName.equals("java/lang/Object")) {
+                if (jar.isDependency(classNode.superName)) {
+                    jar.getClassNode(classNode.superName).ifPresent(superNode -> {
+                        indyTargets.computeIfAbsent(superNode, k -> new HashSet<>()).addAll(superNode.methods);
+                    });
+                } else if (jar.getClassNode(classNode.superName).isEmpty()) {
+                    excludedClasses.add(classNode);
+                }
             }
 
             classNode.methods.forEach(methodNode -> {

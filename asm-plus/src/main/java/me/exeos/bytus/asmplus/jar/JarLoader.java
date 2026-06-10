@@ -41,7 +41,7 @@ public class JarLoader {
         if (dependencyPath != null && dependencyPath.exists() && dependencyPath.isDirectory()) {
             for (File f : Objects.requireNonNull(dependencyPath.listFiles())) {
                 try (JarFile jarFile = new JarFile(f)) {
-                    loadFiles(dependencies, resources, jarFile);
+                    loadFiles(dependencies, new HashMap<>(), jarFile);
                 }
             }
         }

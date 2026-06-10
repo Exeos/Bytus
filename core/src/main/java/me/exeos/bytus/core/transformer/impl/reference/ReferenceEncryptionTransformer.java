@@ -15,6 +15,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -64,8 +65,8 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
                         if (methodNode.name.equals("<init>") && methodInsnNode.owner.equals(classNode.superName))
                             return;
 
-                        ClassNode ownerClass = context.jarCtx().jar().getClassNode(methodInsnNode.owner);
-                        if (ownerClass == null || (ownerClass.access & ACC_ABSTRACT) != 0) {
+                        Optional<ClassNode> ownerClass = context.jarCtx().jar().getClassNode(methodInsnNode.owner);
+                        if (ownerClass.isEmpty() || (ownerClass.get().access & ACC_ABSTRACT) != 0) {
                             return; // doesnt work for abstract super call
                         }
 
@@ -190,13 +191,14 @@ public final class ReferenceEncryptionTransformer extends AbstractTransformer {
         return methodSignature;
     }
 
+    // TODO: REPLACE WITH HIERARCHY ANALYZER
     private ClassNode findDeclaringClass(JarArchive jar, FieldInsnNode fieldInsnNode) {
-        ClassNode current = jar.getClassNode(fieldInsnNode.owner);
-        while (current != null) {
-            boolean declared = current.fields.stream()
+        Optional<ClassNode> current = jar.getClassNode(fieldInsnNode.owner);
+        while (current.isPresent()) {
+            boolean declared = current.get().fields.stream()
                     .anyMatch(f -> f.name.equals(fieldInsnNode.name) && f.desc.equals(fieldInsnNode.desc));
-            if (declared) return current;
-            current = jar.getClassNode(current.superName);
+            if (declared) return current.get();
+            current = jar.getClassNode(current.get().superName);
         }
         return null;
     }
