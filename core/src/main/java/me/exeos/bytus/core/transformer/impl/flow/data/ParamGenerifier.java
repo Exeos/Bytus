@@ -169,6 +169,9 @@ public class ParamGenerifier extends AbstractTransformer {
             return;
         }
 
+
+        MethodExtension methodExtension = context.pipeline().getExtension(methodNode);
+
         // maps original slot -> parameter
         Map<Integer, DescriptorMember> paramBySlot = new HashMap<>();
         // maps original slot-> index in Object[]
@@ -192,6 +195,8 @@ public class ParamGenerifier extends AbstractTransformer {
             paramSlot += param.getSlotWidth();
             paramArrayIndex++;
         }
+
+        context.pipeline().getExtension(methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
 
         // map what slots are mutated
         for (AbstractInsnNode insnNode : methodNode.instructions) {
@@ -221,7 +226,7 @@ public class ParamGenerifier extends AbstractTransformer {
             DescriptorMember param = paramBySlot.get(entry.getKey());
 
             prologue.add(new VarInsnNode(ALOAD, paramsStartIndex));
-            prologue.add(InsnUtil.getIntPush(paramArrayIndexBySlot.get(entry.getKey())));
+            prologue.add(methodExtension.getObfuscatedIntPush(paramArrayIndexBySlot.get(entry.getKey())));
             prologue.add(new InsnNode(AALOAD));
             prologue.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toType()));
             // if param was primitive convert it to primitive
@@ -256,7 +261,7 @@ public class ParamGenerifier extends AbstractTransformer {
                     // load Object[] containing params
                     loadFromArr.add(new VarInsnNode(ALOAD, paramsStartIndex));
                     // push index of param (-paramsStartIndex because first param will always be arr[0] but loadInsn.var will be 1 for virtual methods)
-                    loadFromArr.add(InsnUtil.getIntPush(paramArrayIndexBySlot.get(loadInsn.var)));
+                    loadFromArr.add(methodExtension.getObfuscatedIntPush(paramArrayIndexBySlot.get(loadInsn.var)));
                     // load param from array
                     loadFromArr.add(new InsnNode(AALOAD));
                     // cast to correct type
@@ -290,6 +295,5 @@ public class ParamGenerifier extends AbstractTransformer {
         // insert prologue (storing params in locals if required) and update this methods descriptor
         methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), prologue);
         methodNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
-        context.pipeline().getExtension(methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
     }
 }
