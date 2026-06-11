@@ -14,6 +14,7 @@ import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTra
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
+import me.exeos.bytus.core.transformer.impl.reference.RCT2;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
 
@@ -36,6 +37,7 @@ public class TransformerManager {
     private static final List<Function<BytusConfig, AbstractTransformer>> REGISTRY = new ArrayList<>();
 
     static {
+        REGISTRY.add(RCT2::new);
         REGISTRY.add(MBATransformer::new);
         REGISTRY.add(OverUnderFlowIntTransformer::new);
         REGISTRY.add(SplitStringsTransformer::new);

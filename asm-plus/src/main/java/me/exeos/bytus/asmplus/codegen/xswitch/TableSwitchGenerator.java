@@ -4,7 +4,9 @@ import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
 import org.objectweb.asm.tree.TableSwitchInsnNode;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class TableSwitchGenerator {
 
@@ -13,16 +15,19 @@ public class TableSwitchGenerator {
     }
 
     public static InsnList gen(List<SwitchCase> cases, int min, int max, SwitchCase defaultCase) {
-        return gen(cases, min, max, defaultCase, true);
+        return gen(cases, min, max, defaultCase, true, new LabelNode());
     }
 
-    public static InsnList gen(List<SwitchCase> cases, int min, int max, SwitchCase defaultCase, boolean gotoSwitchEnd) {
+    public static InsnList gen(List<SwitchCase> cases, int min, int max, SwitchCase defaultCase, boolean gotoSwitchEnd, LabelNode switchEnd) {
         InsnList switchInsn = new InsnList();
-        LabelNode switchEnd = new LabelNode();
 
         switchInsn.add(new TableSwitchInsnNode(min, max, defaultCase == null ? switchEnd : defaultCase.caseStart, LookupSwitchGenerator.getLabels(cases)));
+        Set<SwitchCase> seen = new HashSet<>();
         for (SwitchCase switchCase : cases) {
-            switchInsn.add(LookupSwitchGenerator.getCaseInsn(switchCase, gotoSwitchEnd, switchEnd));
+            if (!seen.contains(switchCase)) {
+                switchInsn.add(LookupSwitchGenerator.getCaseInsn(switchCase, gotoSwitchEnd, switchEnd));
+                seen.add(switchCase);
+            }
         }
 
         if (defaultCase != null) {
