@@ -5,10 +5,13 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import javax.swing.text.html.Option;
+import java.util.List;
 import java.util.Optional;
+import java.util.Random;
 
 public class JarUtil {
 
+    private static final Random RANDOM = new Random();
 
     public static Optional<ClassNode> findClass(JarArchive jar, String name) {
         ClassNode cn = jar.getClasses().getOrDefault(name, null);
@@ -42,5 +45,11 @@ public class JarUtil {
         }
 
         return ClassUtil.findMethod(owner.get(), methodName, methodDesc);
+    }
+
+    public static ClassNode getRandomClass(JarArchive jar) {
+        List<ClassNode> asList = jar.getClasses().values().stream().toList();
+
+        return asList.get(RANDOM.nextInt(asList.size()));
     }
 }

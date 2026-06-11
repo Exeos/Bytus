@@ -1,4 +1,4 @@
-package me.exeos.bytus.asmplus.codegen.lookupswitch;
+package me.exeos.bytus.asmplus.codegen.xswitch;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
@@ -17,15 +17,11 @@ public class LookupSwitchGenerator {
         return gen(cases, dfltCase, true);
     }
 
-    public static InsnList gen(List<SwitchCase> cases, SwitchCase dfltCase, boolean gotoSwitchEnd) {
-        return gen(cases, dfltCase, gotoSwitchEnd, false);
-    }
-
     /**
      * Generate a new lookup switch
      * @return Lookup switch instructions
      */
-    public static InsnList gen(List<SwitchCase> cases, SwitchCase dfltCase, boolean gotoSwitchEnd, boolean casesOnly) {
+    public static InsnList gen(List<SwitchCase> cases, SwitchCase dfltCase, boolean gotoSwitchEnd) {
         cases.sort(Comparator.comparingInt(o -> o.key));
 
         InsnList switchInsns = new InsnList();
@@ -33,18 +29,10 @@ public class LookupSwitchGenerator {
 
         switchInsns.add(new LookupSwitchInsnNode(dfltCase != null ? dfltCase.caseStart : switchEnd, getKeys(cases), getLabels(cases)));
         for (SwitchCase switchCase : cases) {
-            switchInsns.add(switchCase.caseStart);
-            switchInsns.add(switchCase.instructions);
-            if (gotoSwitchEnd) {
-                switchInsns.add(new JumpInsnNode(Opcodes.GOTO, switchEnd));
-            }
+            switchInsns.add(getCaseInsn(switchCase, gotoSwitchEnd, switchEnd));
         }
         if (dfltCase != null) {
-            switchInsns.add(dfltCase.caseStart);
-            switchInsns.add(dfltCase.instructions);
-            if (gotoSwitchEnd) {
-                switchInsns.add(new JumpInsnNode(Opcodes.GOTO, switchEnd));
-            }
+            switchInsns.add(getCaseInsn(dfltCase, gotoSwitchEnd, switchEnd));
         }
 
         if (gotoSwitchEnd || dfltCase == null) {
@@ -64,7 +52,7 @@ public class LookupSwitchGenerator {
         return keys;
     }
 
-    private static LabelNode[] getLabels(List<SwitchCase> cases) {
+    public static LabelNode[] getLabels(List<SwitchCase> cases) {
         LabelNode[] labels = new LabelNode[cases.size()];
 
         for (int i = 0; i < cases.size(); i++) {
@@ -72,5 +60,17 @@ public class LookupSwitchGenerator {
         }
 
         return labels;
+    }
+
+    public static InsnList getCaseInsn(SwitchCase switchCase, boolean gotoSwitchEnd, LabelNode switchEnd) {
+        InsnList caseInsn = new InsnList();
+
+        caseInsn.add(switchCase.caseStart);
+        caseInsn.add(switchCase.instructions);
+        if (gotoSwitchEnd) {
+            caseInsn.add(new JumpInsnNode(Opcodes.GOTO, switchEnd));
+        }
+
+        return caseInsn;
     }
 }

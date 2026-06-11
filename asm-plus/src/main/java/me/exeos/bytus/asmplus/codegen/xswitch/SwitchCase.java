@@ -1,4 +1,4 @@
-package me.exeos.bytus.asmplus.codegen.lookupswitch;
+package me.exeos.bytus.asmplus.codegen.xswitch;
 
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
