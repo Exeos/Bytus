@@ -5,6 +5,7 @@ import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import java.util.List;
 
 public class MethodDescriptor {
+
     private List<DescriptorMember> params;
     private DescriptorMember returnType;
 
@@ -43,6 +44,13 @@ public class MethodDescriptor {
         }
 
         return slot;
+    }
+
+    public MethodDescriptor erase() {
+        params.forEach(DescriptorMember::erase);
+        returnType.erase();
+
+        return this;
     }
 
     public MethodDescriptor addParam(DescriptorMember param) {

@@ -16,6 +16,14 @@ public class DescriptorMember {
         this.arrayDepth = arrayDepth;
     }
 
+    public void erase() {
+        if (isPrimitive) {
+            return;
+        }
+
+        value = "java/lang/Object";
+    }
+
     public int getSlotWidth() {
         if (!isArray && isPrimitive && (value.equals("D") || value.equals("J"))) {
             return 2;

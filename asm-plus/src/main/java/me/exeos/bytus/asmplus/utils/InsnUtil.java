@@ -156,4 +156,10 @@ public class InsnUtil implements Opcodes {
             current = next;
         }
     }
+
+    public static boolean isLambdaMetaFactory(InvokeDynamicInsnNode indy) {
+        return indy.bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")
+                && indy.bsm.getName().equals("metafactory")
+                && indy.bsm.getDesc().equals("(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;");
+    }
 }
