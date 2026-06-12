@@ -1,10 +1,12 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
+import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
 import me.exeos.bytus.asmplus.codegen.xswitch.TableSwitchGenerator;
+import me.exeos.bytus.asmplus.utils.AsmUtil;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.JarUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -12,13 +14,20 @@ import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public class RCT2 extends AbstractTransformer {
+
+    private static final String BSM_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
+    private static Map<String, ClassEdge> hierarchy;
+    private static String bsmOwner = null;
+    private static boolean bsmOwnerIsInterface = false;
+    private static String bsmName = null;
 
     public RCT2(BytusConfig config) {
         super(config);
@@ -36,17 +45,128 @@ public class RCT2 extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        addBootstrap(context);
+        hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jar());
+        super.transform(context);
+    }
+
+    @Override
+    public void transform(ClassContext context) {
+        // generate bootstrap method if it doesnt already exist and then add it to this method context after transformer is done replacing callsites
+        MethodContext bsmContext = null;
+        if (bsmOwner == null && bsmName == null) {
+            bsmContext = getBootstrap(context);
+        }
+
+        super.transform(context);
+
+        if (bsmContext != null) {
+            context.pipeline().emit(bsmContext, Set.of(RCT2.class));
+        }
     }
 
     @Override
     public void transform(MethodContext context) {
-        super.transform(context);
+        InsnUtil.loop(context.methodNode().instructions, insnNode -> {
+            InsnList indyCall = new InsnList();
+            switch (insnNode) {
+                case MethodInsnNode methodInsnNode -> {
+                    if (methodInsnNode.name.equals("<init>")) {
+                        return;
+                    }
+
+                    indyCall.add(new InvokeDynamicInsnNode(
+                            RandomUtil.getString(1),
+                            fixMethodDesc(methodInsnNode),
+                            new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, bsmOwnerIsInterface),
+                            methodInsnNode.owner.replace("/", "."),
+                            methodInsnNode.name,
+                            methodInsnNode.desc,
+                            context.ownerCtx().classNode().name.replace("/", "."),
+                            getType(insnNode)
+                    ));
+                }
+                case FieldInsnNode fieldInsnNode -> {
+                    if (!hierarchy.containsKey(fieldInsnNode.owner)) {
+                        return;
+                    }
+
+                    hierarchy
+                            .get(fieldInsnNode.owner)
+                            .findDeclaringClassOfField(fieldInsnNode.name, fieldInsnNode.desc)
+                            .ifPresent(declaringEdge -> {
+                                if (declaringEdge
+                                        .getField(fieldInsnNode.name, fieldInsnNode.desc)
+                                        .map(fieldEdge -> AsmUtil.hasAccess(fieldEdge.fieldNode().access, ACC_FINAL))
+                                        .orElse(false)) {
+                                    return;
+                                }
+
+                                indyCall.add(new InvokeDynamicInsnNode(
+                                        RandomUtil.getString(1),
+                                        fixFieldDescriptor(fieldInsnNode),
+                                        new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, bsmOwnerIsInterface),
+                                        fieldInsnNode.owner.replace("/", "."),
+                                        fieldInsnNode.name,
+                                        fieldInsnNode.desc,
+                                        context.ownerCtx().classNode().name.replace("/", "."),
+                                        getType(insnNode)
+                                ));
+                            });
+                }
+                default -> {
+                }
+            }
+
+            if (indyCall.size() > 0) {
+                context.methodNode().instructions.insert(insnNode, indyCall);
+                context.methodNode().instructions.remove(insnNode);
+            }
+        });
     }
 
-    private void addBootstrap(JarContext context) {
-        ClassNode container = JarUtil.getRandomClass(context.jar());
-        System.out.println(container.name);
+    private String fixMethodDesc(MethodInsnNode methodInsnNode) {
+        switch (methodInsnNode.getOpcode()) {
+            case INVOKEVIRTUAL, INVOKEINTERFACE -> {
+                return methodInsnNode.desc.replace("(", "(Ljava/lang/Object;");
+            }
+            case INVOKESPECIAL -> {
+                if (methodInsnNode.name.equals("<init>")) {
+                    return methodInsnNode.desc.replace(")V", ")L" + methodInsnNode.owner + ";");
+                } else {
+                    return methodInsnNode.desc.replace("(", "(Ljava/lang/Object;");
+                }
+            }
+            default -> {
+                return methodInsnNode.desc;
+            }
+        }
+    }
+
+    private String fixFieldDescriptor(FieldInsnNode fieldInsnNode) {
+        return switch (fieldInsnNode.getOpcode()) {
+            case GETSTATIC -> "()" + fieldInsnNode.desc;
+            case PUTSTATIC -> "(" + fieldInsnNode.desc + ")V";
+            case GETFIELD -> "(Ljava/lang/Object;)" + fieldInsnNode.desc;
+            case PUTFIELD -> "(Ljava/lang/Object;" + fieldInsnNode.desc + ")V";
+            default -> throw new IllegalArgumentException("Opcode " + fieldInsnNode.getOpcode());
+        };
+    }
+
+    private int getType(AbstractInsnNode insnNode) {
+        return switch (insnNode.getOpcode()) {
+            case INVOKESTATIC -> 0;
+            case INVOKEVIRTUAL, INVOKEINTERFACE -> 1;
+            case INVOKESPECIAL -> 2;
+            case GETSTATIC -> 3;
+            case PUTSTATIC -> 4;
+            case GETFIELD -> 5;
+            case PUTFIELD -> 6;
+            default -> throw new IllegalArgumentException("Provided instruction does not map to Type");
+        };
+    }
+
+    private MethodContext getBootstrap(ClassContext context) {
+        ClassNode container = context.classNode();
 
         /*
         CallSite bootstrap(MethodHandles.Lookup lookup,
@@ -60,10 +180,14 @@ public class RCT2 extends AbstractTransformer {
          */
         MethodNode bsm = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
-                ClassUtil.getNoneCollidingClassName(context.jar(), RandomUtil::getString),
+                ClassUtil.getNoneCollidingMethodName(context.jarCtx().jar(), container, RandomUtil::getString),
                 "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;",
                 null, null
         );
+
+        bsmOwner = container.name;
+        bsmOwnerIsInterface = AsmUtil.hasAccess(container.access, ACC_INTERFACE);
+        bsmName = bsm.name;
 
         final int lookupSlot = 0;
         final int invokedTypeSlot = 2;
@@ -86,8 +210,8 @@ public class RCT2 extends AbstractTransformer {
         bsm.instructions.add(start);
         // store lookup.lookupClass().getClassLoader() in classLoaderSlot
         bsm.instructions.add(new VarInsnNode(ALOAD, lookupSlot));
-        bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "lookupClass", "()Ljava/lang/Class"));
-        bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Class", "getClassLoader", "()Ljava/lang/ClassLoader"));
+        bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "lookupClass", "()Ljava/lang/Class;"));
+        bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Class", "getClassLoader", "()Ljava/lang/ClassLoader;"));
         bsm.instructions.add(new VarInsnNode(ASTORE, classLoaderSlot));
 
         // store Class.forName(owner, true, classLoader) in ownerClassSlot
@@ -139,7 +263,7 @@ public class RCT2 extends AbstractTransformer {
         bsm.instructions.add(new MethodInsnNode(INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V"));
         bsm.instructions.add(new InsnNode(ATHROW));
 
-        context.pipeline().emit(new MethodContext(new ClassContext(context, container), bsm), Set.of(RCT2.class));
+        return new MethodContext(context, bsm);
     }
 
     private SwitchCase staticMethodHandler(int lookupSlot, int nameSlot, int ownerClassSlot, int methodTypeSlot, int targetMHandleSlot, LabelNode switchEnd) {
@@ -198,8 +322,8 @@ public class RCT2 extends AbstractTransformer {
         caseInsn.add(new VarInsnNode(ALOAD, callerSlot));
         caseInsn.add(new InsnNode(ICONST_1));
         caseInsn.add(new VarInsnNode(ALOAD, classLoaderSlot));
-        caseInsn.add(new MethodInsnNode(INVOKESTATIC, "java/lang/Class" ,"forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;"));
-        caseInsn.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup" ,"findSpecial", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;"));
+        caseInsn.add(new MethodInsnNode(INVOKESTATIC, "java/lang/Class", "forName", "(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;"));
+        caseInsn.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "findSpecial", "(Ljava/lang/Class;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/Class;)Ljava/lang/invoke/MethodHandle;"));
         caseInsn.add(new VarInsnNode(ASTORE, targetMHandleSlot));
 
         caseInsn.add(new JumpInsnNode(GOTO, switchEnd));
