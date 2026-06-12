@@ -16,7 +16,6 @@ import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.impl.MethodSaltTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
@@ -273,7 +272,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         bsm.instructions.add(new MethodInsnNode(INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V"));
         bsm.instructions.add(new InsnNode(ATHROW));
 
-        context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class, StringEncryptionTransformer.class, MethodSaltTransformer.class, JumpFlattening.class));
+        context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class, StringEncryptionTransformer.class, MethodSaltTransformer.class));
     }
 
     private SwitchCase staticMethodHandler(int lookupSlot, int nameSlot, int ownerClassSlot, int methodTypeSlot, int targetMHandleSlot, LabelNode switchEnd) {
