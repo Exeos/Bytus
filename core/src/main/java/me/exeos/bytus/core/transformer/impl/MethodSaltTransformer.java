@@ -1,7 +1,7 @@
 package me.exeos.bytus.core.transformer.impl;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
@@ -10,13 +10,17 @@ import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
-import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
+import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class MethodSaltTransformer extends AbstractTransformer {
@@ -24,8 +28,8 @@ public class MethodSaltTransformer extends AbstractTransformer {
     private static final DescriptorMember SALT_PARAM = new DescriptorMember("I", true, false, 0);
     private static final int SALT_MIN = 0;
     private static final int SALT_MAX = 50000;
-    private static Map<String, Integer> SALT_BY_METHOD = null;
     private static final Set<AbstractInsnNode> rewrittenCallees = new HashSet<>();
+    private static Map<String, Integer> SALT_BY_METHOD = null;
 
     public MethodSaltTransformer(BytusConfig config) {
         super(config);
@@ -67,7 +71,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
     }
 
     @Override
-    public void transform(ClassContext context) {
+    public void transform(MethodContext context) {
         buildSaltMap(context.jarCtx()).forEach(SALT_BY_METHOD::putIfAbsent);
         transform(context.jarCtx());
     }
@@ -115,43 +119,81 @@ public class MethodSaltTransformer extends AbstractTransformer {
             boolean callerIsSalted
     ) {
         InsnUtil.loop(methodNode.instructions, insn -> {
-            if (rewrittenCallees.contains(insn) || !(insn instanceof MethodInsnNode callInsn)) {
+            if (rewrittenCallees.contains(insn)) {
                 return;
             }
 
-            if (!hierarchy.containsKey(callInsn.owner)) {
-                return;
-            }
+            switch (insn) {
+                case MethodInsnNode callInsn -> {
+                    if (!hierarchy.containsKey(callInsn.owner)) {
+                        return;
+                    }
 
-            AtomicReference<String> calleeId = new AtomicReference<>(null);
-            hierarchy.get(callInsn.owner).findNearestMethod(callInsn.name, callInsn.desc).ifPresent(methodEdge -> {
-                String id = methodEdge.owner().classNode.name + callInsn.name + callInsn.desc;
-                if (SALT_BY_METHOD.containsKey(id) && calleeId.get() == null) {
-                    calleeId.set(id);
+                    AtomicReference<String> calleeId = new AtomicReference<>(null);
+                    hierarchy.get(callInsn.owner).findNearestMethod(callInsn.name, callInsn.desc).ifPresent(methodEdge -> {
+                        String id = methodEdge.owner().classNode.name + callInsn.name + callInsn.desc;
+                        if (SALT_BY_METHOD.containsKey(id) && calleeId.get() == null) {
+                            calleeId.set(id);
+                        }
+                    });
+
+                    if (calleeId.get() == null) {
+                        return;
+                    }
+
+                    // insert insn pushing salt onto stack before call
+                    methodNode.instructions.insertBefore(
+                            callInsn,
+                            InsnUtil.getIntPushSalted(
+                                    SALT_BY_METHOD.get(calleeId.get()),
+                                    callerIsSalted,
+                                    SALT_BY_METHOD.getOrDefault(callerId, 0),
+                                    callerSaltSlot
+                            )
+                    );
+                    // update call description to match salted descriptor
+                    callInsn.desc = DescriptorParser.parseMethodDesc(callInsn.desc)
+                            .addParam(SALT_PARAM)
+                            .toDesc();
+
+                    // mark callInsn as rewritten, to avoid adding another salt when emitted
+                    rewrittenCallees.add(insn);
                 }
-            });
+                case InvokeDynamicInsnNode indy -> {
+                    if (!hierarchy.containsKey(indy.bsm.getOwner())) {
+                        return;
+                    }
 
-            if (calleeId.get() == null) {
-                return;
+                    AtomicReference<String> calleeId = new AtomicReference<>(null);
+                    hierarchy.get(indy.bsm.getOwner()).findNearestMethod(indy.bsm.getName(), indy.bsm.getDesc()).ifPresent(methodEdge -> {
+                        String id = methodEdge.owner().classNode.name + indy.bsm.getName() + indy.bsm.getDesc();
+                        if (SALT_BY_METHOD.containsKey(id) && calleeId.get() == null) {
+                            calleeId.set(id);
+                        }
+                    });
+
+                    if (calleeId.get() == null) {
+                        return;
+                    }
+
+                    indy.bsm = new Handle(
+                            indy.bsm.getTag(),
+                            indy.bsm.getOwner(),
+                            indy.bsm.getName(),
+                            DescriptorParser.parseMethodDesc(indy.bsm.getDesc())
+                                    .addParam(SALT_PARAM)
+                                    .toDesc(),
+                            indy.bsm.isInterface()
+                    );
+                    Object[] newBsmArgs = new Object[indy.bsmArgs.length + 1];
+                    System.arraycopy(indy.bsmArgs, 0, newBsmArgs, 0, indy.bsmArgs.length);
+                    newBsmArgs[newBsmArgs.length - 1] = SALT_BY_METHOD.get(calleeId.get());
+
+                    rewrittenCallees.add(insn);
+                }
+                default -> {
+                }
             }
-
-            // insert insn pushing salt onto stack before call
-            methodNode.instructions.insertBefore(
-                    callInsn,
-                    InsnUtil.getIntPushSalted(
-                            SALT_BY_METHOD.get(calleeId.get()),
-                            callerIsSalted,
-                            SALT_BY_METHOD.getOrDefault(callerId, 0),
-                            callerSaltSlot
-                    )
-            );
-            // update call description to match salted descriptor
-            callInsn.desc = DescriptorParser.parseMethodDesc(callInsn.desc)
-                    .addParam(SALT_PARAM)
-                    .toDesc();
-
-            // mark callInsn as rewritten, to avoid adding another salt when emitted
-            rewrittenCallees.add(insn);
         });
     }
 

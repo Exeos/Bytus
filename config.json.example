@@ -32,11 +32,7 @@
     "dataFlow": false
   },
   "references": {
-    "encryption": {
-      "enable": false,
-      "methodCalls": false,
-      "fieldAccess": false
-    },
+    "encryption": false,
     "proxy": {
       "enable": false,
       "minDepth": 1,

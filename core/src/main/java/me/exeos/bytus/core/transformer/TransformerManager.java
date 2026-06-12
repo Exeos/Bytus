@@ -14,13 +14,13 @@ import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTra
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
-import me.exeos.bytus.core.transformer.impl.reference.RCT2;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
 
-import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,10 +34,9 @@ import java.util.stream.Collectors;
  */
 public class TransformerManager {
 
-    private static final List<Function<BytusConfig, AbstractTransformer>> REGISTRY = new ArrayList<>();
+    private static final Set<Function<BytusConfig, AbstractTransformer>> REGISTRY = new HashSet<>();
 
     static {
-        REGISTRY.add(RCT2::new);
         REGISTRY.add(MBATransformer::new);
         REGISTRY.add(OverUnderFlowIntTransformer::new);
         REGISTRY.add(SplitStringsTransformer::new);

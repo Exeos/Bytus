@@ -2,6 +2,7 @@ package me.exeos.bytus.core.transformer.impl.flow.control;
 
 import me.exeos.bytus.asmplus.codegen.xswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
+import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -13,6 +14,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Control-flow obfuscation transformer that "flattens" jumps by routing them through
@@ -62,7 +64,7 @@ public class JumpFlattening extends AbstractTransformer {
         MethodNode methodNode = context.methodNode();
         MethodExtension methodExtension = context.pipeline().getExtension(methodNode);
 
-        if (methodNode.instructions.size() == 0) {
+        if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
             return;
         }
 
@@ -81,8 +83,9 @@ public class JumpFlattening extends AbstractTransformer {
         );
 
         if (didUpdateAnyJumps) {
-            // insert dispatcher
-            methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex, methodExtension));
+            // insert dispatcher, inserting at random insn might cause issues. if it does insert before first return insn
+            AbstractInsnNode insertPoint = methodNode.instructions.get(RandomUtil.getInt(0, methodNode.instructions.size()));
+            methodNode.instructions.insertBefore(insertPoint, buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex, methodExtension));
         }
     }
 
@@ -191,27 +194,28 @@ public class JumpFlattening extends AbstractTransformer {
      * @return true if at least one jump was rewritten
      */
     private boolean rewriteJumpsToDispatcher(MethodNode methodNode, LabelNode dispatcherEntry, Map<LabelNode, int[]> labelPathMap, int keyVarIndex, MethodExtension methodExtension) {
-        boolean updatedJumps = false;
+        AtomicBoolean updatedJumps = new AtomicBoolean(false);
 
-        for (AbstractInsnNode insnNode : methodNode.instructions) {
-            if (insnNode instanceof JumpInsnNode jumpInsnNode) {
-                int[] path = labelPathMap.get(jumpInsnNode.label);
-                if (path == null) {
-                    continue;
-                }
-
-                InsnList updateKeyInsn = new InsnList();
-                updateKeyInsn.add(methodExtension.getObfuscatedIntPush(path[0]));
-                updateKeyInsn.add(new VarInsnNode(Opcodes.ISTORE, keyVarIndex));
-
-
-                jumpInsnNode.label = dispatcherEntry;
-                methodNode.instructions.insertBefore(jumpInsnNode, updateKeyInsn);
-
-                updatedJumps = true;
+        InsnUtil.loop(methodNode.instructions, insnNode -> {
+            if (!(insnNode instanceof JumpInsnNode jumpInsnNode)) {
+                return;
             }
-        }
 
-        return updatedJumps;
+            int[] path = labelPathMap.get(jumpInsnNode.label);
+            if (path == null) {
+                return;
+            }
+
+            InsnList updateKeyInsn = new InsnList();
+            updateKeyInsn.add(methodExtension.getObfuscatedIntPush(path[0]));
+            updateKeyInsn.add(new VarInsnNode(Opcodes.ISTORE, keyVarIndex));
+
+            jumpInsnNode.label = dispatcherEntry;
+            methodNode.instructions.insertBefore(jumpInsnNode, updateKeyInsn);
+
+            updatedJumps.set(true);
+        });
+
+        return updatedJumps.get();
     }
 }
