@@ -71,7 +71,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
             InsnList indyCall = new InsnList();
             switch (insnNode) {
                 case MethodInsnNode methodInsnNode -> {
-                    if (methodInsnNode.name.equals("<init>")) {
+                    if (methodInsnNode.name.equals("<init>") || methodInsnNode.owner.startsWith("[")) {
                         return;
                     }
 
