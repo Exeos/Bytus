@@ -37,9 +37,9 @@ public class Renamer extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-//        renameMethods(context.jar());
+        renameMethods(context.jar());
         renameFields(context.jar());
-//        renameClasses(context.jar());
+        renameClasses(context.jar());
     }
 
     private void renameClasses(JarArchive jar) {
