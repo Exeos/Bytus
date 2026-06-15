@@ -233,7 +233,7 @@ public class ClassRemapper {
 
         return Type.getType(
                 remapDescMember(
-                        DescriptorParser.parseMembers(target.getDescriptor()).getFirst()
+                        DescriptorParser.parseMember(target.getDescriptor())
                 ).toDesc()
         );
     }

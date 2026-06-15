@@ -64,6 +64,7 @@ public class MethodRenamer extends AbstractTransformer {
             }
         }
 
+        // this should be done by the remapper
         for (ClassNode classNode : context.jar().getClasses().values()) {
             if (!hierarchy.containsKey(classNode)) {
                 continue;
