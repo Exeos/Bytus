@@ -5,7 +5,7 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.impl.MethodSaltTransformer;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
-import me.exeos.bytus.core.transformer.impl.Renamer;
+import me.exeos.bytus.core.transformer.impl.rename.ClassRenamer;
 import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
 import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
@@ -16,6 +16,7 @@ import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlattening;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
+import me.exeos.bytus.core.transformer.impl.rename.MethodRenamer;
 
 import java.util.Comparator;
 import java.util.HashSet;
@@ -49,7 +50,8 @@ public class TransformerManager {
         REGISTRY.add(ReferenceProxyTransformer::new);
         REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);
-        REGISTRY.add(Renamer::new);
+        REGISTRY.add(ClassRenamer::new);
+        REGISTRY.add(MethodRenamer::new);
     }
 
     private final Pipeline pipeline;

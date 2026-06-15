@@ -1,4 +1,4 @@
-package me.exeos.bytus.core.transformer.impl;
+package me.exeos.bytus.core.transformer.impl.rename;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.remapper.ClassRemapper;
@@ -14,9 +14,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-public class Renamer extends AbstractTransformer {
+public class ClassRenamer extends AbstractTransformer {
 
-    public Renamer(BytusConfig config) {
+    public ClassRenamer(BytusConfig config) {
         super(config);
     }
 
@@ -43,11 +43,11 @@ public class Renamer extends AbstractTransformer {
                 classMapping.put(classNode.name, classNode.name);
             } else {
                 int l = 1;
-                String rnd = RandomUtil.getString(l);
-                while (classMapping.containsValue(rnd)) {
-                    l++;
-                    rnd = RandomUtil.getString(l);
-                }
+                String rnd;
+                do {
+                    rnd = RandomUtil.getString(l++);
+                } while (classMapping.containsValue(rnd));
+
                 classMapping.put(classNode.name, rnd);
             }
         }

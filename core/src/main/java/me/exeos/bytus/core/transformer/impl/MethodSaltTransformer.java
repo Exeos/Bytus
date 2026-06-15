@@ -272,7 +272,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
             for (MethodNode excludedMethod : entry.getValue()) {
                 hierarchy.get(owner).getMethod(excludedMethod).ifPresent(excludedEdge -> {
                     MethodEdge root = excludedEdge.getRoot();
-                    for (MethodEdge override : root.getOverrides()) {
+                    for (MethodEdge override : root.getOverriders()) {
                         excludedMethods.add(override.methodNode());
                     }
                     excludedMethods.add(root.methodNode());
@@ -284,7 +284,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
             for (MethodNode methodNode : excludedClass.methods) {
                 hierarchy.get(excludedClass).getMethod(methodNode).ifPresent(excludedEdge -> {
                     MethodEdge root = excludedEdge.getRoot();
-                    for (MethodEdge override : root.getOverrides()) {
+                    for (MethodEdge override : root.getOverriders()) {
                         excludedMethods.add(override.methodNode());
                     }
                     excludedMethods.add(root.methodNode());

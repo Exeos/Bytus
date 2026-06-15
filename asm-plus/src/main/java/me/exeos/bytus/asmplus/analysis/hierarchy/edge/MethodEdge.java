@@ -22,7 +22,7 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
      *
      * @return A list of overriding method edges
      */
-    public List<MethodEdge> getOverrides() {
+    public List<MethodEdge> getOverriders() {
         List<MethodEdge> found = new ArrayList<>();
 
         if (MethodUtil.hasAccess(methodNode, Opcodes.ACC_FINAL)
@@ -83,6 +83,6 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
             return false;
         }
 
-        return other.getOverrides().contains(this);
+        return other.getOverriders().contains(this);
     }
 }

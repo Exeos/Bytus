@@ -244,4 +244,8 @@ public class ClassEdge {
 
         return Optional.empty();
     }
+
+    public List<MethodEdge> getMethods() {
+        return methods;
+    }
 }
