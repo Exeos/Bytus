@@ -8,6 +8,7 @@ import org.objectweb.asm.tree.MethodNode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
@@ -155,6 +156,31 @@ public class ClassEdge {
     }
 
     /**
+     * Finds the class that is declaring the method root.
+     * @param methodNode The method node to match
+     * @return The class declaring the method root, if found
+     */
+    public Optional<MethodEdge> findMethodRoot(MethodNode methodNode) {
+        return findMethodRoot(methodNode.name, methodNode.desc);
+    }
+
+    /**
+     * Finds the class that is declaring the method root.
+     * @param name The method name
+     * @param desc The method descriptor
+     * @return The class declaring the method root, if found
+     */
+    public Optional<MethodEdge> findMethodRoot(String name, String desc) {
+        AtomicReference<Optional<MethodEdge>> root = new AtomicReference<>(Optional.empty());
+
+        findNearestMethod(name, desc).ifPresent(nearest -> {
+            root.set(Optional.of(nearest.getRoot()));
+        });
+
+        return root.get();
+    }
+
+    /**
      * Finds the nearest method with the same name and descriptor as the given method node.
      *
      * @param methodNode the method node to match
@@ -216,6 +242,19 @@ public class ClassEdge {
         }
 
         return Optional.empty();
+    }
+
+    public Optional<MethodEdge> getMethodRoot(MethodNode methodNode) {
+        return getMethodRoot(methodNode.name, methodNode.desc);
+    }
+
+    public Optional<MethodEdge> getMethodRoot(String name, String desc) {
+        AtomicReference<Optional<MethodEdge>> root = new AtomicReference<>(Optional.empty());
+        getMethod(name, desc).ifPresent(methodEdge -> {
+            root.set(Optional.of(methodEdge.getRoot()));
+        });
+
+        return root.get();
     }
 
     /**

@@ -74,9 +74,10 @@ public class ClassRemapper {
 
     private void rebuildArchiveMap(JarArchive archive) {
         Map<String, ClassNode> newMap = new HashMap<>();
-        for (Map.Entry<String, String> entry : mapping.entrySet()) {
-            newMap.put(entry.getValue(), archive.getClasses().get(entry.getKey()));
+        for (Map.Entry<String, ClassNode> entry : archive.getClasses().entrySet()) {
+            newMap.put(mapping.getOrDefault(entry.getKey(), entry.getKey()), entry.getValue());
         }
+
         archive.setClasses(newMap);
     }
 

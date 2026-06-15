@@ -2,12 +2,13 @@ package me.exeos.bytus.asmplus.remapper;
 
 import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Optional;
 
 public class MethodRemapper {
 
@@ -19,6 +20,8 @@ public class MethodRemapper {
 
     public void remap(JarArchive jar) {
         Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(jar);
+
+        hierarchyMergeMapping(jar, hierarchy);
         jar.getClasses().values().forEach(classNode -> remap(hierarchy, classNode));
     }
 
@@ -55,14 +58,28 @@ public class MethodRemapper {
             return owner;
         }
 
-        AtomicReference<String> rootOwner = new AtomicReference<>(owner);
-        hierarchy.get(owner)
-                .findNearestMethod(name, desc)
-                .ifPresent(methodEdge -> {
-                    rootOwner.set(methodEdge.getRoot().owner().classNode.name);
-                });
+        Optional<MethodEdge> rootMethod = hierarchy.get(owner).findMethodRoot(name, desc);
+        return rootMethod.isPresent() ? rootMethod.get().owner().classNode.name : owner;
+    }
 
-        return rootOwner.get();
+    private void hierarchyMergeMapping(JarArchive jar, Map<String, ClassEdge> hierarchy) {
+        for (ClassNode classNode : jar.getClasses().values()) {
+            if (!hierarchy.containsKey(classNode.name)) {
+                continue;
+            }
+
+            for (MethodNode methodNode : classNode.methods) {
+                hierarchy.get(classNode.name).getMethodRoot(methodNode).ifPresent(root -> {
+                    String rootKey = root.owner().classNode.name + root.methodNode().name + root.methodNode().desc;
+                    if (mapping.containsKey(rootKey)) {
+                        mapping.put(
+                                classNode.name + methodNode.name + methodNode.desc,
+                                mapping.get(rootKey)
+                        );
+                    }
+                });
+            }
+        }
     }
 
     private Handle remapHandle(Handle handle) {
