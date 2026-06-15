@@ -62,10 +62,6 @@ public class FieldRemapper {
         return getMapped(owner, fieldNode.name, fieldNode.desc);
     }
 
-    private String getMapped(FieldInsnNode fieldInsnNode) {
-        return getMapped(fieldInsnNode.owner, fieldInsnNode.name, fieldInsnNode.desc);
-    }
-
     private String getMapped(String owner, String name, String desc) {
         return mapping.getOrDefault(owner + name + desc, name);
     }
