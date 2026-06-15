@@ -27,8 +27,6 @@ public class MethodRemapper {
 
     private void remap(Map<String, ClassEdge> hierarchy, ClassNode classNode) {
         for (MethodNode methodNode : classNode.methods) {
-            methodNode.name = getMapped(classNode.name, methodNode);
-
             for (AbstractInsnNode insnNode : methodNode.instructions) {
                 switch (insnNode) {
                     case MethodInsnNode methodInsnNode -> {
@@ -50,6 +48,10 @@ public class MethodRemapper {
                     default -> {}
                 }
             }
+        }
+
+        for (MethodNode methodNode : classNode.methods) {
+            methodNode.name = getMapped(classNode.name, methodNode);
         }
     }
 

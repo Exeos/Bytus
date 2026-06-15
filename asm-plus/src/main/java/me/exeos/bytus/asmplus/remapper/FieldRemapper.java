@@ -26,9 +26,8 @@ public class FieldRemapper {
                         continue;
                     }
 
-                    String xx = getDeclaringClass(fieldInsnNode, hierarchy);
                     fieldInsnNode.name = getMapped(
-                            xx,
+                            getDeclaringClass(fieldInsnNode, hierarchy),
                             fieldInsnNode.name,
                             fieldInsnNode.desc
                     );
