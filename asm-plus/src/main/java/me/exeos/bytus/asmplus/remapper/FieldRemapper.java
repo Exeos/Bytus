@@ -21,9 +21,6 @@ public class FieldRemapper {
 
         for (ClassNode classNode : jar.getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                if (classNode.name.contains("FizzBuzzComputationUnitLookupTableEntry") && methodNode.name.contains("init")) {
-                    System.out.println();
-                }
                 for (AbstractInsnNode insnNode : methodNode.instructions) {
                     if (!(insnNode instanceof FieldInsnNode fieldInsnNode)) {
                         continue;
