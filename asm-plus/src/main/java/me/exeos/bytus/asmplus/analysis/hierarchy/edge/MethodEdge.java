@@ -7,7 +7,7 @@ import org.objectweb.asm.tree.MethodNode;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Represents a method in the analyzed class hierarchy.
@@ -52,24 +52,13 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
      * @return The root method in the hierarchy chain
      */
     public MethodEdge getRoot() {
-        return getRoot(this);
-    }
+        AtomicReference<MethodEdge> root = new AtomicReference<>(this);
 
-    /**
-     * Recursively walks up the parent hierarchy to find the root method for the given start method.
-     *
-     * @param start The method edge to begin from
-     * @return The root method edge in the override chain
-     */
-    private MethodEdge getRoot(MethodEdge start) {
-        for (ClassEdge parent : start.owner.parents) {
-            Optional<MethodEdge> maybe = parent.getMethod(start.methodNode);
-            if (maybe.isPresent() && overrides(maybe.get())) {
-                return getRoot(maybe.get());
-            }
-        }
+        HierarchyAnalyzer.recurseParents(owner.parents, parentEdge -> {
+            parentEdge.getMethod(methodNode).ifPresent(root::set);
+        });
 
-        return start;
+        return root.get();
     }
 
     /**
