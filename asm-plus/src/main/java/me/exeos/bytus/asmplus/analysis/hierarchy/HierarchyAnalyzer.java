@@ -2,12 +2,9 @@ package me.exeos.bytus.asmplus.analysis.hierarchy;
 
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
 import org.objectweb.asm.tree.ClassNode;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class HierarchyAnalyzer {
@@ -26,12 +23,19 @@ public class HierarchyAnalyzer {
 
         for (ClassNode classNode : jar.getClassesAndDependencies().values()) {
             edgeMap.putIfAbsent(classNode, new ClassEdge(classNode));
-            // TODO only add direct parents
-            HierarchyUtil.forEachAncestorClass(jar, classNode, true, false, parent -> {
-                edgeMap.get(classNode).parents.add(edgeMap.computeIfAbsent(parent, ClassEdge::new));
-            }, name -> {
-                edgeMap.get(classNode).unresolvedParents.add(name);
-            });
+
+            Set<String> directParents = new HashSet<>(classNode.interfaces);
+            if (classNode.superName != null) {
+                directParents.add(classNode.superName);
+            }
+
+            for (String parentName : directParents) {
+                jar.getClassNode(parentName).ifPresentOrElse(parentClass -> {
+                    edgeMap.get(classNode).parents.add(edgeMap.computeIfAbsent(parentClass, ClassEdge::new));
+                }, () -> {
+                    edgeMap.get(classNode).unresolvedParents.add(parentName);
+                });
+            }
         }
 
         for (ClassEdge edge : edgeMap.values()) {
@@ -46,7 +50,7 @@ public class HierarchyAnalyzer {
     public static void recurseParents(List<ClassEdge> edges, Consumer<ClassEdge> edgeConsumer) {
         for (ClassEdge edge : edges) {
             edgeConsumer.accept(edge);
-            recurseChildren(edge.parents, edgeConsumer);
+            recurseParents(edge.parents, edgeConsumer);
         }
     }
 

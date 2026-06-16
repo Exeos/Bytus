@@ -6,6 +6,7 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -55,6 +56,25 @@ public class ClassEdge {
         for (MethodNode methodNode : classNode.methods) {
             methods.add(new MethodEdge(this, methodNode));
         }
+    }
+
+    /**
+     * Check if this Class or any of its parents have unresolved parents
+     * @return true if this Class or any of its parents have unresolved parents
+     */
+    public boolean hasUnresolved() {
+        if (!unresolvedParents.isEmpty()) {
+            return true;
+        }
+
+        AtomicBoolean parentsHaveUnresolved = new AtomicBoolean(false);
+        HierarchyAnalyzer.recurseParents(parents, parent -> {
+            if (!parent.unresolvedParents.isEmpty()) {
+                parentsHaveUnresolved.set(true);
+            }
+        });
+
+        return parentsHaveUnresolved.get();
     }
 
     /**

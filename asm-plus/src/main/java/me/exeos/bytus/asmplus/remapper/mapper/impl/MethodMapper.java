@@ -30,7 +30,7 @@ public class MethodMapper {
             Set<String> hierarchyExcludedMethods = new HashSet<>();
             AtomicBoolean containsUnresolved = new AtomicBoolean(false);
             HierarchyAnalyzer.recurseParents(hierarchy.get(classNode.name).parents, edge -> {
-                if (!edge.unresolvedParents.isEmpty()) {
+                if (edge.hasUnresolved()) {
                     containsUnresolved.set(true);
                 }
 
@@ -44,7 +44,6 @@ public class MethodMapper {
             if (containsUnresolved.get()) {
                 continue;
             }
-
 
             Set<String> usedNames = MapperUtil.mergeUsedFromHierarchy(hierarchy.get(classNode.name), usedNamesByClass);
             for (MethodNode methodNode : classNode.methods) {
