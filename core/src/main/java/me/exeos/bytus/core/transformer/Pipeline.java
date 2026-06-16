@@ -42,11 +42,19 @@ public class Pipeline {
      * @param context jar context
      */
     public void run(JarContext context) {
+        long start = System.currentTimeMillis();
         transformers.forEach(transformer -> {
-            System.out.println("Running: " + transformer.getClass().getSimpleName());
+            String transformerName = transformer.getClass().getSimpleName();
+
+            System.out.println("Running: " + transformerName);
+
+            long tStart = System.currentTimeMillis();
             transformer.transform(context);
-            System.out.println("Finished: " + transformer.getClass().getSimpleName());
+
+            System.out.println("Finished [" + (System.currentTimeMillis() - tStart) + "ms]: " + transformerName);
+            System.out.println();
         });
+        System.out.println("Finished all transformers in: " + (1000 / (System.currentTimeMillis() - start)) + "s");
     }
 
     /**
