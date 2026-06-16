@@ -69,6 +69,7 @@ public class Pipeline {
      */
     public void emit(MethodContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
         context.ownerCtx().classNode().methods.add(context.methodNode());
+        context.jarCtx().getExtension().invalidateHierarchy();
         transform(context, exclusions);
     }
 
