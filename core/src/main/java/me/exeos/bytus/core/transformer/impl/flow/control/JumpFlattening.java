@@ -62,7 +62,7 @@ public class JumpFlattening extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
-        MethodExtension methodExtension = context.pipeline().getExtension(methodNode);
+        MethodExtension methodExtension = context.getExtension();
 
         if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
             return;

@@ -48,7 +48,7 @@ public class MBATransformer extends AbstractTransformer {
                         // a + (~b + 1)
                         expression.add(new InsnNode(ICONST_M1));
                         expression.add(new InsnNode(IXOR));
-                        expression.add(context.pipeline().getExtension(methodNode).getObfuscatedIntPush(1));
+                        expression.add(context.getExtension().getObfuscatedIntPush(1));
                         expression.add(new InsnNode(IADD));
                         expression.add(new InsnNode(IADD));
                     }

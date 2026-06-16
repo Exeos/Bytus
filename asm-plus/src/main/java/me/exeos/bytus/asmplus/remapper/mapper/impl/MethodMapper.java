@@ -17,9 +17,12 @@ import java.util.stream.Collectors;
 public class MethodMapper {
 
     public static Map<String, String> map(JarArchive jar, Function<Integer, String> nameGen, Function<MappingContext, Boolean> shouldExclude) {
+        return map(jar, HierarchyAnalyzer.analyzeNameMapped(jar), nameGen, shouldExclude);
+    }
+
+    public static Map<String, String> map(JarArchive jar, Map<String, ClassEdge> hierarchy, Function<Integer, String> nameGen, Function<MappingContext, Boolean> shouldExclude) {
         Map<String, String> mapping = new HashMap<>();
 
-        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(jar);
         Map<ClassEdge, Set<String>> usedNamesByClass = new HashMap<>();
 
         for (ClassNode classNode : jar.getClasses().values()) {

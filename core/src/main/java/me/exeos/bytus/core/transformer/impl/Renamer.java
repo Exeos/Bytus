@@ -1,7 +1,5 @@
 package me.exeos.bytus.core.transformer.impl;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.remapper.ClassRemapper;
 import me.exeos.bytus.asmplus.remapper.FieldRemapper;
@@ -11,7 +9,6 @@ import me.exeos.bytus.asmplus.remapper.mapper.impl.FieldMapper;
 import me.exeos.bytus.asmplus.remapper.mapper.impl.MethodMapper;
 import me.exeos.bytus.asmplus.utils.AsmUtil;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
 import me.exeos.bytus.asmplus.utils.JarUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -22,7 +19,6 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -44,36 +40,39 @@ public class Renamer extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jar());
+        renameMethods(context);
+        renameFields(context);
+        renameClasses(context);
 
-        renameMethods(context.jar(), hierarchy);
-        renameFields(context.jar(), hierarchy);
-        renameClasses(context.jar());
+        // needs to be invalidated because classnames changed
+        context.getExtension().invalidateHierarchyNameMap();
     }
 
-    private void renameClasses(JarArchive jar) {
+    private void renameClasses(JarContext context) {
         new ClassRemapper(
                 ClassMapper.map(
-                        jar,
+                        context.jar(),
                         RandomUtil::getString,
-                        classNode -> isEntrypoint(jar, classNode.name)
+                        classNode -> isEntrypoint(context.jar(), classNode.name)
                 )
-        ).remap(jar);
+        ).remap(context.jar());
     }
 
-    private void renameFields(JarArchive jar, Map<String, ClassEdge> hierarchy) {
+    private void renameFields(JarContext context) {
         new FieldRemapper(
                 FieldMapper.map(
-                        jar,
+                        context.jar(),
+                        context.getExtension().getHierarchy(),
                         RandomUtil::getString
                 )
-        ).remap(jar, hierarchy);
+        ).remap(context.jar(), context.getExtension().getHierarchyNameMapped());
     }
 
-    private void renameMethods(JarArchive jar, Map<String, ClassEdge> hierarchy) {
+    private void renameMethods(JarContext context) {
         new MethodRemapper(
                 MethodMapper.map(
-                        jar,
+                        context.jar(),
+                        context.getExtension().getHierarchyNameMapped(),
                         RandomUtil::getString,
                         mappingContext -> {
                             ClassNode classNode = mappingContext.classNode();
@@ -81,10 +80,10 @@ public class Renamer extends AbstractTransformer {
 
                             return AsmUtil.hasAccess(classNode.access, ACC_ANNOTATION)
                                     || (ClassUtil.isEnum(classNode) && methodNode.isPresent() && (List.of("values", "valueOf").contains(methodNode.get().name)))
-                                    || (methodNode.isPresent() && isEntrypoint(jar, classNode.name, methodNode.get().name, methodNode.get().desc));
+                                    || (methodNode.isPresent() && isEntrypoint(context.jar(), classNode.name, methodNode.get().name, methodNode.get().desc));
                         }
                 )
-        ).remap(jar, hierarchy);
+        ).remap(context.jar(), context.getExtension().getHierarchyNameMapped());
     }
 
     private boolean isEntrypoint(JarArchive archive, String className) {

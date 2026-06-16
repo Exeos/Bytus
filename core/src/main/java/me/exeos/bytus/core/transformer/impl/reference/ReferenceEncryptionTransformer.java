@@ -1,6 +1,5 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
 import me.exeos.bytus.asmplus.codegen.xswitch.TableSwitchGenerator;
@@ -53,7 +52,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(ClassContext context) {
-        hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jarCtx().jar());
+        hierarchy = context.jarCtx().getExtension().getHierarchyNameMapped();
         if (bsmOwner == null && bsmName == null) {
             getBootstrap(context);
         }

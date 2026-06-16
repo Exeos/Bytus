@@ -13,9 +13,12 @@ import java.util.function.Function;
 public class FieldMapper {
 
     public static Map<String, String> map(JarArchive jar, Function<Integer, String> nameGen) {
+        return map(jar, HierarchyAnalyzer.analyze(jar), nameGen);
+    }
+
+    public static Map<String, String> map(JarArchive jar, Map<ClassNode, ClassEdge> hierarchy, Function<Integer, String> nameGen) {
         Map<String, String> mapping = new HashMap<>();
 
-        Map<ClassNode, ClassEdge> hierarchy = HierarchyAnalyzer.analyze(jar);
         Map<ClassEdge, Set<String>> usedNamesByClass = new HashMap<>();
 
         for (ClassNode classNode : jar.getClasses().values()) {

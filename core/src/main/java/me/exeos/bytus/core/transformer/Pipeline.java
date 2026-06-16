@@ -1,7 +1,9 @@
 package me.exeos.bytus.core.transformer;
 
 
+import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.exceptions.BytusTransformException;
+import me.exeos.bytus.core.transformer.extensions.JarExtension;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
@@ -22,6 +24,7 @@ import java.util.function.Consumer;
 public class Pipeline {
 
     private final List<AbstractTransformer> transformers;
+    private final Map<JarArchive, JarExtension> jarExtensions = new HashMap<>();
     private final Map<MethodNode, MethodExtension> methodExtensions = new HashMap<>();
 
     /**
@@ -54,6 +57,7 @@ public class Pipeline {
      */
     public void emit(ClassContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
         context.jarCtx().jar().getClasses().put(context.classNode().name, context.classNode());
+        context.jarCtx().getExtension().invalidateHierarchy();
         transform(context, exclusions);
     }
 
@@ -114,15 +118,13 @@ public class Pipeline {
         return methodExtensions.get(methodNode);
     }
 
-    public void assignExtension(MethodNode methodNode, MethodExtension extension) {
-        if (methodExtensions.containsKey(methodNode)) {
-            throw new BytusTransformException("Target already has an extension. Update it instead");
-        }
-
-        methodExtensions.put(methodNode, extension);
+    public JarExtension getExtension(JarContext context) {
+        return getExtension(context.jar());
     }
 
-    public MethodExtension.SaltInfo getSaltInfo(MethodNode methodNode) {
-        return getExtension(methodNode).saltInfo;
+    public JarExtension getExtension(JarArchive jar) {
+        jarExtensions.putIfAbsent(jar, new JarExtension(jar));
+
+        return jarExtensions.get(jar);
     }
 }

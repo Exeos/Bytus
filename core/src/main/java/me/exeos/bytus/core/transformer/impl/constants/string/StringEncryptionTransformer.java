@@ -66,7 +66,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(MethodContext context) {
-        applyTransformation(context.methodNode().instructions, context.pipeline().getExtension(context));
+        applyTransformation(context.methodNode().instructions, context.getExtension());
     }
 
     @Override

@@ -51,7 +51,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
             SALT_BY_METHOD = buildSaltMap(context);
         }
 
-        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(context.jar());
+        Map<String, ClassEdge> hierarchy = context.getExtension().getHierarchyNameMapped();
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 processMethod(context, hierarchy, classNode, methodNode);
@@ -207,7 +207,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
         Set<ClassNode> excludedClass = new HashSet<>();
         Set<MethodNode> excludedMethods = new HashSet<>();
-        buildExclusions(context.jar(), excludedClass, excludedMethods);
+        buildExclusions(context.jar(), context.getExtension().getHierarchy(), excludedClass, excludedMethods);
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             if (ClassUtil.isEnum(classNode) || excludedClass.contains(classNode)) {
@@ -215,7 +215,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                if (!context.pipeline().getSaltInfo(methodNode).hasSalt()
+                if (!context.pipeline().getExtension(methodNode).saltInfo.hasSalt()
                         && !MethodUtil.isSpecial(methodNode)
                         && !excludedMethods.contains(methodNode)
                 ) {
@@ -227,7 +227,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
         return methodSaltMap;
     }
 
-    private void buildExclusions(JarArchive jar, Set<ClassNode> excludedClasses, Set<MethodNode> excludedMethods) {
+    private void buildExclusions(JarArchive jar, Map<ClassNode, ClassEdge> hierarchy, Set<ClassNode> excludedClasses, Set<MethodNode> excludedMethods) {
         Map<ClassNode, Set<MethodNode>> indyTargets = new HashMap<>();
         for (ClassNode classNode : jar.getClasses().values()) {
             // TODO: dont exclude all interfaces
@@ -265,7 +265,6 @@ public class MethodSaltTransformer extends AbstractTransformer {
             });
         }
 
-        Map<ClassNode, ClassEdge> hierarchy = HierarchyAnalyzer.analyze(jar);
         for (Map.Entry<ClassNode, Set<MethodNode>> entry : indyTargets.entrySet()) {
             ClassNode owner = entry.getKey();
 
