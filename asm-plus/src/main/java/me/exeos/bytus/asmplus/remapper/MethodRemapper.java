@@ -3,8 +3,11 @@ package me.exeos.bytus.asmplus.remapper;
 import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
+import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
+import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import org.objectweb.asm.Handle;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.util.Map;
@@ -19,13 +22,15 @@ public class MethodRemapper {
     }
 
     public void remap(JarArchive jar) {
-        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(jar);
-
-        hierarchyMergeMapping(jar, hierarchy);
-        jar.getClasses().values().forEach(classNode -> remap(hierarchy, classNode));
+        remap(jar, HierarchyAnalyzer.analyzeNameMapped(jar));
     }
 
-    private void remap(Map<String, ClassEdge> hierarchy, ClassNode classNode) {
+    public void remap(JarArchive jar, Map<String, ClassEdge> hierarchy) {
+        jar.getClasses().values().forEach(classNode -> remapCallsites(hierarchy, classNode));
+        jar.getClasses().values().forEach(this::remapMethodNames);
+    }
+
+    private void remapCallsites(Map<String, ClassEdge> hierarchy, ClassNode classNode) {
         for (MethodNode methodNode : classNode.methods) {
             for (AbstractInsnNode insnNode : methodNode.instructions) {
                 switch (insnNode) {
@@ -36,8 +41,12 @@ public class MethodRemapper {
                                 methodInsnNode.desc);
                     }
                     case InvokeDynamicInsnNode indy -> {
-                        indy.bsm = remapHandle(indy.bsm);
+                        DescriptorMember returnType = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
+                        if (!returnType.isPrimitive() && !returnType.isArray() && indy.bsmArgs.length > 0 && indy.bsmArgs[0] instanceof Type type) {
+                            indy.name = getMapped(returnType.getValue(), indy.name, type.getDescriptor());
+                        }
 
+                        indy.bsm = remapHandle(indy.bsm);
                         for (int i = 0; i < indy.bsmArgs.length; i++) {
                             Object bsmArg = indy.bsmArgs[i];
                             if (bsmArg instanceof Handle handle) {
@@ -49,9 +58,11 @@ public class MethodRemapper {
                 }
             }
         }
+    }
 
-        for (MethodNode methodNode : classNode.methods) {
-            methodNode.name = getMapped(classNode.name, methodNode);
+    public void remapMethodNames(ClassNode owner) {
+        for (MethodNode methodNode : owner.methods) {
+            methodNode.name = getMapped(owner.name, methodNode);
         }
     }
 
@@ -62,26 +73,6 @@ public class MethodRemapper {
 
         Optional<MethodEdge> rootMethod = hierarchy.get(owner).findMethodRoot(name, desc);
         return rootMethod.isPresent() ? rootMethod.get().owner().classNode.name : owner;
-    }
-
-    private void hierarchyMergeMapping(JarArchive jar, Map<String, ClassEdge> hierarchy) {
-        for (ClassNode classNode : jar.getClasses().values()) {
-            if (!hierarchy.containsKey(classNode.name)) {
-                continue;
-            }
-
-            for (MethodNode methodNode : classNode.methods) {
-                hierarchy.get(classNode.name).getMethodRoot(methodNode).ifPresent(root -> {
-                    String rootKey = root.owner().classNode.name + root.methodNode().name + root.methodNode().desc;
-                    if (mapping.containsKey(rootKey)) {
-                        mapping.put(
-                                classNode.name + methodNode.name + methodNode.desc,
-                                mapping.get(rootKey)
-                        );
-                    }
-                });
-            }
-        }
     }
 
     private Handle remapHandle(Handle handle) {

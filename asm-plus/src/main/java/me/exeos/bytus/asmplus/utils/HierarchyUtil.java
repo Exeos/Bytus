@@ -16,6 +16,10 @@ public class HierarchyUtil {
     }
 
     public static void forEachAncestorClass(JarArchive jar, ClassNode start, boolean includeInterfaces, boolean includeStart, Consumer<ClassNode> visitor) {
+        forEachAncestorClass(jar, start, includeInterfaces, includeStart, visitor, _ -> {});
+    }
+
+    public static void forEachAncestorClass(JarArchive jar, ClassNode start, boolean includeInterfaces, boolean includeStart, Consumer<ClassNode> visitor, Consumer<String> notFoundVisitor) {
         Deque<String> work = new ArrayDeque<>();
         Set<String> seen = new HashSet<>();
 
@@ -40,7 +44,7 @@ public class HierarchyUtil {
                 continue;
             }
 
-            jar.getClassNode(name).ifPresent(cn -> {
+            jar.getClassNode(name).ifPresentOrElse(cn -> {
                 visitor.accept(cn);
 
                 if (cn.superName != null) {
@@ -50,7 +54,7 @@ public class HierarchyUtil {
                 if (includeInterfaces) {
                     work.addAll(cn.interfaces);
                 }
-            });
+            }, () -> notFoundVisitor.accept(name));
         }
     }
 

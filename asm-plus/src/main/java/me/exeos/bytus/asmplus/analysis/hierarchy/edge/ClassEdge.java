@@ -5,9 +5,7 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -21,6 +19,11 @@ import java.util.function.Consumer;
 public class ClassEdge {
 
     public final ClassNode classNode;
+
+    /**
+     * A set of all the parents not found in the jar archive or provided dependencies
+     */
+    public final Set<String> unresolvedParents = new HashSet<>();
 
     /**
      * Direct parent classes and interfaces in the hierarchy.

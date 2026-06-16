@@ -17,8 +17,10 @@ public class FieldRemapper {
     }
 
     public void remap(JarArchive jar) {
-        Map<String, ClassEdge> hierarchy = HierarchyAnalyzer.analyzeNameMapped(jar);
+        remap(jar, HierarchyAnalyzer.analyzeNameMapped(jar));
+    }
 
+    public void remap(JarArchive jar, Map<String, ClassEdge> hierarchy) {
         for (ClassNode classNode : jar.getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 for (AbstractInsnNode insnNode : methodNode.instructions) {
