@@ -3,10 +3,7 @@ package me.exeos.bytus.core.transformer.impl.reference;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
 import me.exeos.bytus.asmplus.codegen.xswitch.TableSwitchGenerator;
-import me.exeos.bytus.asmplus.utils.AsmUtil;
-import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
+import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -53,8 +50,9 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
     @Override
     public void transform(ClassContext context) {
         hierarchy = context.jarCtx().getExtension().getHierarchyNameMapped();
-        if (bsmOwner == null && bsmName == null) {
-            getBootstrap(context);
+        ClassEdge classEdge = context.jarCtx().getExtension().getHierarchy().get(context.classNode());
+        if (bsmOwner == null && bsmName == null && classEdge != null) {
+            getBootstrap(context, classEdge);
         }
 
         super.transform(context);
@@ -165,7 +163,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         };
     }
 
-    private void getBootstrap(ClassContext context) {
+    private void getBootstrap(ClassContext context, ClassEdge ownerEdge) {
         ClassNode container = context.classNode();
 
         /*
@@ -178,10 +176,11 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                                      String caller,
                                      int type)
          */
+        String bsmDesc = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
         MethodNode bsm = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
-                ClassUtil.getNoneCollidingMethodName(context.jarCtx().jar(), container, RandomUtil::getString),
-                "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;",
+                HierarchyUtil.genNoneCollidingMethodName(ownerEdge, bsmDesc, RandomUtil::getString),
+                bsmDesc,
                 null, null
         );
 

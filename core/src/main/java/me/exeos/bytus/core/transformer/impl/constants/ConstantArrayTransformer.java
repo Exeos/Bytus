@@ -1,7 +1,9 @@
 package me.exeos.bytus.core.transformer.impl.constants;
 
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
+import me.exeos.bytus.asmplus.utils.HierarchyUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -25,6 +27,8 @@ import java.util.*;
  */
 public final class ConstantArrayTransformer extends AbstractTransformer {
 
+    private final static String CONST_FIELD_DESC = "[Ljava/lang/Object;";
+    
     public ConstantArrayTransformer(BytusConfig config) {
         super(config);
     }
@@ -42,17 +46,18 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
     @Override
     public void transform(ClassContext context) {
         Set<Object> constants = this.collectConstants(context.classNode());
-        if (constants.isEmpty()) return;
+        ClassEdge owner = context.jarCtx().getExtension().getHierarchy().get(context.classNode());
+        if (constants.isEmpty() || owner == null) return;
 
         Map<Object, Integer> constantIndexMap = this.assignIndices(constants);
-
-        String constantFieldName = ClassUtil.getNoneCollidingFieldName(context.jarCtx().jar(), context.classNode(), RandomUtil::getString);
+        
+        String constantFieldName = HierarchyUtil.genNoneCollidingFieldName(owner, CONST_FIELD_DESC, RandomUtil::getString);
 
         replaceConstants(context.classNode(), constantIndexMap, constantFieldName);
-        context.classNode().fields.add(new FieldNode(ACC_PRIVATE | ACC_STATIC, constantFieldName, "[Ljava/lang/Object;", null, null));
+        context.classNode().fields.add(new FieldNode(ACC_PRIVATE | ACC_STATIC, constantFieldName, CONST_FIELD_DESC, null, null));
 
         MethodNode clinit = ClassUtil.getOrCreateStaticInitializer(context.classNode());
-        InsnList initializer = this.buildFieldInitializer(context.jarCtx().jar(), context.classNode(), constantIndexMap, constantFieldName);
+        InsnList initializer = this.buildFieldInitializer(context.jarCtx().jar(), context.classNode(), owner, constantIndexMap, constantFieldName);
         clinit.instructions.insertBefore(clinit.instructions.getFirst(), initializer);
     }
 
@@ -76,7 +81,7 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
 
                 int index = constants.get(cst);
                 InsnList replacement = new InsnList();
-                replacement.add(new FieldInsnNode(GETSTATIC, classNode.name, constantFieldName, "[Ljava/lang/Object;"));
+                replacement.add(new FieldInsnNode(GETSTATIC, classNode.name, constantFieldName, CONST_FIELD_DESC));
                 replacement.add(InsnUtil.getIntPush(index));
                 replacement.add(new InsnNode(AALOAD));
 
@@ -109,12 +114,12 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
         });
     }
 
-    private InsnList buildFieldInitializer(JarArchive jar, ClassNode classNode, Map<Object, Integer> constants, String constantFieldName) {
+    private InsnList buildFieldInitializer(JarArchive jar, ClassNode classNode, ClassEdge ownerEdge, Map<Object, Integer> constants, String constantFieldName) {
         InsnList list = new InsnList();
 
         list.add(new LdcInsnNode(constants.size()));
         list.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
-        list.add(new FieldInsnNode(PUTSTATIC, classNode.name, constantFieldName, "[Ljava/lang/Object;"));
+        list.add(new FieldInsnNode(PUTSTATIC, classNode.name, constantFieldName, CONST_FIELD_DESC));
 
         int maxPerMethod = 500;
         int current = 0;
@@ -126,13 +131,19 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
                     // insert return at the end
                     currentMethod.instructions.add(new InsnNode(RETURN));
                 }
-                currentMethod = new MethodNode(ACC_STATIC | ACC_PRIVATE, ClassUtil.getNoneCollidingMethodName(jar, classNode, RandomUtil::getString), "()V", null, null);
+                currentMethod = new MethodNode(
+                        ACC_STATIC | ACC_PRIVATE,
+                        HierarchyUtil.genNoneCollidingMethodName(ownerEdge, "()V", RandomUtil::getString),
+                        "()V",
+                        null,
+                        null
+                );
                 classNode.methods.add(currentMethod);
                 current = 0;
                 list.add(new MethodInsnNode(INVOKESTATIC, classNode.name, currentMethod.name, currentMethod.desc, false));
             }
 
-            currentMethod.instructions.add(new FieldInsnNode(GETSTATIC, classNode.name, constantFieldName, "[Ljava/lang/Object;"));
+            currentMethod.instructions.add(new FieldInsnNode(GETSTATIC, classNode.name, constantFieldName, CONST_FIELD_DESC));
             currentMethod.instructions.add(new LdcInsnNode(entry.getValue()));
             currentMethod.instructions.add(new LdcInsnNode(entry.getKey()));
 

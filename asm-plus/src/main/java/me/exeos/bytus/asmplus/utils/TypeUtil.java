@@ -5,6 +5,12 @@ import org.objectweb.asm.Opcodes;
 
 public class TypeUtil implements Opcodes {
 
+    /**
+     * Get the class name representing a given primitive
+     * @param primitive The primitive to get the class for
+     * @return The class name if matched
+     * @throws IllegalArgumentException If provided char doesn't represent a primitive
+     */
     public static String primitiveToClass(char primitive) {
         return switch (primitive) {
             case 'B' -> "java/lang/Byte";
@@ -19,6 +25,11 @@ public class TypeUtil implements Opcodes {
         };
     }
 
+    /**
+     * Get the method name responsible for converting an instance class to its primitive type
+     * @param primitive The primitive target
+     * @return Method name if matched
+     */
     public static String clsInstanceToPrimMethodName(char primitive) {
         return switch (primitive) {
             case 'B' -> "byteValue";
@@ -33,6 +44,11 @@ public class TypeUtil implements Opcodes {
         };
     }
 
+    /**
+     * Get opcode for loading a local based on a given description member
+     * @param member The member to get the opcode for
+     * @return The load opcode for the type provided
+     */
     public static int loadOpcodeForType(DescriptorMember member) {
         if (!member.isPrimitive() || member.isArray()) {
             return ALOAD;
@@ -42,10 +58,16 @@ public class TypeUtil implements Opcodes {
             case 'J' -> LLOAD;
             case 'D' -> DLOAD;
             case 'F' -> FLOAD;
-            default -> ILOAD;
+            case 'I' -> ILOAD;
+            default -> throw new IllegalArgumentException("Value does not map to load opcode");
         };
     }
 
+    /**
+     * Get opcode for storing a local based on a given description member
+     * @param member The member to get the opcode for
+     * @return The store opcode for the type provided
+     */
     public static int storeOpcodeForType(DescriptorMember member) {
         if (!member.isPrimitive() || member.isArray()) {
             return ASTORE;
@@ -55,7 +77,8 @@ public class TypeUtil implements Opcodes {
             case 'J' -> LSTORE;
             case 'D' -> DSTORE;
             case 'F' -> FSTORE;
-            default -> ISTORE;
+            case 'I' -> ISTORE;
+            default -> throw new IllegalArgumentException("Value does not map to store opcode");
         };
     }
 }

@@ -2,16 +2,11 @@ package me.exeos.bytus.asmplus.utils;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.MethodNode;
 
-import javax.swing.text.html.Option;
-import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 public class JarUtil {
 
-    private static final Random RANDOM = new Random();
 
     public static Optional<ClassNode> findClass(JarArchive jar, String name) {
         ClassNode cn = jar.getClasses().getOrDefault(name, null);
@@ -36,20 +31,5 @@ public class JarUtil {
             }
         }
         return Optional.empty();
-    }
-
-    public static Optional<MethodNode> findMethod(JarArchive jar, String ownerName, String methodName, String methodDesc) {
-        Optional<ClassNode> owner = JarUtil.findClass(jar, ownerName);
-        if (owner.isEmpty()) {
-            return Optional.empty();
-        }
-
-        return ClassUtil.findMethod(owner.get(), methodName, methodDesc);
-    }
-
-    public static ClassNode getRandomClass(JarArchive jar) {
-        List<ClassNode> asList = jar.getClasses().values().stream().toList();
-
-        return asList.get(RANDOM.nextInt(asList.size()));
     }
 }

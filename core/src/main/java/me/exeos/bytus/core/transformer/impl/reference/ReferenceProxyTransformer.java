@@ -1,7 +1,9 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
+import me.exeos.bytus.asmplus.utils.HierarchyUtil;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -39,7 +41,8 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
     @Override
     public void transform(ClassContext context) {
         ClassNode classNode = context.classNode();
-        if ((classNode.access & ACC_INTERFACE) != 0) return;
+        ClassEdge classEdge = context.jarCtx().getExtension().getHierarchy().get(classNode);
+        if (classEdge == null || (classNode.access & ACC_INTERFACE) != 0) return;
 
         for (MethodNode methodNode : classNode.methods.toArray(new MethodNode[0])) {
             InsnUtil.loop(methodNode.instructions, insnNode -> {
@@ -50,7 +53,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
                         && methodInsnNode.getOpcode() != INVOKEINTERFACE)
                     return;
 
-                MethodNode[] proxyMethods = this.generateProxyMethods(context.jarCtx().jar(), classNode, methodInsnNode);
+                MethodNode[] proxyMethods = this.generateProxyMethods(context.jarCtx().jar(), classNode, classEdge, methodInsnNode);
                 MethodNode firstProxy = proxyMethods[0];
 
                 // replace the methodInsnNode with the call to the first proxy
@@ -70,7 +73,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
     }
 
     // TODO: add more stuff into the proxy methods, maybe move more logic into instead of just the actual call
-    private MethodNode[] generateProxyMethods(JarArchive archive, ClassNode classNode, MethodInsnNode methodInsnNode) {
+    private MethodNode[] generateProxyMethods(JarArchive archive, ClassNode classNode, ClassEdge classEdge, MethodInsnNode methodInsnNode) {
         int proxyAmount = RandomUtil.getInt(Math.max(1, this.minDepth), Math.max(1, this.maxDepth + 1));
         MethodNode[] proxyMethods = new MethodNode[proxyAmount];
 
@@ -87,7 +90,7 @@ public final class ReferenceProxyTransformer extends AbstractTransformer {
         for (int i = proxyAmount - 1; i >= 0; i--) {
             MethodNode proxyMethod = new MethodNode(
                     ACC_PRIVATE | ACC_STATIC,
-                    ClassUtil.getNoneCollidingMethodName(archive, classNode, usedNames, RandomUtil::getString),
+                    HierarchyUtil.genNoneCollidingMethodName(classEdge, proxyDesc, usedNames, RandomUtil::getString),
                     proxyDesc,
                     null,
                     null

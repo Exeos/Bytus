@@ -47,6 +47,7 @@ public class ParamGenerifier extends AbstractTransformer {
             }
         }
 
+        // TODO: this is retarded need to get rid of this and use new hierarchy system
         HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName);
 
         // exclude entry points
@@ -181,7 +182,7 @@ public class ParamGenerifier extends AbstractTransformer {
         // set of original slots that are written to
         Set<Integer> writtenSlots = new HashSet<>();
 
-        int paramsStartIndex = MethodUtil.getParamSlotStart(methodNode);
+        int paramsStartIndex = MethodUtil.getLocalsOffset(methodNode);
 
         // slot of param
         int paramSlot = paramsStartIndex;

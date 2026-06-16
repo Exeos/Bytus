@@ -139,7 +139,7 @@ public class ClassEdge {
      * @param desc The method descriptor
      * @param consumer Callback invoked for each discovered method edge
      */
-    public void discoverMethod(String name, String desc, Consumer<MethodEdge> consumer) {
+    public void discoverMethods(String name, String desc, Consumer<MethodEdge> consumer) {
         Optional<MethodEdge> nearest = findNearestMethod(name, desc);
         if (nearest.isEmpty()) {
             return;
@@ -214,7 +214,7 @@ public class ClassEdge {
     }
 
     /**
-     * Finds the nearest method with the given name and descriptor in this class hierarchy.
+     * Finds the nearest method declaration with the given name and descriptor in this class hierarchy.
      * <p>
      * This first checks the current class, then recursively searches parent classes/interfaces
      * until a matching method is found.

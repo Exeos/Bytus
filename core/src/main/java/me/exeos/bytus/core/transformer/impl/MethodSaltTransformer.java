@@ -1,6 +1,5 @@
 package me.exeos.bytus.core.transformer.impl;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
@@ -89,7 +88,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 : 0;
 
         if (isSalted)
-            MethodUtil.fixVars(methodNode.instructions, saltSlot);
+            MethodUtil.remapLocals(methodNode.instructions, saltSlot);
 
         rewriteCallSites(hierarchy, methodNode, methodId, saltSlot, isSalted);
     }

@@ -41,23 +41,18 @@ public class MethodUtil implements Opcodes {
      *
      * @param to    Method to add param to
      * @param param Param to add to method
+     * @param remapLocals Should instructions loading locals be remapped
      * @return Local slot of the newly added Param
      */
-    public static int addParam(MethodNode to, DescriptorMember param, boolean fixVars) {
+    public static int addParam(MethodNode to, DescriptorMember param, boolean remapLocals) {
         MethodDescriptor newMethodDesc = DescriptorParser.parseMethodDesc(to.desc).addParam(param);
         int newParamSlot = newMethodDesc.getAbsoluteSlot(
                 newMethodDesc.getParams().size() - 1,
-                MethodUtil.getParamSlotStart(to));
+                MethodUtil.getLocalsOffset(to));
 
         // loop trough each insn and update target var if it collides
-        if (fixVars) {
-            InsnUtil.loop(to.instructions, insnNode -> {
-                if (insnNode instanceof VarInsnNode varInsnNode && varInsnNode.var >= newParamSlot) {
-                    varInsnNode.var++;
-                } else if (insnNode instanceof IincInsnNode iincInsnNode && iincInsnNode.var >= newParamSlot) {
-                    iincInsnNode.var++;
-                }
-            });
+        if (remapLocals) {
+            remapLocals(to.instructions, newParamSlot);
         }
 
         to.desc = newMethodDesc.toDesc();
@@ -70,10 +65,15 @@ public class MethodUtil implements Opcodes {
 
         return newMethodDesc.getAbsoluteSlot(
                 newMethodDesc.getParams().size() - 1,
-                MethodUtil.getParamSlotStart(to));
+                MethodUtil.getLocalsOffset(to));
     }
 
-    public static void fixVars(InsnList container, int threshold) {
+    /**
+     * Remaps indexes of locals so they don't collide with newly added params
+     * @param container Instructions to remap
+     * @param threshold The index threshold marking the end of the method params
+     */
+    public static void remapLocals(InsnList container, int threshold) {
         InsnUtil.loop(container, insnNode -> {
             if (insnNode instanceof VarInsnNode varInsnNode && varInsnNode.var >= threshold) {
                 varInsnNode.var++;
@@ -83,10 +83,20 @@ public class MethodUtil implements Opcodes {
         });
     }
 
-    public static int getParamSlotStart(MethodNode methodNode) {
+    /**
+     * Returns the start slot of the locals in a method
+     * @param methodNode Method node to get the offset for
+     * @return The start slot of the locals in a method
+     */
+    public static int getLocalsOffset(MethodNode methodNode) {
         return MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
     }
 
+    /**
+     * Finds all methods targeted by invokedynamic insn in the provided methods instructions
+     * @param methodNode The MethodNode to scan for indy instructions
+     * @return Set of owner + name + desc of targeted methods
+     */
     public static Set<String> getInvokeDynamicTargets(MethodNode methodNode) {
         Set<String> targeted = new HashSet<>();
         for (AbstractInsnNode insnNode : methodNode.instructions) {
@@ -102,6 +112,12 @@ public class MethodUtil implements Opcodes {
         return targeted;
     }
 
+    /**
+     * Finds all methods targeted by invokedynamic and maps them into their owner classes
+     * @param jar JarArchive containing the relevant classes
+     * @param methodNode The MethodNode to scan for indy instructions
+     * @return Map mapping classes and theirs methods if that method is targeted by invoke dynamic
+     */
     public static Map<ClassNode, Set<MethodNode>> getInvokeDynamicTargets(JarArchive jar, MethodNode methodNode) {
         Map<ClassNode, Set<MethodNode>> targeted = new HashMap<>();
         for (AbstractInsnNode insnNode : methodNode.instructions) {
