@@ -39,11 +39,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   </li>
  * </ol>
  */
-public class JumpFlattening extends AbstractTransformer {
+public class JumpFlatteningTransformer extends AbstractTransformer {
 
     private final int minDispatcherChainLength, maxDispatcherChainLength;
 
-    public JumpFlattening(BytusConfig config) {
+    public JumpFlatteningTransformer(BytusConfig config) {
         super(config);
         minDispatcherChainLength = config.flow.controlFlow().minDispatcherChainLength();
         maxDispatcherChainLength = config.flow.controlFlow().maxDispatcherChainLength();

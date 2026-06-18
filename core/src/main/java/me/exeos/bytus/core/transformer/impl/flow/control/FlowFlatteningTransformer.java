@@ -45,9 +45,9 @@ import java.util.*;
  *       {@code state} and jumping back to the dispatcher entry.</li>
  * </ul>
  */
-public class FlowFlattening extends AbstractTransformer {
+public class FlowFlatteningTransformer extends AbstractTransformer {
 
-    public FlowFlattening(BytusConfig config) {
+    public FlowFlatteningTransformer(BytusConfig config) {
         super(config);
     }
 

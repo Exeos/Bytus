@@ -141,6 +141,12 @@ public class InsnUtil implements Opcodes {
         }
     }
 
+    public static void addFromInsnList(InsnList source, List<AbstractInsnNode> target) {
+        for (AbstractInsnNode insnNode : source) {
+            target.add(insnNode);
+        }
+    }
+
     /**
      * Safely loop trough instructions, you can insert, delete, etc without breaking iteration
      *
@@ -148,6 +154,16 @@ public class InsnUtil implements Opcodes {
      * @param visitor
      */
     public static void loop(InsnList insnList, Consumer<AbstractInsnNode> visitor) {
+        AbstractInsnNode current = insnList.getFirst();
+
+        while (current != null) {
+            AbstractInsnNode next = current.getNext();
+            visitor.accept(current);
+            current = next;
+        }
+    }
+
+    public static void loop(List<AbstractInsnNode> insnList, Consumer<AbstractInsnNode> visitor) {
         AbstractInsnNode current = insnList.getFirst();
 
         while (current != null) {
