@@ -86,6 +86,7 @@ public class HierarchyUtil {
         }
     }
 
+    // todo
     public static void expandExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
         for (ClassNode classNode : jar.getClasses().values()) {
             // Collect all ancestor methods that are excluded, so we can exclude overrides and calls in this class.
