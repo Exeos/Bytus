@@ -18,7 +18,6 @@ import org.objectweb.asm.tree.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -28,6 +27,8 @@ import java.util.stream.Collectors;
  */
 public class ParamGenerifier extends AbstractTransformer {
 
+    private final static String OBJ_ARR_DESC = "([Ljava/lang/Object;)";
+    
     public ParamGenerifier(BytusConfig config) {
         super(config);
     }
@@ -61,8 +62,6 @@ public class ParamGenerifier extends AbstractTransformer {
         MWList exclusions = new MWList(config.getEntryPoints(context.jar()));
 
         exclusions.add(MethodWrapper.of("<clinit>"));
-        exclusions.add(MethodWrapper.of("<init>"));
-
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             Map<String, Integer> methodDeclarationMap = new HashMap<>();
@@ -187,7 +186,7 @@ public class ParamGenerifier extends AbstractTransformer {
                     arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
 
                     methodNode.instructions.insertBefore(insnNode, arrBuilder);
-                    methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
+                    methodInsnNode.desc = OBJ_ARR_DESC + descriptor.getReturnType().toDesc();
                 }
                 case InvokeDynamicInsnNode indy -> {
                     DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
@@ -215,15 +214,15 @@ public class ParamGenerifier extends AbstractTransformer {
 
                     DescriptorMember typeRet = targetDesc.getReturnType();
 
-                    indy.bsmArgs[0] = Type.getType("([Ljava/lang/Object;)" + typeRet.toDesc());
+                    indy.bsmArgs[0] = Type.getType(OBJ_ARR_DESC + typeRet.toDesc());
                     indy.bsmArgs[1] = new Handle(
                             handle.getTag(),
                             handle.getOwner(),
                             handle.getName(),
-                            "(L[java/lang/Object;)" + DescriptorParser.parseMethodDesc(handle.getDesc()).getReturnType().toDesc(),
+                            OBJ_ARR_DESC + DescriptorParser.parseMethodDesc(handle.getDesc()).getReturnType().toDesc(),
                             handle.isInterface()
                     );
-                    indy.bsmArgs[2] = Type.getType("([Ljava/lang/Object;)" + typeRet.erase().toDesc());
+                    indy.bsmArgs[2] = Type.getType(OBJ_ARR_DESC + typeRet.erase().toDesc());
                 }
                 default -> {}
             }
@@ -364,6 +363,6 @@ public class ParamGenerifier extends AbstractTransformer {
 
         // insert prologue (storing params in locals if required) and update this methods descriptor
         methodNode.instructions.insertBefore(methodNode.instructions.getFirst(), prologue);
-        methodNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
+        methodNode.desc = OBJ_ARR_DESC + descriptor.getReturnType().toDesc();
     }
 }
