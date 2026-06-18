@@ -28,7 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class ParamGenerifier extends AbstractTransformer {
 
     private final static String OBJ_ARR_DESC = "([Ljava/lang/Object;)";
-    
+
     public ParamGenerifier(BytusConfig config) {
         super(config);
     }
@@ -48,13 +48,17 @@ public class ParamGenerifier extends AbstractTransformer {
         MethodMatcher exclusions = buildExclusions(context);
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
-            for (MethodNode methodNode : classNode.methods) {
-                convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(methodNode), exclusions);
-            }
+            transform(context, classNode, exclusions);
+        }
+    }
 
-            for (MethodNode methodNode : classNode.methods) {
-                convertParamUsage(context, classNode, methodNode, exclusions);
-            }
+    private void transform(JarContext context, ClassNode classNode, MethodMatcher exclusions) {
+        for (MethodNode methodNode : classNode.methods) {
+            convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(methodNode), exclusions);
+        }
+
+        for (MethodNode methodNode : classNode.methods) {
+            convertParamUsage(context, classNode, methodNode, exclusions);
         }
     }
 
@@ -255,7 +259,7 @@ public class ParamGenerifier extends AbstractTransformer {
     }
 
     private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, MethodMatcher exclusions) {
-        if (exclusions.match(MethodMatchEntry.of(ownerNode.name, methodNode))) {
+        if (context.pipeline().getExtension(methodNode).paramObfInfo.hasParamObf() || exclusions.match(MethodMatchEntry.of(ownerNode.name, methodNode))) {
             return;
         }
 
@@ -290,8 +294,6 @@ public class ParamGenerifier extends AbstractTransformer {
             paramArrayIndex++;
         }
 
-        context.pipeline().getExtension(methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
-
         // map what slots are mutated
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof VarInsnNode varInsnNode && InsnUtil.isStore(insnNode)) {
@@ -313,6 +315,9 @@ public class ParamGenerifier extends AbstractTransformer {
 
             paramSlot += param.getSlotWidth();
         }
+
+        // dont move this to the bottom, will break methodExtension.getObfuscatedIntPush
+        context.pipeline().getExtension(methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
 
         // prologue stores params that are written to in local vars
         InsnList prologue = new InsnList();
