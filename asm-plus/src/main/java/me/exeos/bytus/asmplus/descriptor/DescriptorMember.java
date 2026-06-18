@@ -16,12 +16,17 @@ public class DescriptorMember {
         this.arrayDepth = arrayDepth;
     }
 
-    public void erase() {
+    public DescriptorMember toErased() {
+        return new DescriptorMember(value, isPrimitive, isArray, arrayDepth).erase();
+    }
+
+    public DescriptorMember erase() {
         if (isPrimitive) {
-            return;
+            return this;
         }
 
         value = "java/lang/Object";
+        return this;
     }
 
     public int getSlotWidth() {

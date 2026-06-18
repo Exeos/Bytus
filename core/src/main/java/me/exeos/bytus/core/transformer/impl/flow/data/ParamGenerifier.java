@@ -3,6 +3,8 @@ package me.exeos.bytus.core.transformer.impl.flow.data;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
+import me.exeos.bytus.asmplus.idkhowtonamethisyet.MWList;
+import me.exeos.bytus.asmplus.idkhowtonamethisyet.MethodWrapper;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
@@ -10,53 +12,24 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Transforms argument passing to Object[]
  * Pure aids to implement because of unlimited edge cases.
- * TODO: handle interfaces better than just excluding them
  * TODO: use Pipeline methods better so emitted methods can be obfuscated
  */
 public class ParamGenerifier extends AbstractTransformer {
 
     public ParamGenerifier(BytusConfig config) {
         super(config);
-    }
-
-    private void buildExclusions(JarArchive jar, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
-        for (ClassNode classNode : jar.getClasses().values()) {
-            // map tracking amount of methods declared by their ower + name
-            Map<String, Integer> methodDeclarationMap = new HashMap<>();
-            for (MethodNode methodNode : classNode.methods) {
-                // exclude methods in same class with same name as signature would be the same after transformation
-                methodDeclarationMap.merge(classNode.name + methodNode.name, 1, (oldVal, _) -> oldVal + 1);
-                if (methodDeclarationMap.get(classNode.name + methodNode.name) > 1) {
-                    exclusionsByName.add(classNode.name + methodNode.name);
-                }
-
-                // exclude all methods declared in interfaces
-                if ((classNode.access & ACC_INTERFACE) != 0) {
-                    exclusionsByName.add(classNode.name + methodNode.name);
-                }
-
-                // exclude all methods invoked by InvokeDynamic
-                exclusionsByDesc.addAll(MethodUtil.getInvokeDynamicTargets(methodNode));
-            }
-        }
-
-        // TODO: this is retarded need to get rid of this and use new hierarchy system
-        HierarchyUtil.expandExclusions(jar, exclusionsByDesc, exclusionsByName);
-
-        // exclude entry points
-        if (config.entryPoints.fromManifest())
-            JarUtil.getMainMethodFromManifest(jar).ifPresent(exclusionsByDesc::add);
-
-        config.entryPoints.custom().forEach((className, methodName) -> {
-            exclusionsByName.add(className.replace(".", "/") + methodName);
-        });
     }
 
     @Override
@@ -71,97 +44,194 @@ public class ParamGenerifier extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        // ownerCtx + name + desc
-        Set<String> exclusionsByDesc = new HashSet<>();
-        // ownerCtx + name
-        Set<String> exclusionsByName = new HashSet<>();
-
-        buildExclusions(context.jar(), exclusionsByDesc, exclusionsByName);
+        MWList exclusions = buildExclusions(context);
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(methodNode), exclusionsByDesc, exclusionsByName);
+                convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(methodNode), exclusions);
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                convertParamUsage(context, classNode, methodNode, exclusionsByDesc, exclusionsByName);
+                convertParamUsage(context, classNode, methodNode, exclusions);
             }
         }
+    }
+
+    private MWList buildExclusions(JarContext context) {
+        MWList exclusions = new MWList(config.getEntryPoints(context.jar()));
+
+        exclusions.add(MethodWrapper.of("<clinit>"));
+        exclusions.add(MethodWrapper.of("<init>"));
+
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            Map<String, Integer> methodDeclarationMap = new HashMap<>();
+            var x = classNode.methods.stream().collect(Collectors.toMap(methodNode -> methodNode.name, e -> 1, Math::addExact));
+            for (MethodNode methodNode : classNode.methods) {
+                if (x.get(methodNode.name) > 1) {
+                    exclusions.add(new MethodWrapper(classNode.name, methodNode.name, methodNode.desc, 1));
+                }
+            }
+        }
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                for (AbstractInsnNode insnNode : methodNode.instructions) {
+                    if (!(insnNode instanceof InvokeDynamicInsnNode indy)) {
+                        continue;
+                    }
+
+                    DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
+                    if (indyRet.isPrimitive() || indyRet.isArray() || indy.bsmArgs.length < 2 || !(indy.bsmArgs[0] instanceof Type normalType) || !(indy.bsmArgs[1] instanceof Handle handle)) {
+                        continue;
+                    }
+
+                    String owner = indyRet.getValue();
+                    String name = indy.name;
+                    String desc = normalType.getDescriptor();
+
+                    // exclude lambdas methods invoked by members not in jar as their sigs cant be changed
+                    if (!context.jar().getClasses().containsKey(owner) || exclusions.contains(MethodWrapper.of(handle.getOwner(), handle.getName(), handle.getDesc()))) {
+                        exclusions.add(MethodWrapper.of(owner, name, desc));
+                        exclusions.add(MethodWrapper.of(handle.getOwner(), handle.getName(), handle.getDesc()));
+                    }
+                }
+            }
+        }
+
+        var hierarchy = context.getExtension().getHierarchyNameMapped();
+        for (MethodWrapper wrapper : exclusions.get().toArray(new MethodWrapper[0])) {
+            if (!hierarchy.containsKey(wrapper.owner())) {
+                continue;
+            }
+
+            hierarchy.get(wrapper.owner()).findMethodRoot(wrapper.name(), wrapper.desc()).ifPresent(rootEdge -> {
+                if (wrapper.owner().endsWith("StatisticFunction") && wrapper.name().equals("evaluate")) {
+                    System.out.println();
+                }
+                rootEdge.getOverriders().forEach(ov -> {
+                    exclusions.add(MethodWrapper.of(ov.owner().classNode.name, ov.methodNode().name, ov.methodNode().desc));
+                });
+            });
+        }
+
+        return exclusions;
     }
 
     /**
      * Converts the way params are passed to Methods from normal passing to Object[] passing
      */
-    private void convertParamPassing(JarArchive jar, MethodNode methodNode, MethodExtension methodExtension, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
-        int paramArrVarIndex = methodNode.maxLocals++;
+    private void convertParamPassing(JarArchive jar, MethodNode methodNode, MethodExtension methodExtension, MWList exclusions) {
+        int paramArrVarIndex = methodNode.maxLocals;
+        AtomicBoolean updatedInsn = new AtomicBoolean(false);
+
         InsnUtil.loop(methodNode.instructions, insnNode -> {
-            if (!(insnNode instanceof MethodInsnNode methodInsnNode)) {
-                return;
-            }
+            switch (insnNode) {
+                case MethodInsnNode methodInsnNode -> {
+                    // check if invocation target is in the jar and not excluded
+                    if (exclusions.contains(MethodWrapper.of(methodInsnNode)) || !jar.getClasses().containsKey(methodInsnNode.owner)) {
+                        return;
+                    }
 
-            // check if target method is included and if ownerCtx of target method belongs to jarCtx
-            if (exclusionsByDesc.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)
-                    || exclusionsByName.contains(methodInsnNode.owner + methodInsnNode.name)
-                    || !jar.getClasses().containsKey(methodInsnNode.owner)
-            ) {
-                return;
-            }
+                    MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
+                    int paramLength = descriptor.getParams().size();
+                    if (paramLength == 0) {
+                        return;
+                    }
 
-            MethodDescriptor descriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
-            int paramLength = descriptor.getParams().size();
-            if (paramLength == 0) {
-                return;
-            }
+                    if (!updatedInsn.get()) {
+                        methodNode.maxLocals++;
+                        updatedInsn.set(true);
+                    }
 
-            // tmp variables to avoid stack swapping as it can lead to issues with doubles and longs
-            // each param gets a local assigned
-            int[] tmpLocal = new int[paramLength];
-            for (int i = 0; i < paramLength; i++) {
-                tmpLocal[i] = methodNode.maxLocals;
-                methodNode.maxLocals += descriptor.getParams().get(i).getSlotWidth();
-            }
+                    // tmp variables to avoid stack swapping as it can lead to issues with doubles and longs
+                    // each param gets a local assigned
+                    int[] tmpLocal = new int[paramLength];
+                    for (int i = 0; i < paramLength; i++) {
+                        tmpLocal[i] = methodNode.maxLocals;
+                        methodNode.maxLocals += descriptor.getParams().get(i).getSlotWidth();
+                    }
 
-            InsnList arrBuilder = new InsnList();
+                    InsnList arrBuilder = new InsnList();
 
-            // store params stored on stack into temps in reverse (stack top is last argument)
-            for (int i = paramLength - 1; i >= 0; i--) {
-                arrBuilder.add(new VarInsnNode(TypeUtil.storeOpcodeForType(descriptor.getParams().get(i)), tmpLocal[i]));
-            }
+                    // store params stored on stack into temps in reverse (stack top is last argument)
+                    for (int i = paramLength - 1; i >= 0; i--) {
+                        arrBuilder.add(new VarInsnNode(TypeUtil.storeOpcodeForType(descriptor.getParams().get(i)), tmpLocal[i]));
+                    }
 
-            // create Object[] and store at paramArrVarIndex
-            arrBuilder.add(methodExtension.getObfuscatedIntPush(paramLength));
-            arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
-            arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
+                    // create Object[] and store at paramArrVarIndex
+                    arrBuilder.add(methodExtension.getObfuscatedIntPush(paramLength));
+                    arrBuilder.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
+                    arrBuilder.add(new VarInsnNode(ASTORE, paramArrVarIndex));
 
-            // store each param in the Object[]
-            for (int i = 0; i < paramLength; i++) {
-                DescriptorMember param = descriptor.getParams().get(i);
+                    // store each param in the Object[]
+                    for (int i = 0; i < paramLength; i++) {
+                        DescriptorMember param = descriptor.getParams().get(i);
 
-                // load Object[]
-                arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
-                // param index for Object[]
-                arrBuilder.add(methodExtension.getObfuscatedIntPush(i));
-                // load actual param from its tempLocal
-                arrBuilder.add(new VarInsnNode(TypeUtil.loadOpcodeForType(param), tmpLocal[i]));
-                // convert to object if it's a primitive
-                if (param.isPrimitive() && !param.isArray()) {
-                    String primClassName = TypeUtil.primitiveToClass(param.getValue().charAt(0));
+                        // load Object[]
+                        arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+                        // param index for Object[]
+                        arrBuilder.add(methodExtension.getObfuscatedIntPush(i));
+                        // load actual param from its tempLocal
+                        arrBuilder.add(new VarInsnNode(TypeUtil.loadOpcodeForType(param), tmpLocal[i]));
+                        // convert to object if it's a primitive
+                        if (param.isPrimitive() && !param.isArray()) {
+                            String primClassName = TypeUtil.primitiveToClass(param.getValue().charAt(0));
 
-                    arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.getValue() + ")L" + primClassName + ";"));
+                            arrBuilder.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.getValue() + ")L" + primClassName + ";"));
+                        }
+                        // store in Object[]
+                        arrBuilder.add(new InsnNode(AASTORE));
+                    }
+                    // load finalized Object[] for passing to method
+                    arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+
+                    methodNode.instructions.insertBefore(insnNode, arrBuilder);
+                    methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
                 }
-                // store in Object[]
-                arrBuilder.add(new InsnNode(AASTORE));
-            }
-            // load finalized Object[] for passing to method
-            arrBuilder.add(new VarInsnNode(ALOAD, paramArrVarIndex));
+                case InvokeDynamicInsnNode indy -> {
+                    DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
+                    if (indyRet.isPrimitive() || indyRet.isArray()
+                            || indy.bsmArgs.length < 3
+                            || !(indy.bsmArgs[0] instanceof Type normalType)
+                            || !(indy.bsmArgs[1] instanceof Handle handle)
+                            || !(indy.bsmArgs[2] instanceof Type erasedType)
+                    ) {
+                        return;
+                    }
 
-            methodNode.instructions.insertBefore(insnNode, arrBuilder);
-            methodInsnNode.desc = "([Ljava/lang/Object;)" + descriptor.getReturnType().toDesc();
+                    String owner = indyRet.getValue();
+                    String name = indy.name;
+                    String desc = normalType.getDescriptor();
+
+                    if (exclusions.contains(MethodWrapper.of(owner, name, desc)) || !jar.getClasses().containsKey(owner)) {
+                        return;
+                    }
+
+                    MethodDescriptor targetDesc = DescriptorParser.parseMethodDesc(normalType.getDescriptor());
+                    if (targetDesc.getParams().isEmpty()) {
+                        return;
+                    }
+
+                    DescriptorMember typeRet = targetDesc.getReturnType();
+
+                    indy.bsmArgs[0] = Type.getType("([Ljava/lang/Object;)" + typeRet.toDesc());
+                    indy.bsmArgs[1] = new Handle(
+                            handle.getTag(),
+                            handle.getOwner(),
+                            handle.getName(),
+                            "(L[java/lang/Object;)" + DescriptorParser.parseMethodDesc(handle.getDesc()).getReturnType().toDesc(),
+                            handle.isInterface()
+                    );
+                    indy.bsmArgs[2] = Type.getType("([Ljava/lang/Object;)" + typeRet.erase().toDesc());
+                }
+                default -> {}
+            }
         });
     }
 
-    private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, Set<String> exclusionsByDesc, Set<String> exclusionsByName) {
-        if (exclusionsByDesc.contains(ownerNode.name + methodNode.name + methodNode.desc) || exclusionsByName.contains(ownerNode.name + methodNode.name)) {
+    private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, MWList exclusions) {
+        if (exclusions.contains(MethodWrapper.of(ownerNode.name, methodNode))) {
             return;
         }
 
@@ -169,7 +239,6 @@ public class ParamGenerifier extends AbstractTransformer {
         if (descriptor.getParams().isEmpty()) {
             return;
         }
-
 
         MethodExtension methodExtension = context.pipeline().getExtension(methodNode);
 
