@@ -6,11 +6,9 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class ClassUtil implements Opcodes {
 
@@ -48,5 +46,14 @@ public class ClassUtil implements Opcodes {
 
     public static boolean isEnum(ClassNode classNode) {
         return classNode.superName != null && classNode.superName.equals("java/lang/Enum");
+    }
+
+    /**
+     * Returns a map, mapping the methods name and how often a method with that name is declared. Ignores descriptor and hierarchy methods.
+     * @param owner Class containing methods
+     * @return A map, mapping the methods name and how often a method with that name is declared
+     */
+    public static Map<String, Integer> methodCountByName(ClassNode owner) {
+        return owner.methods.stream().collect(Collectors.toMap(methodNode -> methodNode.name, e -> 1, Math::addExact));
     }
 }

@@ -2,8 +2,9 @@ package me.exeos.bytus.core.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import me.exeos.bytus.asmplus.idkhowtonamethisyet.MethodWrapper;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.JarUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
@@ -19,7 +20,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 
 public class BytusConfig {
@@ -62,19 +62,19 @@ public class BytusConfig {
         return MAPPER.readValue(json, BytusConfig.class);
     }
 
-    public Set<MethodWrapper> getEntryPoints(JarArchive jar) {
-        Set<MethodWrapper> entries = new HashSet<>();
+    public Set<MethodMatchEntry> getEntryPoints(JarArchive jar) {
+        Set<MethodMatchEntry> entries = new HashSet<>();
         if (entryPoints.fromManifest()) {
             JarUtil.getMainClass(jar).ifPresent(mainClass -> {
                 mainClass.methods.stream().filter(methodNode ->
                         methodNode.name.equals("main")
                                 && methodNode.desc.equals("([Ljava/lang/String;)V")
                                 && MethodUtil.hasAccess(methodNode, Opcodes.ACC_PUBLIC)
-                                && MethodUtil.hasAccess(methodNode, Opcodes.ACC_STATIC)).forEach(entryMethod -> entries.add(new MethodWrapper(mainClass.name, entryMethod.name, entryMethod.desc, 0)));
+                                && MethodUtil.hasAccess(methodNode, Opcodes.ACC_STATIC)).forEach(entryMethod -> entries.add(new MethodMatchEntry(mainClass.name, entryMethod.name, entryMethod.desc, MethodMatcher.Mode.OWNER_NAME_DESC)));
             });
         }
         entryPoints.custom().forEach((className, methodName) -> {
-            JarUtil.findClass(jar, className).flatMap(classNode -> ClassUtil.findMethod(classNode, methodName, "([Ljava/lang/String;)V")).ifPresent(entryMethod -> entries.add(new MethodWrapper(className, methodName, entryMethod.desc, 0)));
+            JarUtil.findClass(jar, className).flatMap(classNode -> ClassUtil.findMethod(classNode, methodName, "([Ljava/lang/String;)V")).ifPresent(entryMethod -> entries.add(new MethodMatchEntry(className, methodName, entryMethod.desc, MethodMatcher.Mode.OWNER_NAME_DESC)));
         });
 
         return entries;

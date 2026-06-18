@@ -1,10 +1,12 @@
 package me.exeos.bytus.core.transformer.impl.flow.data;
 
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
-import me.exeos.bytus.asmplus.idkhowtonamethisyet.MWList;
-import me.exeos.bytus.asmplus.idkhowtonamethisyet.MethodWrapper;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
@@ -18,11 +20,9 @@ import org.objectweb.asm.tree.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 /**
- * Transforms argument passing to Object[]
- * Pure aids to implement because of unlimited edge cases.
+ * Changes the regular way that params are passed to methods, to pass a single Object[]
  * TODO: use Pipeline methods better so emitted methods can be obfuscated
  */
 public class ParamGenerifier extends AbstractTransformer {
@@ -45,7 +45,7 @@ public class ParamGenerifier extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        MWList exclusions = buildExclusions(context);
+        MethodMatcher exclusions = buildExclusions(context);
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
@@ -58,22 +58,60 @@ public class ParamGenerifier extends AbstractTransformer {
         }
     }
 
-    private MWList buildExclusions(JarContext context) {
-        MWList exclusions = new MWList(config.getEntryPoints(context.jar()));
-
-        exclusions.add(MethodWrapper.of("<clinit>"));
+    private MethodMatcher buildExclusions(JarContext context) {
+        MethodMatcher exclusions = new MethodMatcher(config.getEntryPoints(context.jar()));
+        exclusions.add(MethodMatchEntry.of("<clinit>"));
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
-            Map<String, Integer> methodDeclarationMap = new HashMap<>();
-            var x = classNode.methods.stream().collect(Collectors.toMap(methodNode -> methodNode.name, e -> 1, Math::addExact));
-            for (MethodNode methodNode : classNode.methods) {
-                if (x.get(methodNode.name) > 1) {
-                    exclusions.add(new MethodWrapper(classNode.name, methodNode.name, methodNode.desc, 1));
-                }
+            ClassEdge classEdge = context.getExtension().getHierarchy().get(classNode);
+            if (classEdge == null || classEdge.hasUnresolved()) {
+                classNode.methods.forEach(methodNode -> exclusions.add(MethodMatchEntry.of(classNode.name, methodNode)));
+            } else {
+                excludeMethodsWithCollidingSignatures(classEdge, exclusions);
             }
         }
 
-        for (ClassNode classNode : context.jar().getClasses().values()) {
+        excludeProblematicIndy(context.jar(), exclusions);
+
+        HierarchyUtil.hierarchyExpandMethodMatcher(exclusions, context.getExtension().getHierarchyNameMapped());
+
+        return exclusions;
+    }
+
+    /**
+     * Exclude all methods that would collide, if they had the same signature
+     * @param classEdge
+     * @param exclusions
+     */
+    private void excludeMethodsWithCollidingSignatures(ClassEdge classEdge, MethodMatcher exclusions) {
+        for (MethodEdge methodEdge : classEdge.getMethods()) {
+            int sameMethodCount = 0;
+            boolean isStatic = MethodUtil.hasAccess(methodEdge.methodNode(), ACC_STATIC);
+            Set<String> affectedOwners = new HashSet<>();
+
+            for (MethodEdge foundEdge : classEdge.findMethods(methodEdge.getName())) {
+                // only collide if both methods are static, or both aren't
+                if (isStatic == MethodUtil.hasAccess(foundEdge.methodNode(), ACC_STATIC)) {
+                    affectedOwners.add(foundEdge.getOwner());
+                    sameMethodCount++;
+                }
+            }
+
+            if (sameMethodCount > 1) {
+                for (String owner : affectedOwners) {
+                    exclusions.add(MethodMatchEntry.of(owner, methodEdge.methodNode(), MethodMatcher.Mode.OWNER_NAME));
+                }
+            }
+        }
+    }
+
+    /**
+     * Handles indy. TODO: document this with claude
+     * @param jar
+     * @param exclusions
+     */
+    private void excludeProblematicIndy(JarArchive jar, MethodMatcher exclusions) {
+        for (ClassNode classNode : jar.getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 for (AbstractInsnNode insnNode : methodNode.instructions) {
                     if (!(insnNode instanceof InvokeDynamicInsnNode indy)) {
@@ -90,37 +128,24 @@ public class ParamGenerifier extends AbstractTransformer {
                     String desc = normalType.getDescriptor();
 
                     // exclude lambdas methods invoked by members not in jar as their sigs cant be changed
-                    if (!context.jar().getClasses().containsKey(owner) || exclusions.contains(MethodWrapper.of(handle.getOwner(), handle.getName(), handle.getDesc()))) {
-                        exclusions.add(MethodWrapper.of(owner, name, desc));
-                        exclusions.add(MethodWrapper.of(handle.getOwner(), handle.getName(), handle.getDesc()));
+                    // I don't remember why I check and exclude handle.* but works
+                    if (!jar.getClasses().containsKey(owner)
+                            || exclusions.match(
+                                    MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc())
+                            )
+                    ) {
+                        exclusions.add(MethodMatchEntry.of(owner, name, desc));
+                        exclusions.add(MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc()));
                     }
                 }
             }
         }
-
-        var hierarchy = context.getExtension().getHierarchyNameMapped();
-        for (MethodWrapper wrapper : exclusions.get().toArray(new MethodWrapper[0])) {
-            if (!hierarchy.containsKey(wrapper.owner())) {
-                continue;
-            }
-
-            hierarchy.get(wrapper.owner()).findMethodRoot(wrapper.name(), wrapper.desc()).ifPresent(rootEdge -> {
-                if (wrapper.owner().endsWith("StatisticFunction") && wrapper.name().equals("evaluate")) {
-                    System.out.println();
-                }
-                rootEdge.getOverriders().forEach(ov -> {
-                    exclusions.add(MethodWrapper.of(ov.owner().classNode.name, ov.methodNode().name, ov.methodNode().desc));
-                });
-            });
-        }
-
-        return exclusions;
     }
 
     /**
      * Converts the way params are passed to Methods from normal passing to Object[] passing
      */
-    private void convertParamPassing(JarArchive jar, MethodNode methodNode, MethodExtension methodExtension, MWList exclusions) {
+    private void convertParamPassing(JarArchive jar, MethodNode methodNode, MethodExtension methodExtension, MethodMatcher exclusions) {
         int paramArrVarIndex = methodNode.maxLocals;
         AtomicBoolean updatedInsn = new AtomicBoolean(false);
 
@@ -128,7 +153,7 @@ public class ParamGenerifier extends AbstractTransformer {
             switch (insnNode) {
                 case MethodInsnNode methodInsnNode -> {
                     // check if invocation target is in the jar and not excluded
-                    if (exclusions.contains(MethodWrapper.of(methodInsnNode)) || !jar.getClasses().containsKey(methodInsnNode.owner)) {
+                    if (exclusions.match(MethodMatchEntry.of(methodInsnNode)) || !jar.getClasses().containsKey(methodInsnNode.owner)) {
                         return;
                     }
 
@@ -203,7 +228,7 @@ public class ParamGenerifier extends AbstractTransformer {
                     String name = indy.name;
                     String desc = normalType.getDescriptor();
 
-                    if (exclusions.contains(MethodWrapper.of(owner, name, desc)) || !jar.getClasses().containsKey(owner)) {
+                    if (exclusions.match(MethodMatchEntry.of(owner, name, desc)) || !jar.getClasses().containsKey(owner)) {
                         return;
                     }
 
@@ -229,8 +254,8 @@ public class ParamGenerifier extends AbstractTransformer {
         });
     }
 
-    private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, MWList exclusions) {
-        if (exclusions.contains(MethodWrapper.of(ownerNode.name, methodNode))) {
+    private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, MethodMatcher exclusions) {
+        if (exclusions.match(MethodMatchEntry.of(ownerNode.name, methodNode))) {
             return;
         }
 

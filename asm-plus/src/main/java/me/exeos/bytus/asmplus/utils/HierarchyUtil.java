@@ -1,6 +1,8 @@
 package me.exeos.bytus.asmplus.utils;
 
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 
 import java.util.*;
 import java.util.function.Function;
@@ -31,5 +33,20 @@ public class HierarchyUtil {
         } while (excludedNames.contains(name) || owner.findNearestMethod(name, methodDesc).isPresent());
 
         return name;
+    }
+
+    public static void hierarchyExpandMethodMatcher(MethodMatcher matcher, Map<String, ClassEdge> hierarchy) {
+        for (MethodMatchEntry wrapper : matcher.get().toArray(new MethodMatchEntry[0])) {
+            if (!hierarchy.containsKey(wrapper.owner())) {
+                continue;
+            }
+
+            hierarchy.get(wrapper.owner()).findMethodRoot(wrapper.name(), wrapper.desc()).ifPresent(rootMethod -> {
+                matcher.add(MethodMatchEntry.of(rootMethod));
+                rootMethod.getOverriders().forEach(overrider -> {
+                    matcher.add(MethodMatchEntry.of(overrider));
+                });
+            });
+        }
     }
 }

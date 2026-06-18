@@ -9,6 +9,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Represents a class in the analyzed hierarchy.
@@ -203,6 +204,15 @@ public class ClassEdge {
         return root.get();
     }
 
+    public Set<MethodEdge> findMethods(String name) {
+        Set<MethodEdge> methods = getMethods(name);
+        for (ClassEdge parent : parents) {
+            methods.addAll(parent.findMethods(name));
+        }
+
+        return methods;
+    }
+
     /**
      * Finds the nearest method with the same name and descriptor as the given method node.
      *
@@ -305,6 +315,13 @@ public class ClassEdge {
         }
 
         return Optional.empty();
+    }
+
+    public Set<MethodEdge> getMethods(String name) {
+        return methods
+                .stream()
+                .filter(methodEdge -> methodEdge.methodNode().name.equals(name))
+                .collect(Collectors.toSet());
     }
 
     public List<MethodEdge> getMethods() {
