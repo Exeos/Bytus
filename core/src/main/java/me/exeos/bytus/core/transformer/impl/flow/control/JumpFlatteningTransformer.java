@@ -5,6 +5,7 @@ import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
+import me.exeos.bytus.core.exceptions.BytusTransformException;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.MethodContext;
@@ -83,8 +84,18 @@ public class JumpFlatteningTransformer extends AbstractTransformer {
         );
 
         if (didUpdateAnyJumps) {
-            // insert dispatcher, inserting at random insn might cause issues. if it does insert before first return insn
-            AbstractInsnNode insertPoint = methodNode.instructions.get(RandomUtil.getInt(0, methodNode.instructions.size()));
+            AbstractInsnNode insertPoint = null;
+            for (AbstractInsnNode insnNode : methodNode.instructions) {
+                if (InsnUtil.isTerminal(insnNode)) {
+                    insertPoint = insnNode;
+                    break;
+                }
+            }
+
+            if (insertPoint == null) {
+                throw new BytusTransformException("Failed to find return insn for method");
+            }
+//            AbstractInsnNode insertPoint = methodNode.instructions.get(RandomUtil.getInt(0, methodNode.instructions.size()));
             methodNode.instructions.insertBefore(insertPoint, buildDispatcher(dispatcherEntry, labelPathMap, keyVarIndex, methodExtension));
         }
     }

@@ -34,7 +34,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.references.encryption();
+        return config.references.encryption().enable();
     }
 
     @Override
@@ -68,7 +68,10 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
             InsnList indyCall = new InsnList();
             switch (insnNode) {
                 case MethodInsnNode methodInsnNode -> {
-                    if (methodInsnNode.name.equals("<init>") || methodInsnNode.owner.startsWith("[")) {
+                    if (methodInsnNode.name.equals("<init>")
+                            || methodInsnNode.owner.startsWith("[")
+                            || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(methodInsnNode.owner))
+                    ) {
                         return;
                     }
 
@@ -84,7 +87,8 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                     ));
                 }
                 case FieldInsnNode fieldInsnNode -> {
-                    if (!hierarchy.containsKey(fieldInsnNode.owner)) {
+                    if (!hierarchy.containsKey(fieldInsnNode.owner)
+                            || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(fieldInsnNode.owner))) {
                         return;
                     }
 

@@ -139,4 +139,10 @@ public class MethodUtil implements Opcodes {
     public static boolean isSpecial(MethodNode methodNode) {
         return methodNode.name.equals("<init>") || methodNode.name.equals("<clinit>");
     }
+
+    public static void removeAllInsn(MethodNode methodNode) {
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            methodNode.instructions.remove(insnNode);
+        }
+    }
 }

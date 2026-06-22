@@ -1,6 +1,8 @@
 package me.exeos.bytus.core.utils;
 
+import java.util.Arrays;
 import java.util.Random;
+import java.util.function.Function;
 
 public class RandomUtil {
 
@@ -21,13 +23,20 @@ public class RandomUtil {
         }
 
         if (min > max) {
-//            throw new IllegalArgumentException("Max must be greater than min");
             int temp = min;
             min = max;
             max = temp;
         }
 
         return (int) ((Math.random() * (max - min)) + min);
+    }
+
+    public static int getIntExcept(int... except) {
+        int i;
+        do {
+            i = getInt();
+        } while (contains(except, i));
+        return i;
     }
 
     public static boolean chance(int percentage) {
@@ -43,5 +52,14 @@ public class RandomUtil {
             builder.append(chars.charAt(getInt(0, chars.length() - 1)));
         }
         return builder.toString();
+    }
+
+    private static boolean contains(int[] arr, int i) {
+        for (int i1 : arr) {
+            if (i1 == i) {
+                return true;
+            }
+        }
+        return false;
     }
 }

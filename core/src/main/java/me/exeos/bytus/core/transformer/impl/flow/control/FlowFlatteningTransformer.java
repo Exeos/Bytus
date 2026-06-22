@@ -85,9 +85,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         methodNode.localVariables = null;
 
         // Remove all original instructions. We rebuild method from scratch.
-        for (AbstractInsnNode insn : methodNode.instructions.toArray()) {
-            methodNode.instructions.remove(insn);
-        }
+        MethodUtil.removeAllInsn(methodNode);
 
         Map<BasicBlock, int[]> blockPathMap = genBlockKeys(blocks);
         int stateVarIndex = methodNode.maxLocals++;

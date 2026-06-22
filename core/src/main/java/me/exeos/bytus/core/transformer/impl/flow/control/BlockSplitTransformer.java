@@ -24,12 +24,12 @@ public class BlockSplitTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return config.flow.controlFlow().enable() && false;
     }
 
     @Override
     public int priority() {
-        return Priority.FLOW_CTRL_FLATTENING - 1;
+        return Priority.FLOW_BLOCK_SPLIT;
     }
 
     @Override

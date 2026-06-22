@@ -32,7 +32,10 @@
     "dataFlow": false
   },
   "references": {
-    "encryption": false,
+    "encryption": {
+      "enable": false,
+      "firstClassOnly": false
+    },
     "proxy": {
       "enable": false,
       "minDepth": 1,

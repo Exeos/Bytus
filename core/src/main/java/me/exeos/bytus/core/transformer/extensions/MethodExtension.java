@@ -1,7 +1,8 @@
 package me.exeos.bytus.core.transformer.extensions;
 
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.bytus.core.asm.ObfCodenGen;
 import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.LabelNode;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -27,14 +28,11 @@ public class MethodExtension {
     }
 
     public InsnList getObfuscatedIntPush(int value) {
-        return InsnUtil.getIntPushSalted(
-                value,
-                saltInfo.hasSalt(),
-                saltInfo.getSaltOrDefault(),
-                paramObfInfo.getArrayIndexBySlotOrSlot(saltInfo.getSaltSlotOrDefault()),
-                paramObfInfo.hasParamObf(),
-                paramObfInfo.getObjArrSlotOrDefault()
-        );
+        return ObfCodenGen.getObfuscatedIntPush(value, saltInfo, paramObfInfo);
+    }
+
+    public InsnList getObfuscatedJump(LabelNode to) {
+        return ObfCodenGen.getRandomJump(to, saltInfo, paramObfInfo);
     }
 
     public static class SaltInfo {

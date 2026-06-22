@@ -21,6 +21,10 @@ public class InsnUtil implements Opcodes {
         return insnNode.getOpcode() >= Opcodes.IRETURN && insnNode.getOpcode() <= Opcodes.RETURN;
     }
 
+    public static boolean isTerminal(AbstractInsnNode insnNode) {
+        return insnNode.getOpcode() == ATHROW || isReturn(insnNode);
+    }
+
     public static boolean isBranch(AbstractInsnNode insnNode) {
         return insnNode instanceof JumpInsnNode;
     }
