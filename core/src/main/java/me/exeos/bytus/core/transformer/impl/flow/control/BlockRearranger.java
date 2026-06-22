@@ -65,12 +65,12 @@ public class BlockRearranger extends AbstractTransformer {
             switch (basicBlock) {
                 case JumpBlock jumpBlock -> {
                     jumpBlock.falseBranchBlock.ifPresent(falseBlock -> {
-                        rearranged.add(extension.getObfuscatedJump(labelByBlock.get(falseBlock)));
+                        rearranged.add(new JumpInsnNode(GOTO, labelByBlock.get(falseBlock)));
                     });
                 }
                 case SwitchBlock switchBlock -> {}
                 case FallTroughBlock fallTroughBlock -> {
-                    rearranged.add(extension.getObfuscatedJump(labelByBlock.get(fallTroughBlock.fallTroughBlock)));
+                    rearranged.add(new JumpInsnNode(GOTO, labelByBlock.get(fallTroughBlock.fallTroughBlock)));
                 }
                 case TerminalBlock terminalBlock -> {}
                 default -> {
