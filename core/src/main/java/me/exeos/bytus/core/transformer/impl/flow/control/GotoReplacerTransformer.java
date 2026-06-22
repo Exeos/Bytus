@@ -19,7 +19,7 @@ public class GotoReplacerTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return config.flow.controlFlow().enable();
     }
 
     @Override

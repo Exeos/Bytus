@@ -1,8 +1,10 @@
 package me.exeos.bytus.core.utils;
 
-import java.util.Arrays;
+import me.exeos.bytus.core.asm.ObfCodenGen;
+
+import java.util.Iterator;
 import java.util.Random;
-import java.util.function.Function;
+import java.util.Set;
 
 public class RandomUtil {
 
@@ -10,11 +12,11 @@ public class RandomUtil {
     private static final Random rnd = new Random();
 
     public static int nextInt() {
-        return rnd.nextInt(Integer.MAX_VALUE);
+        return rnd.nextInt(ObfCodenGen.SAFE_MAX);
     }
 
     public static int getInt() {
-        return getInt(Integer.MIN_VALUE, Integer.MAX_VALUE);
+        return getInt(ObfCodenGen.SAFE_MIN, ObfCodenGen.SAFE_MAX);
     }
 
     public static int getInt(int min, int max) {
@@ -61,5 +63,26 @@ public class RandomUtil {
             }
         }
         return false;
+    }
+
+    public static <T> T getRandomEntry(Set<T> set) {
+        if (set == null || set.isEmpty()) {
+            return null;
+        }
+
+        int randomIndex = getInt(0, set.size() - 1);
+
+        Iterator<T> iterator = set.iterator();
+        int currentIndex = 0;
+
+        while (iterator.hasNext()) {
+            T element = iterator.next();
+            if (currentIndex == randomIndex) {
+                return element;
+            }
+            currentIndex++;
+        }
+
+        return null;
     }
 }

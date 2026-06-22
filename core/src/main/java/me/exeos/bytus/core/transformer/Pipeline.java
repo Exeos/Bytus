@@ -2,13 +2,14 @@ package me.exeos.bytus.core.transformer;
 
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.core.exceptions.BytusTransformException;
+import me.exeos.bytus.core.transformer.extensions.ClassExtension;
 import me.exeos.bytus.core.transformer.extensions.JarExtension;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.util.*;
@@ -25,6 +26,7 @@ public class Pipeline {
 
     private final List<AbstractTransformer> transformers;
     private final Map<JarArchive, JarExtension> jarExtensions = new HashMap<>();
+    private final Map<ClassNode, ClassExtension> classExtensions = new HashMap<>();
     private final Map<MethodNode, MethodExtension> methodExtensions = new HashMap<>();
 
     /**
@@ -117,12 +119,22 @@ public class Pipeline {
         }
     }
 
-    public MethodExtension getExtension(MethodContext context) {
-        return getExtension(context.methodNode());
+    public ClassExtension getExtension(ClassContext context) {
+        return getExtension(context.classNode());
     }
 
-    public MethodExtension getExtension(MethodNode methodNode) {
-        methodExtensions.putIfAbsent(methodNode, new MethodExtension());
+    public ClassExtension getExtension(ClassNode classNode) {
+        classExtensions.putIfAbsent(classNode, new ClassExtension());
+
+        return classExtensions.get(classNode);
+    }
+
+    public MethodExtension getExtension(MethodContext context) {
+        return getExtension(context.ownerCtx().classNode(), context.methodNode());
+    }
+
+    public MethodExtension getExtension(ClassNode owner, MethodNode methodNode) {
+        methodExtensions.putIfAbsent(methodNode, new MethodExtension(this, owner));
 
         return methodExtensions.get(methodNode);
     }

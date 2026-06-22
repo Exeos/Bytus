@@ -1,4 +1,4 @@
-package me.exeos.bytus.core.transformer.impl;
+package me.exeos.bytus.core.transformer.impl.salt;
 
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
@@ -6,8 +6,10 @@ import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.*;
+import me.exeos.bytus.core.asm.ObfCodenGen;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Pipeline;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
@@ -41,7 +43,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
     @Override
     public int priority() {
-        return Priority.SALT;
+        return Priority.SALT_METHOD;
     }
 
     @Override
@@ -63,7 +65,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
 
                 if (isSalted) {
-                    injectSaltParam(context, methodNode, SALT_BY_METHOD.get(methodId));
+                    injectSaltParam(context, classNode, methodNode, SALT_BY_METHOD.get(methodId));
                 }
             }
         }
@@ -90,14 +92,14 @@ public class MethodSaltTransformer extends AbstractTransformer {
         if (isSalted)
             MethodUtil.remapLocals(methodNode.instructions, saltSlot);
 
-        rewriteCallSites(hierarchy, methodNode, methodId, saltSlot, isSalted);
+        rewriteCallSites(context.pipeline(), classNode, hierarchy, methodNode, methodId, saltSlot, isSalted);
     }
 
     /**
      * Registers the salt metadata in the pipeline extension for this method.
      */
-    private void injectSaltParam(JarContext context, MethodNode methodNode, int salt) {
-        MethodExtension extension = context.pipeline().getExtension(methodNode);
+    private void injectSaltParam(JarContext context, ClassNode classNode, MethodNode methodNode, int salt) {
+        MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
         if (!extension.saltInfo.hasSalt()) {
             extension.saltInfo.setSalt(salt, MethodUtil.addParam(methodNode, SALT_PARAM, false));
         }
@@ -111,6 +113,8 @@ public class MethodSaltTransformer extends AbstractTransformer {
      * salt push instruction and updates the callee descriptor.
      */
     private void rewriteCallSites(
+            Pipeline pipeline,
+            ClassNode classNode,
             Map<String, ClassEdge> hierarchy,
             MethodNode methodNode,
             String callerId,
@@ -140,14 +144,19 @@ public class MethodSaltTransformer extends AbstractTransformer {
                         return;
                     }
 
+                    MethodExtension.MethodSaltInfo msi = new MethodExtension.MethodSaltInfo();
+                    if (callerIsSalted) {
+                        msi = new MethodExtension.MethodSaltInfo(SALT_BY_METHOD.get(callerId), callerSaltSlot);
+                    }
+
                     // insert insn pushing salt onto stack before call
                     methodNode.instructions.insertBefore(
                             callInsn,
-                            InsnUtil.getIntPushSalted(
+                            ObfCodenGen.getObfuscatedIntPush(
                                     SALT_BY_METHOD.get(calleeId.get()),
-                                    callerIsSalted,
-                                    SALT_BY_METHOD.getOrDefault(callerId, 0),
-                                    callerSaltSlot
+                                    pipeline.getExtension(classNode).saltInfo(),
+                                    msi,
+                                    new MethodExtension.ParamObfInfo()
                             )
                     );
                     // update call description to match salted descriptor
@@ -214,7 +223,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
             }
 
             for (MethodNode methodNode : classNode.methods) {
-                if (!context.pipeline().getExtension(methodNode).saltInfo.hasSalt()
+                if (!context.pipeline().getExtension(classNode, methodNode).saltInfo.hasSalt()
                         && !MethodUtil.isSpecial(methodNode)
                         && !excludedMethods.contains(methodNode)
                 ) {

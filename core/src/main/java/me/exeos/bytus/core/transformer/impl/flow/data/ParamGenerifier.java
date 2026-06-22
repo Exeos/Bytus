@@ -54,7 +54,7 @@ public class ParamGenerifier extends AbstractTransformer {
 
     private void transform(JarContext context, ClassNode classNode, MethodMatcher exclusions) {
         for (MethodNode methodNode : classNode.methods) {
-            convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(methodNode), exclusions);
+            convertParamPassing(context.jar(), methodNode, context.pipeline().getExtension(classNode, methodNode), exclusions);
         }
 
         for (MethodNode methodNode : classNode.methods) {
@@ -259,7 +259,7 @@ public class ParamGenerifier extends AbstractTransformer {
     }
 
     private void convertParamUsage(JarContext context, ClassNode ownerNode, MethodNode methodNode, MethodMatcher exclusions) {
-        if (context.pipeline().getExtension(methodNode).paramObfInfo.hasParamObf() || exclusions.match(MethodMatchEntry.of(ownerNode.name, methodNode))) {
+        if (context.pipeline().getExtension(ownerNode, methodNode).paramObfInfo.hasParamObf() || exclusions.match(MethodMatchEntry.of(ownerNode.name, methodNode))) {
             return;
         }
 
@@ -268,7 +268,7 @@ public class ParamGenerifier extends AbstractTransformer {
             return;
         }
 
-        MethodExtension methodExtension = context.pipeline().getExtension(methodNode);
+        MethodExtension methodExtension = context.pipeline().getExtension(ownerNode, methodNode);
 
         // maps original slot -> parameter
         Map<Integer, DescriptorMember> paramBySlot = new HashMap<>();
@@ -317,7 +317,7 @@ public class ParamGenerifier extends AbstractTransformer {
         }
 
         // dont move this to the bottom, will break methodExtension.getObfuscatedIntPush
-        context.pipeline().getExtension(methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
+        context.pipeline().getExtension(ownerNode, methodNode).paramObfInfo.setParamObf(paramsStartIndex, paramArrayIndexBySlot);
 
         // prologue stores params that are written to in local vars
         InsnList prologue = new InsnList();

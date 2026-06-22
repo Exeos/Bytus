@@ -69,15 +69,13 @@ public class InsnUtil implements Opcodes {
         return new IntInsnNode(SIPUSH, value);
     }
 
-    public static InsnList getIntPushSalted(int value, int salt, int saltSlot) {
-        return getIntPushSalted(value, true, salt, saltSlot);
-    }
-
     public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot) {
-        return getIntPushSalted(value, hasSalt, salt, saltSlot, false, 0);
+        InsnList pushSalt = new InsnList();
+        pushSalt.add(new VarInsnNode(ILOAD, saltSlot));
+        return getIntPushSalted(value, hasSalt, salt, pushSalt);
     }
 
-    public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot, boolean fromObjArr, int objArrSlot) {
+    public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, InsnList pushSaltInsn) {
         InsnList pushInsn = new InsnList();
 
         if (!hasSalt) {
@@ -85,15 +83,7 @@ public class InsnUtil implements Opcodes {
             return pushInsn;
         }
 
-        if (fromObjArr) {
-            pushInsn.add(new VarInsnNode(ALOAD, objArrSlot));
-            pushInsn.add(InsnUtil.getIntPush(saltSlot));
-            pushInsn.add(new InsnNode(AALOAD));
-            pushInsn.add(new TypeInsnNode(CHECKCAST, "java/lang/Integer"));
-            pushInsn.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I"));
-        } else {
-            pushInsn.add(new VarInsnNode(ILOAD, saltSlot));
-        }
+        pushInsn.add(pushSaltInsn);
 
         int diff = salt - value;
         if (diff != 0) {

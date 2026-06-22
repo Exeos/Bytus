@@ -10,7 +10,7 @@ import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
-import me.exeos.bytus.core.transformer.impl.MethodSaltTransformer;
+import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;

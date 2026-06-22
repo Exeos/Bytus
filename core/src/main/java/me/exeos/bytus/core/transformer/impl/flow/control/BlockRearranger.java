@@ -28,8 +28,7 @@ public class BlockRearranger extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-//        return config.flow.controlFlow().enable();
-        return true;
+        return config.flow.controlFlow().enable();
     }
 
     @Override

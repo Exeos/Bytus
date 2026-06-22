@@ -1,6 +1,8 @@
 package me.exeos.bytus.core.transformer.extensions;
 
 import me.exeos.bytus.core.asm.ObfCodenGen;
+import me.exeos.bytus.core.transformer.Pipeline;
+import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
 
@@ -9,42 +11,41 @@ import java.util.Map;
 
 public class MethodExtension {
 
-    public final SaltInfo saltInfo;
+    private final Pipeline pipeline;
+    private final ClassNode owner;
+
+    public final MethodSaltInfo saltInfo;
     public final ParamObfInfo paramObfInfo;
 
     public MethodExtension() {
-        this.saltInfo = new SaltInfo();
+        this(null, null);
+    }
+
+    public MethodExtension(Pipeline pipeline, ClassNode owner) {
+        this.pipeline = pipeline;
+        this.owner = owner;
+        this.saltInfo = new MethodSaltInfo();
         this.paramObfInfo = new ParamObfInfo();
     }
 
-    public MethodExtension(int salt, int saltSlot) {
-        this.saltInfo = new SaltInfo(salt, saltSlot);
-        paramObfInfo = new ParamObfInfo();
-    }
-
-    public MethodExtension(int paramObfParamSlot, Map<Integer, Integer> paramArrayIndexBySlot) {
-        paramObfInfo = new ParamObfInfo(paramObfParamSlot, paramArrayIndexBySlot);
-        saltInfo = new SaltInfo();
-    }
-
     public InsnList getObfuscatedIntPush(int value) {
-        return ObfCodenGen.getObfuscatedIntPush(value, saltInfo, paramObfInfo);
+        return ObfCodenGen.getObfuscatedIntPush(value, pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(), saltInfo, paramObfInfo);
     }
 
     public InsnList getObfuscatedJump(LabelNode to) {
-        return ObfCodenGen.getRandomJump(to, saltInfo, paramObfInfo);
+        return ObfCodenGen.getRandomJump(to, pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(), saltInfo, paramObfInfo);
     }
 
-    public static class SaltInfo {
+    public static class MethodSaltInfo {
         private int salt;
         private int saltSlot;
         private boolean hasSalt;
 
-        public SaltInfo() {
+        public MethodSaltInfo() {
             hasSalt = false;
         }
 
-        public SaltInfo(int salt, int saltSlot) {
+        public MethodSaltInfo(int salt, int saltSlot) {
             this.salt = salt;
             this.saltSlot = saltSlot;
             hasSalt = true;
