@@ -24,6 +24,7 @@ public class BlockSplitTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
+        // way to unstable
         return config.flow.controlFlow().enable() && false;
     }
 
@@ -45,7 +46,7 @@ public class BlockSplitTransformer extends AbstractTransformer {
             methodNode.instructions.remove(insn);
         }
 
-        int splitAmount = 10;
+        int splitAmount = 2;
 
         for (BasicBlock block : basicBlocks) {
             int size = block.instructions.size();
