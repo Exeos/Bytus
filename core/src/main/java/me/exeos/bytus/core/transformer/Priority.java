@@ -14,8 +14,8 @@ public class Priority {
     public static final int SALT = 2;
     public static final int FLOW_BLOCK_SPLIT = 3;
     public static final int FLOW_CTRL_FLATTENING = 4;
-    public static final int FLOW_JUMP_FLATTENING = 6;
     public static final int FLOW_BLOCK_REARRANGE = 5;
+    public static final int FLOW_JUMP_FLATTENING = 6;
     public static final int CONST_ARRAY = 7;
     public static final int NUM_UNDER_OVER_FLOW = 8;
     public static final int FLOW_PARAM_GENERIFY = 9;
