@@ -18,7 +18,7 @@ public class ObfCodenGen implements Opcodes {
             MethodExtension.MethodSaltInfo methodSaltInfo, 
             MethodExtension.ParamObfInfo paramObfInfo
     ) {
-        InsnList idk = new InsnList();
+        InsnList insn = new InsnList();
 
         InsnList methodSaltPush = new InsnList();
         if (methodSaltInfo.hasSalt()) {
@@ -29,6 +29,7 @@ public class ObfCodenGen implements Opcodes {
                 methodSaltPush.add(new InsnNode(AALOAD));
                 methodSaltPush.add(new TypeInsnNode(CHECKCAST, "java/lang/Integer"));
                 methodSaltPush.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I"));
+
             } else {
                 methodSaltPush.add(new VarInsnNode(ILOAD, saltSlot));
             }
@@ -40,23 +41,22 @@ public class ObfCodenGen implements Opcodes {
         }
 
         if (methodSaltInfo.hasSalt() && classSaltInfo.hasSalt()) {
-            int first = RandomUtil.getInt(SAFE_MIN, SAFE_MAX);
-            int second = RandomUtil.getInt(SAFE_MIN, SAFE_MAX);
-            int obf = value + first + second;
+            int obf = value + methodSaltInfo.getSalt() + classSaltInfo.getSalt();
 
-            idk.add(InsnUtil.getIntPush(obf));
-            idk.add(InsnUtil.getIntPushSalted(first, true, methodSaltInfo.getSalt(), methodSaltPush));
-            idk.add(new InsnNode(ISUB));
-            idk.add(InsnUtil.getIntPushSalted(second, true, classSaltInfo.getSalt(), classSaltPush));
-            idk.add(new InsnNode(ISUB));
+            insn.add(InsnUtil.getIntPush(obf));
+            insn.add(methodSaltPush);
+            insn.add(new InsnNode(ISUB));
+            insn.add(classSaltPush);
+            insn.add(new InsnNode(ISUB));
         } else if (methodSaltInfo.hasSalt()) {
-            idk.add(InsnUtil.getIntPushSalted(value, true, methodSaltInfo.getSalt(), methodSaltPush));
+            insn.add(InsnUtil.getIntPushSalted(value, true, methodSaltInfo.getSalt(), methodSaltPush));
         } else if (classSaltInfo.hasSalt()) {
-            idk.add(InsnUtil.getIntPushSalted(value, true, classSaltInfo.getSalt(), classSaltPush));
+            insn.add(InsnUtil.getIntPushSalted(value, true, classSaltInfo.getSalt(), classSaltPush));
         } else {
-            idk.add(InsnUtil.getIntPush(value));
+            insn.add(InsnUtil.getIntPush(value));
         }
-        return idk;
+
+        return insn;
     }
 
     public static InsnList getRandomJump(
