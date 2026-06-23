@@ -134,7 +134,7 @@ public class Pipeline {
     }
 
     public MethodExtension getExtension(ClassNode owner, MethodNode methodNode) {
-        methodExtensions.putIfAbsent(methodNode, new MethodExtension(this, owner));
+        methodExtensions.putIfAbsent(methodNode, new MethodExtension(this, owner, methodNode));
 
         return methodExtensions.get(methodNode);
     }

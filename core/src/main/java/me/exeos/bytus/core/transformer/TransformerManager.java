@@ -37,7 +37,6 @@ public class TransformerManager {
     private static final Set<Function<BytusConfig, AbstractTransformer>> REGISTRY = new HashSet<>();
 
     static {
-        REGISTRY.add(ClassSaltTransformer::new);
         REGISTRY.add(MBATransformer::new);
         REGISTRY.add(OverUnderFlowIntTransformer::new);
         REGISTRY.add(SplitStringsTransformer::new);
@@ -51,6 +50,7 @@ public class TransformerManager {
         REGISTRY.add(ParamGenerifier::new);
         REGISTRY.add(ReferenceEncryptionTransformer::new);
         REGISTRY.add(ReferenceProxyTransformer::new);
+        REGISTRY.add(ClassSaltTransformer::new);
         REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);
         REGISTRY.add(Renamer::new);

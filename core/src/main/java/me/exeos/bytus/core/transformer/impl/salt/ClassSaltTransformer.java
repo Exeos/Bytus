@@ -4,6 +4,7 @@ import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.init.ClassInitAnalyzer;
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.*;
+import me.exeos.bytus.core.asm.ObfCodenGen;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -39,19 +40,15 @@ public class ClassSaltTransformer extends AbstractTransformer {
 
         // build map mapping class name to classes that initialize it
         Map<String, Set<String>> initMap = buildInitMap(context.jar());
-        if (initMap == null) {
-            return;
-        }
-
         Map<String, Integer> classSaltMap = new HashMap<>();
         Map<String, String> saltFieldNameMap = new HashMap<>();
-        mapSaltAndCreateField(context, context.getExtension().getHierarchy(), classSaltMap, saltFieldNameMap);
 
+        mapSaltAndCreateField(context, context.getExtension().getHierarchy(), classSaltMap, saltFieldNameMap);
         initClassSaltFields(jar, initMap, classSaltMap, saltFieldNameMap);
     }
 
     private Map<String, Set<String>> buildInitMap(JarArchive jar) {
-        AtomicReference<Map<String, Set<String>>> initMap = new AtomicReference<>(null);
+        AtomicReference<Map<String, Set<String>>> initMap = new AtomicReference<>(new HashMap<>());
 
         config.getEntryPoints(jar).stream().findFirst().ifPresent(entry -> {
             JarUtil.findClass(jar, entry.owner()).ifPresent(entryClass -> {
@@ -66,8 +63,13 @@ public class ClassSaltTransformer extends AbstractTransformer {
 
     private void mapSaltAndCreateField(JarContext context, Map<ClassNode, ClassEdge> hierarchy, Map<String, Integer> classSaltMap, Map<String, String> saltFieldNameMap) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
+            int access = ACC_PUBLIC | ACC_STATIC;
+            if (AsmUtil.hasAccess(classNode.access, ACC_INTERFACE)) {
+                access = access | ACC_FINAL;
+            }
+
             FieldNode saltField = new FieldNode(
-                    Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC,
+                    access,
                     HierarchyUtil.genNoneCollidingFieldName(
                             hierarchy.get(classNode),
                             SALT_FIELD_DESC,
@@ -95,9 +97,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
     ) {
         for (ClassNode classNode : jar.getClasses().values()) {
             MethodNode clinit = ClassUtil.getOrCreateStaticInitializer(classNode);
-
             String initPick = RandomUtil.getRandomEntry(initMap.get(classNode.name));
-
             int currentSalt = classSaltMap.get(classNode.name);
 
             InsnList saltStoreInsn = new InsnList();

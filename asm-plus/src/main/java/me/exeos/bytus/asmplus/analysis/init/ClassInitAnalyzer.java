@@ -57,7 +57,7 @@ public class ClassInitAnalyzer {
      * @param sourceGraph The original map.
      * @return A new map containing the structurally inverted graph.
      */
-    public static Map<String, Set<String>> invertGraph(Map<String, Set<String>> sourceGraph) {
+    private static Map<String, Set<String>> invertGraph(Map<String, Set<String>> sourceGraph) {
         Map<String, Set<String>> invertedGraph = new HashMap<>();
         for (Map.Entry<String, Set<String>> entry : sourceGraph.entrySet()) {
             for (String value : entry.getValue()) {

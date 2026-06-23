@@ -5,6 +5,7 @@ import me.exeos.bytus.core.transformer.Pipeline;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -13,27 +14,41 @@ public class MethodExtension {
 
     private final Pipeline pipeline;
     private final ClassNode owner;
+    private final MethodNode methodNode;
 
     public final MethodSaltInfo saltInfo;
     public final ParamObfInfo paramObfInfo;
 
     public MethodExtension() {
-        this(null, null);
+        this(null, null, null);
     }
 
-    public MethodExtension(Pipeline pipeline, ClassNode owner) {
+    public MethodExtension(Pipeline pipeline, ClassNode owner, MethodNode methodNode) {
         this.pipeline = pipeline;
         this.owner = owner;
+        this.methodNode = methodNode;
         this.saltInfo = new MethodSaltInfo();
         this.paramObfInfo = new ParamObfInfo();
     }
 
     public InsnList getObfuscatedIntPush(int value) {
-        return ObfCodenGen.getObfuscatedIntPush(value, pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(), saltInfo, paramObfInfo);
+        return ObfCodenGen.getObfuscatedIntPush(
+                value,
+                methodNode == null || methodNode.name.equals("<clinit>"),
+                pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(),
+                saltInfo,
+                paramObfInfo
+        );
     }
 
     public InsnList getObfuscatedJump(LabelNode to) {
-        return ObfCodenGen.getRandomJump(to, pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(), saltInfo, paramObfInfo);
+        return ObfCodenGen.getRandomJump(
+                to,
+                methodNode == null || methodNode.name.equals("<clinit>"),
+                pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(),
+                saltInfo,
+                paramObfInfo
+        );
     }
 
     public static class MethodSaltInfo {

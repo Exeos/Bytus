@@ -154,6 +154,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
                             callInsn,
                             ObfCodenGen.getObfuscatedIntPush(
                                     SALT_BY_METHOD.get(calleeId.get()),
+                                    methodNode.name.equals("<clinit>"),
                                     pipeline.getExtension(classNode).saltInfo(),
                                     msi,
                                     new MethodExtension.ParamObfInfo()
