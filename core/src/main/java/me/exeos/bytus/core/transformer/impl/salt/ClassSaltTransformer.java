@@ -79,7 +79,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
                     null,
                     null
             );
-            int salt = RandomUtil.getInt();
+            int salt = RandomUtil.getInt(ObfCodenGen.SAFE_MIN, ObfCodenGen.SAFE_MAX);
 
             classNode.fields.add(saltField);
 
@@ -97,7 +97,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
     ) {
         for (ClassNode classNode : jar.getClasses().values()) {
             MethodNode clinit = ClassUtil.getOrCreateStaticInitializer(classNode);
-            String initPick = RandomUtil.getRandomEntry(initMap.get(classNode.name));
+            String initPick = RandomUtil.getRandomEntry(initMap.get(classNode.name), classNode.name);
             int currentSalt = classSaltMap.get(classNode.name);
 
             InsnList saltStoreInsn = new InsnList();

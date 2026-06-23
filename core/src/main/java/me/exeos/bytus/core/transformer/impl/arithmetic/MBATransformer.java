@@ -45,7 +45,7 @@ public class MBATransformer extends AbstractTransformer {
                     }
                     case LADD -> {}
                     case ISUB -> {
-                        expression.add(new InsnNode(ICONST_M1));
+                        expression.add(context.getExtension().getObfuscatedIntPush(-1));
                         expression.add(new InsnNode(IXOR));
                         expression.add(new InsnNode(DUP2));
                         expression.add(new InsnNode(IAND));
@@ -53,10 +53,10 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(POP));
                         expression.add(new InsnNode(IXOR));
                         expression.add(new InsnNode(SWAP));
-                        expression.add(new InsnNode(ICONST_2));
+                        expression.add(context.getExtension().getObfuscatedIntPush(2));
                         expression.add(new InsnNode(IMUL));
                         expression.add(new InsnNode(IADD));
-                        expression.add(new InsnNode(ICONST_1));
+                        expression.add(context.getExtension().getObfuscatedIntPush(1));
                         expression.add(new InsnNode(IADD));
                     }
                     case LSUB -> {}

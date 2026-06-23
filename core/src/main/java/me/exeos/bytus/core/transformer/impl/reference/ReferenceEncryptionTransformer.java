@@ -22,11 +22,10 @@ import java.util.Set;
 
 public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
-    private static final String BSM_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
-    private static Map<String, ClassEdge> hierarchy;
+    private final static int CLASS_VERSION = V1_8;
     private static String bsmOwner = null;
-    private static boolean bsmOwnerIsInterface = false;
     private static String bsmName = null;
+    private static final String BSM_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
 
     public ReferenceEncryptionTransformer(BytusConfig config) {
         super(config);
@@ -44,17 +43,9 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        super.transform(context);
-    }
-
-    @Override
-    public void transform(ClassContext context) {
-        hierarchy = context.jarCtx().getExtension().getHierarchyNameMapped();
-        ClassEdge classEdge = context.jarCtx().getExtension().getHierarchy().get(context.classNode());
-        if (bsmOwner == null && bsmName == null && classEdge != null) {
-            getBootstrap(context, classEdge);
-        }
-
+        bsmOwner = ClassUtil.getNoneCollidingClassName(context.jar(), RandomUtil::getString);
+        bsmName = RandomUtil.getString(1);
+        getBootstrap(context);
         super.transform(context);
     }
 
@@ -64,6 +55,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
             return;
         }
 
+        Map<String, ClassEdge> hierarchy = context.jarCtx().getExtension().getHierarchyNameMapped();
         InsnUtil.loop(context.methodNode().instructions, insnNode -> {
             InsnList indyCall = new InsnList();
             switch (insnNode) {
@@ -78,7 +70,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                     indyCall.add(new InvokeDynamicInsnNode(
                             RandomUtil.getString(1),
                             fixMethodDesc(methodInsnNode),
-                            new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, bsmOwnerIsInterface),
+                            new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, false),
                             methodInsnNode.owner.replace("/", "."),
                             methodInsnNode.name,
                             methodInsnNode.desc,
@@ -106,7 +98,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                                 indyCall.add(new InvokeDynamicInsnNode(
                                         RandomUtil.getString(1),
                                         fixFieldDescriptor(fieldInsnNode),
-                                        new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, bsmOwnerIsInterface),
+                                        new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, false),
                                         declaringEdge.classNode.name.replace("/", "."),
                                         fieldInsnNode.name,
                                         fieldInsnNode.desc,
@@ -167,8 +159,9 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         };
     }
 
-    private void getBootstrap(ClassContext context, ClassEdge ownerEdge) {
-        ClassNode container = context.classNode();
+    private void getBootstrap(JarContext context) {
+        ClassNode container = new ClassNode();
+        container.visit(CLASS_VERSION, ACC_PUBLIC, bsmOwner, null, "java/lang/Object", null);
 
         /*
         CallSite bootstrap(MethodHandles.Lookup lookup,
@@ -180,17 +173,12 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                                      String caller,
                                      int type)
          */
-        String bsmDesc = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
         MethodNode bsm = new MethodNode(
                 ACC_PUBLIC | ACC_STATIC,
-                HierarchyUtil.genNoneCollidingMethodName(ownerEdge, bsmDesc, RandomUtil::getString),
-                bsmDesc,
+                bsmName,
+                BSM_DESC,
                 null, null
         );
-
-        bsmOwner = container.name;
-        bsmOwnerIsInterface = AsmUtil.hasAccess(container.access, ACC_INTERFACE);
-        bsmName = bsm.name;
 
         final int lookupSlot = 0;
         final int invokedTypeSlot = 2;
@@ -274,7 +262,9 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         bsm.instructions.add(new MethodInsnNode(INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V"));
         bsm.instructions.add(new InsnNode(ATHROW));
 
-        context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class, StringEncryptionTransformer.class, MethodSaltTransformer.class));
+        container.methods.add(bsm);
+        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class));
+//        context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class, StringEncryptionTransformer.class, MethodSaltTransformer.class));
     }
 
     private SwitchCase staticMethodHandler(int lookupSlot, int nameSlot, int ownerClassSlot, int methodTypeSlot, int targetMHandleSlot, LabelNode switchEnd) {

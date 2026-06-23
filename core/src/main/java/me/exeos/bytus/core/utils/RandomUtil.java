@@ -2,17 +2,16 @@ package me.exeos.bytus.core.utils;
 
 import me.exeos.bytus.core.asm.ObfCodenGen;
 
-import java.util.Iterator;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class RandomUtil {
 
-    private static final String chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    private static final Random rnd = new Random();
+    private final static String CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    private final static Random RND = new Random();
 
     public static int nextInt() {
-        return rnd.nextInt(ObfCodenGen.SAFE_MAX);
+        return RND.nextInt(ObfCodenGen.SAFE_MAX);
     }
 
     public static int getInt() {
@@ -37,7 +36,7 @@ public class RandomUtil {
         int i;
         do {
             i = getInt();
-        } while (contains(except, i));
+        } while (ArrayUtil.contains(except, i));
         return i;
     }
 
@@ -51,18 +50,19 @@ public class RandomUtil {
     public static String getString(int length) {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < length; i++) {
-            builder.append(chars.charAt(getInt(0, chars.length() - 1)));
+            builder.append(CHARS.charAt(getInt(0, CHARS.length() - 1)));
         }
         return builder.toString();
     }
 
-    private static boolean contains(int[] arr, int i) {
-        for (int i1 : arr) {
-            if (i1 == i) {
-                return true;
-            }
+    public static <T> T getRandomEntry(Set<T> set, T... except) {
+        if (set == null) {
+            return null;
         }
-        return false;
+
+        return getRandomEntry(
+                set.stream().filter(t -> !ArrayUtil.contains(except, t)).collect(Collectors.toSet())
+        );
     }
 
     public static <T> T getRandomEntry(Set<T> set) {
