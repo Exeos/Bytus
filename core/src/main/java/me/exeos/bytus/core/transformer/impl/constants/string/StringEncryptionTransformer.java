@@ -10,6 +10,7 @@ import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
+import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
@@ -61,7 +62,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
 
         super.transform(context);
         ClassNode cn = cryptClass();
-        context.pipeline().emit(new ClassContext(context, cryptClass()), Set.of(StringEncryptionTransformer.class));
+        context.pipeline().emit(new ClassContext(context, cryptClass()), Set.of(StringEncryptionTransformer.class, MethodSaltTransformer.class));
     }
 
     @Override

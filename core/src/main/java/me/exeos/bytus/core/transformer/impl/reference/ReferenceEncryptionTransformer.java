@@ -254,8 +254,8 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         bsm.instructions.add(new InsnNode(ARETURN));
 
         bsm.instructions.add(handler);
-        bsm.instructions.add(new VarInsnNode(ASTORE, classLoaderSlot));
-//        bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/RuntimeException", "printStackTrace", "()V"));
+//        bsm.instructions.add(new VarInsnNode(ASTORE, classLoaderSlot));
+        bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Exception", "printStackTrace", "()V"));
         bsm.instructions.add(new TypeInsnNode(NEW, "java/lang/RuntimeException"));
         bsm.instructions.add(new InsnNode(DUP));
         bsm.instructions.add(new LdcInsnNode("Dynamic method invocation failed"));
@@ -263,8 +263,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         bsm.instructions.add(new InsnNode(ATHROW));
 
         container.methods.add(bsm);
-        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class));
-//        context.pipeline().emit(new MethodContext(context, bsm), Set.of(ReferenceEncryptionTransformer.class, StringEncryptionTransformer.class, MethodSaltTransformer.class));
+        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class, MethodSaltTransformer.class));
     }
 
     private SwitchCase staticMethodHandler(int lookupSlot, int nameSlot, int ownerClassSlot, int methodTypeSlot, int targetMHandleSlot, LabelNode switchEnd) {
