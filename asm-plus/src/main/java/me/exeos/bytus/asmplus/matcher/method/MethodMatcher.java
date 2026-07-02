@@ -5,22 +5,29 @@ import java.util.Set;
 
 public class MethodMatcher {
 
-    private final Set<MethodMatchEntry> wrappers = new HashSet<>();
+    private final Set<MethodMatchEntry> entries = new HashSet<>();
+
+    public MethodMatcher() {
+    }
 
     public MethodMatcher(Set<MethodMatchEntry> initList) {
-        wrappers.addAll(initList);
+        entries.addAll(initList);
+    }
+
+    public void add(MethodMatcher other) {
+        entries.addAll(other.get());
     }
 
     public void add(MethodMatchEntry mw) {
-        wrappers.add(mw);
+        entries.add(mw);
     }
 
     public Set<MethodMatchEntry> get() {
-        return wrappers;
+        return entries;
     }
 
     public boolean match(MethodMatchEntry other) {
-        for (MethodMatchEntry methodMatchEntry : wrappers) {
+        for (MethodMatchEntry methodMatchEntry : entries) {
             if (methodMatchEntry.equals(other)) {
                 return true;
             }
@@ -28,7 +35,7 @@ public class MethodMatcher {
         return false;
     }
 
-    public static enum Mode {
+    public enum Mode {
         OWNER_NAME_DESC,
         OWNER_NAME,
         NAME

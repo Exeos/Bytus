@@ -4,7 +4,8 @@ import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 
-import java.util.*;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 public class HierarchyUtil {
@@ -37,6 +38,9 @@ public class HierarchyUtil {
 
     public static void hierarchyExpandMethodMatcher(MethodMatcher matcher, Map<String, ClassEdge> hierarchy) {
         for (MethodMatchEntry wrapper : matcher.get().toArray(new MethodMatchEntry[0])) {
+            if (wrapper.name().equals("build")) {
+                System.out.println();
+            }
             if (!hierarchy.containsKey(wrapper.owner())) {
                 continue;
             }

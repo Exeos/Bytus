@@ -75,7 +75,7 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
         return other.getOverriders().contains(this);
     }
 
-    public String getOwner() {
+    public String getOwnerName() {
         return owner.classNode.name;
     }
 
@@ -85,5 +85,9 @@ public record MethodEdge(ClassEdge owner, MethodNode methodNode) {
 
     public String getDesc() {
         return methodNode.desc;
+    }
+
+    public int getAccess() {
+        return methodNode.access;
     }
 }

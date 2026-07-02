@@ -5,9 +5,9 @@ import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
-import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
-import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -18,7 +18,10 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -75,8 +78,7 @@ public class ParamGenerifier extends AbstractTransformer {
             }
         }
 
-        excludeProblematicIndy(context.jar(), exclusions);
-
+        MethodUtil.excludeUnrewritableIndyTargets(context.jar(), exclusions);
         HierarchyUtil.hierarchyExpandMethodMatcher(exclusions, context.getExtension().getHierarchyNameMapped());
 
         return exclusions;
@@ -84,19 +86,19 @@ public class ParamGenerifier extends AbstractTransformer {
 
     /**
      * Exclude all methods that would collide, if they had the same signature
+     *
      * @param classEdge
      * @param exclusions
      */
     private void excludeMethodsWithCollidingSignatures(ClassEdge classEdge, MethodMatcher exclusions) {
         for (MethodEdge methodEdge : classEdge.getMethods()) {
             int sameMethodCount = 0;
-            boolean isStatic = MethodUtil.hasAccess(methodEdge.methodNode(), ACC_STATIC);
             Set<String> affectedOwners = new HashSet<>();
 
             for (MethodEdge foundEdge : classEdge.findMethods(methodEdge.getName())) {
                 // only collide if both methods are static, or both aren't
-                if (isStatic == MethodUtil.hasAccess(foundEdge.methodNode(), ACC_STATIC)) {
-                    affectedOwners.add(foundEdge.getOwner());
+                if (AsmUtil.bothHaveOrLackAccess(methodEdge.methodNode().access, foundEdge.methodNode().access, ACC_STATIC)) {
+                    affectedOwners.add(foundEdge.getOwnerName());
                     sameMethodCount++;
                 }
             }
@@ -104,43 +106,6 @@ public class ParamGenerifier extends AbstractTransformer {
             if (sameMethodCount > 1) {
                 for (String owner : affectedOwners) {
                     exclusions.add(MethodMatchEntry.of(owner, methodEdge.methodNode(), MethodMatcher.Mode.OWNER_NAME));
-                }
-            }
-        }
-    }
-
-    /**
-     * Handles indy. TODO: document this with claude
-     * @param jar
-     * @param exclusions
-     */
-    private void excludeProblematicIndy(JarArchive jar, MethodMatcher exclusions) {
-        for (ClassNode classNode : jar.getClasses().values()) {
-            for (MethodNode methodNode : classNode.methods) {
-                for (AbstractInsnNode insnNode : methodNode.instructions) {
-                    if (!(insnNode instanceof InvokeDynamicInsnNode indy)) {
-                        continue;
-                    }
-
-                    DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
-                    if (indyRet.isPrimitive() || indyRet.isArray() || indy.bsmArgs.length < 2 || !(indy.bsmArgs[0] instanceof Type normalType) || !(indy.bsmArgs[1] instanceof Handle handle)) {
-                        continue;
-                    }
-
-                    String owner = indyRet.getValue();
-                    String name = indy.name;
-                    String desc = normalType.getDescriptor();
-
-                    // exclude lambdas methods invoked by members not in jar as their sigs cant be changed
-                    // I don't remember why I check and exclude handle.* but works
-                    if (!jar.getClasses().containsKey(owner)
-                            || exclusions.match(
-                                    MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc())
-                            )
-                    ) {
-                        exclusions.add(MethodMatchEntry.of(owner, name, desc));
-                        exclusions.add(MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc()));
-                    }
                 }
             }
         }
@@ -253,7 +218,8 @@ public class ParamGenerifier extends AbstractTransformer {
                     );
                     indy.bsmArgs[2] = Type.getType(OBJ_ARR_DESC + typeRet.erase().toDesc());
                 }
-                default -> {}
+                default -> {
+                }
             }
         });
     }

@@ -4,7 +4,10 @@ import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.MethodEdge;
 import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
+import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 import me.exeos.bytus.asmplus.utils.*;
 import me.exeos.bytus.core.asm.ObfCodenGen;
 import me.exeos.bytus.core.config.BytusConfig;
@@ -16,6 +19,7 @@ import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.util.HashMap;
@@ -51,16 +55,21 @@ public class MethodSaltTransformer extends AbstractTransformer {
         if (SALT_BY_METHOD == null) {
             SALT_BY_METHOD = buildSaltMap(context);
         }
+        System.out.println("SALTED: " + SALT_BY_METHOD.size());
 
+        MethodMatcher exclusions = buildExclusions2(context);
         Map<String, ClassEdge> hierarchy = context.getExtension().getHierarchyNameMapped();
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                processMethod(context, hierarchy, classNode, methodNode);
+                processMethod(context, hierarchy, exclusions, classNode, methodNode);
             }
         }
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
+                if (classNode.name.contains("SimpleTestRepositoryFactory") && methodNode.name.equals("build")) {
+                    System.out.println();
+                }
                 String methodId = classNode.name + methodNode.name + methodNode.desc;
                 boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
 
@@ -82,7 +91,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
      * rewrites every call site inside it to pass the appropriate salt argument.
      * Salt is then registered in the MethodExtension
      */
-    private void processMethod(JarContext context, Map<String, ClassEdge> hierarchy, ClassNode classNode, MethodNode methodNode) {
+    private void processMethod(JarContext context, Map<String, ClassEdge> hierarchy, MethodMatcher exclusions, ClassNode classNode, MethodNode methodNode) {
         String methodId = classNode.name + methodNode.name + methodNode.desc;
         boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
         int saltSlot = isSalted
@@ -92,7 +101,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
         if (isSalted)
             MethodUtil.remapLocals(methodNode.instructions, saltSlot);
 
-        rewriteCallSites(context.pipeline(), classNode, hierarchy, methodNode, methodId, saltSlot, isSalted);
+        rewriteCallSites(context.pipeline(), context.jar(), classNode, hierarchy, exclusions, methodNode, methodId, saltSlot, isSalted);
     }
 
     /**
@@ -114,8 +123,10 @@ public class MethodSaltTransformer extends AbstractTransformer {
      */
     private void rewriteCallSites(
             Pipeline pipeline,
+            JarArchive jar,
             ClassNode classNode,
             Map<String, ClassEdge> hierarchy,
+            MethodMatcher exclusions,
             MethodNode methodNode,
             String callerId,
             int callerSaltSlot,
@@ -128,7 +139,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
             switch (insn) {
                 case MethodInsnNode callInsn -> {
-                    if (!hierarchy.containsKey(callInsn.owner)) {
+                    if (exclusions.match(MethodMatchEntry.of(callInsn)) || !hierarchy.containsKey(callInsn.owner)) {
                         return;
                     }
 
@@ -169,34 +180,38 @@ public class MethodSaltTransformer extends AbstractTransformer {
                     rewrittenCallees.add(insn);
                 }
                 case InvokeDynamicInsnNode indy -> {
-                    if (!hierarchy.containsKey(indy.bsm.getOwner())) {
+                    DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
+                    if (indyRet.isPrimitive() || indyRet.isArray()
+                            || indy.bsmArgs.length < 3
+                            || !(indy.bsmArgs[0] instanceof Type normalType)
+                            || !(indy.bsmArgs[1] instanceof Handle handle)
+                            || !(indy.bsmArgs[2] instanceof Type erasedType)
+                    ) {
                         return;
                     }
 
-                    AtomicReference<String> calleeId = new AtomicReference<>(null);
-                    hierarchy.get(indy.bsm.getOwner()).findNearestMethod(indy.bsm.getName(), indy.bsm.getDesc()).ifPresent(methodEdge -> {
-                        String id = methodEdge.owner().classNode.name + indy.bsm.getName() + indy.bsm.getDesc();
-                        if (SALT_BY_METHOD.containsKey(id) && calleeId.get() == null) {
-                            calleeId.set(id);
-                        }
-                    });
+                    String owner = indyRet.getValue();
+                    String name = indy.name;
+                    String desc = normalType.getDescriptor();
 
-                    if (calleeId.get() == null) {
+                    if (exclusions.match(MethodMatchEntry.of(owner, name, desc)) || !jar.getClasses().containsKey(owner)) {
+                        return;
+                    }
+                    if (!SALT_BY_METHOD.containsKey(owner + name + desc)) {
                         return;
                     }
 
-                    indy.bsm = new Handle(
-                            indy.bsm.getTag(),
-                            indy.bsm.getOwner(),
-                            indy.bsm.getName(),
-                            DescriptorParser.parseMethodDesc(indy.bsm.getDesc())
-                                    .addParam(SALT_PARAM)
-                                    .toDesc(),
-                            indy.bsm.isInterface()
+                    MethodDescriptor targetDesc = DescriptorParser.parseMethodDesc(desc).addParam(SALT_PARAM);
+
+                    indy.bsmArgs[0] = Type.getType(targetDesc.toDesc());
+                    indy.bsmArgs[1] = new Handle(
+                            handle.getTag(),
+                            handle.getOwner(),
+                            handle.getName(),
+                            DescriptorParser.parseMethodDesc(handle.getDesc()).addParam(SALT_PARAM).toDesc(),
+                            handle.isInterface()
                     );
-                    Object[] newBsmArgs = new Object[indy.bsmArgs.length + 1];
-                    System.arraycopy(indy.bsmArgs, 0, newBsmArgs, 0, indy.bsmArgs.length);
-                    newBsmArgs[newBsmArgs.length - 1] = SALT_BY_METHOD.get(calleeId.get());
+                    indy.bsmArgs[2] = Type.getType(targetDesc.erase().toDesc());
 
                     rewrittenCallees.add(insn);
                 }
@@ -214,19 +229,15 @@ public class MethodSaltTransformer extends AbstractTransformer {
     private Map<String, Integer> buildSaltMap(JarContext context) {
         Map<String, Integer> methodSaltMap = new HashMap<>();
 
-        Set<ClassNode> excludedClass = new HashSet<>();
-        Set<MethodNode> excludedMethods = new HashSet<>();
-        buildExclusions(context.jar(), context.getExtension().getHierarchy(), excludedClass, excludedMethods);
+        MethodMatcher exclusions = buildExclusions2(context);
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
-            if (ClassUtil.isEnum(classNode) || excludedClass.contains(classNode)) {
-                continue;
-            }
-
             for (MethodNode methodNode : classNode.methods) {
+                if (classNode.name.contains("SimpleTestRepositoryFactory") && methodNode.name.equals("build")) {
+                    System.out.println();
+                }
                 if (!context.pipeline().getExtension(classNode, methodNode).saltInfo.hasSalt()
-                        && !MethodUtil.isSpecial(methodNode)
-                        && !excludedMethods.contains(methodNode)
+                        && !exclusions.match(MethodMatchEntry.of(classNode.name, methodNode))
                 ) {
                     methodSaltMap.put(classNode.name + methodNode.name + methodNode.desc, RandomUtil.getInt(SALT_MIN, SALT_MAX));
                 }
@@ -234,6 +245,79 @@ public class MethodSaltTransformer extends AbstractTransformer {
         }
 
         return methodSaltMap;
+    }
+
+    private MethodMatcher buildExclusions2(JarContext context) {
+        MethodMatcher exclusions = new MethodMatcher(config.getEntryPoints(context.jar()));
+        exclusions.add(MethodMatchEntry.of("<clinit>"));
+        exclusions.add(MethodMatchEntry.of("<init>"));
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            if (AsmUtil.hasAccess(classNode.access, ACC_ANNOTATION)) {
+                for (MethodNode methodNode : classNode.methods) {
+                    exclusions.add(MethodMatchEntry.of(classNode.name, methodNode));
+                }
+            }
+        }
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            ClassEdge classEdge = context.getExtension().getHierarchy().get(classNode);
+            if (classEdge == null || classEdge.hasUnresolved()) {
+                classNode.methods.forEach(methodNode -> exclusions.add(MethodMatchEntry.of(classNode.name, methodNode)));
+            }
+        }
+
+        MethodUtil.excludeUnrewritableIndyTargets(context.jar(), exclusions);
+        HierarchyUtil.hierarchyExpandMethodMatcher(exclusions, context.getExtension().getHierarchyNameMapped());
+        exclusions.add(excludeCollidingSignatures(context, exclusions));
+
+        return exclusions;
+    }
+
+    private MethodMatcher excludeCollidingSignatures(JarContext context, MethodMatcher excluded) {
+        MethodMatcher exclusions = new MethodMatcher();
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            ClassEdge classEdge = context.getExtension().getHierarchy().get(classNode);
+            if (classEdge == null) {
+                continue;
+            }
+
+            for (MethodEdge baseMethod : classEdge.getMethods()) {
+                // baseMethod is already excluded, no need to re-exclude it
+                if (excluded.match(MethodMatchEntry.of(classNode.name, baseMethod.methodNode()))) {
+                    continue;
+                }
+
+                // baseMethod descriptor after salting param has been added
+                String saltedDesc = DescriptorParser.parseMethodDesc(baseMethod.getDesc())
+                        .addParam(SALT_PARAM)
+                        .toDesc();
+
+                // loop through all methods with the same name as baseMethod in the hierarchy
+                for (MethodEdge edge : classEdge.findMethods(baseMethod.getName())) {
+                    if (baseMethod.equals(edge) || !AsmUtil.bothHaveOrLackAccess(baseMethod.getAccess(), edge.getAccess(), ACC_STATIC)) {
+                        continue;
+                    }
+
+                    String edgeDesc;
+                    if (excluded.match(MethodMatchEntry.of(edge.getOwnerName(), edge.methodNode()))) {
+                        edgeDesc = DescriptorParser.parseMethodDesc(edge.getDesc()).toDesc();
+                    } else {
+                        edgeDesc = DescriptorParser.parseMethodDesc(edge.getDesc())
+                                .addParam(SALT_PARAM)
+                                .toDesc();
+                    }
+
+                    if (saltedDesc.equals(edgeDesc)) {
+                        exclusions.add(MethodMatchEntry.of(classNode.name, baseMethod.methodNode()));
+                    }
+                }
+            }
+        }
+
+        HierarchyUtil.hierarchyExpandMethodMatcher(exclusions, context.getExtension().getHierarchyNameMapped());
+        return exclusions;
     }
 
     private void buildExclusions(JarArchive jar, Map<ClassNode, ClassEdge> hierarchy, Set<ClassNode> excludedClasses, Set<MethodNode> excludedMethods) {

@@ -4,6 +4,8 @@ import me.exeos.bytus.asmplus.descriptor.DescriptorMember;
 import me.exeos.bytus.asmplus.descriptor.DescriptorParser;
 import me.exeos.bytus.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
@@ -134,6 +136,55 @@ public class MethodUtil implements Opcodes {
         }
 
         return targeted;
+    }
+
+    /**
+     * Scans {@code invokedynamic} call sites and excludes method signatures that should not be rewritten.
+     *
+     * <p>This protects lambda/indy-linked targets when their effective signature cannot be safely changed,
+     * especially when:
+     * <ul>
+     *   <li>the indy return owner is not a class contained in this {@code jar}, or</li>
+     *   <li>the bootstrap-linked method handle matches an already excluded method.</li>
+     * </ul>
+     *
+     * <p>For each such site, both are excluded:
+     * <ul>
+     *   <li>the synthetic/indy target method inferred from {@code (owner, indy.name, samDescriptor)}</li>
+     *   <li>the bootstrap method-handle target {@code (handle.owner, handle.name, handle.desc)}</li>
+     * </ul>
+     *
+     * @param jar archive being transformed
+     * @param exclusions mutable matcher to expand
+     */
+    public static void excludeUnrewritableIndyTargets(JarArchive jar, MethodMatcher exclusions) {
+        for (ClassNode classNode : jar.getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                for (AbstractInsnNode insnNode : methodNode.instructions) {
+                    if (!(insnNode instanceof InvokeDynamicInsnNode indy)) {
+                        continue;
+                    }
+
+                    DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
+                    if (indyRet.isPrimitive() || indyRet.isArray() || indy.bsmArgs.length < 2 || !(indy.bsmArgs[0] instanceof Type normalType) || !(indy.bsmArgs[1] instanceof Handle handle)) {
+                        continue;
+                    }
+
+                    String owner = indyRet.getValue();
+                    String name = indy.name;
+                    String desc = normalType.getDescriptor();
+
+                    if (!jar.getClasses().containsKey(owner)
+                            || exclusions.match(
+                            MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc())
+                    )
+                    ) {
+                        exclusions.add(MethodMatchEntry.of(owner, name, desc));
+                        exclusions.add(MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc()));
+                    }
+                }
+            }
+        }
     }
 
     public static boolean isSpecial(MethodNode methodNode) {
