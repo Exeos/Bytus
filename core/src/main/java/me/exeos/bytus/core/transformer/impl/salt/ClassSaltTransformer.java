@@ -127,7 +127,6 @@ public class ClassSaltTransformer extends AbstractTransformer {
             } else {
                 saltStoreInsn.add(InsnUtil.getIntPush(currentSalt));
             }
-            System.out.println("");
             saltStoreInsn.add(new FieldInsnNode(Opcodes.PUTSTATIC, classNode.name, saltFieldNameMap.get(classNode.name), SALT_FIELD_DESC));
 
             clinit.instructions.insertBefore(clinit.instructions.getFirst(), saltStoreInsn);
