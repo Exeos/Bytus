@@ -15,6 +15,7 @@ import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.ClassSaltTransformer;
+import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 
 import java.util.Comparator;
 import java.util.HashSet;
@@ -50,7 +51,7 @@ public class TransformerManager {
         REGISTRY.add(ReferenceEncryptionTransformer::new);
         REGISTRY.add(ReferenceProxyTransformer::new);
         REGISTRY.add(ClassSaltTransformer::new);
-//        REGISTRY.add(MethodSaltTransformer::new);
+        REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);
         REGISTRY.add(Renamer::new);
     }

@@ -105,13 +105,13 @@ public class MethodUtil implements Opcodes {
      * @param methodNode The MethodNode to scan for indy instructions
      * @return Set of owner + name + desc of targeted methods
      */
-    public static Set<String> getInvokeDynamicTargets(MethodNode methodNode) {
-        Set<String> targeted = new HashSet<>();
+    public static MethodMatcher getInvokeDynamicTargets(MethodNode methodNode) {
+        MethodMatcher targeted = new MethodMatcher();
         for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (insnNode instanceof InvokeDynamicInsnNode indy) {
                 for (Object bsmArg : indy.bsmArgs) {
                     if (bsmArg instanceof Handle handle) {
-                        targeted.add(handle.getOwner() + handle.getName() + handle.getDesc());
+                        targeted.add(MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc()));
                     }
                 }
             }

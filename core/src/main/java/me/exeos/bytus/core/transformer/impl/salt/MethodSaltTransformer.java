@@ -61,9 +61,6 @@ public class MethodSaltTransformer extends AbstractTransformer {
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                if (classNode.name.contains("SimpleTestRepositoryFactory") && methodNode.name.equals("build")) {
-                    System.out.println();
-                }
                 String methodId = classNode.name + methodNode.name + methodNode.desc;
                 boolean isSalted = SALT_BY_METHOD.containsKey(methodId);
 
@@ -182,33 +179,7 @@ public class MethodSaltTransformer extends AbstractTransformer {
                     rewrittenCallees.add(insn);
                 }
                 case InvokeDynamicInsnNode indy -> {
-                    if (indy.bsmArgs.length < 3 || !(indy.bsmArgs[1] instanceof Handle handle)) return;
-
-                    String owner = handle.getOwner();
-                    String name = handle.getName();
-                    String desc = handle.getDesc();
-
-                    if (!jar.getClasses().containsKey(owner) || exclusions.match(MethodMatchEntry.of(owner, name, desc)))
-                        return;
-
-                    String calleeId = owner + name + desc;
-                    if (!SALT_BY_METHOD.containsKey(calleeId)) return;
-
-                    methodNode.instructions.insertBefore(indy, InsnUtil.getIntPush(SALT_BY_METHOD.get(calleeId)));
-
-                    // captured salt at factory
-                    indy.desc = DescriptorParser.parseMethodDesc(indy.desc).addParam(SALT_PARAM).toDesc();
-
-                    // impl handle salt with tag-aware parameter placement
-                    indy.bsmArgs[1] = new Handle(
-                            handle.getTag(),
-                            owner,
-                            name,
-                            addSaltToImplHandleDesc(handle),
-                            handle.isInterface()
-                    );
-
-                    rewrittenCallees.add(insn);
+                    // todo
                 }
                 default -> {
                 }
@@ -265,8 +236,10 @@ public class MethodSaltTransformer extends AbstractTransformer {
                 continue;
             }
 
-            // exclude all methods declared outside of jar
+            // exclude all methods declared outside of jar and targeted by indy
             for (MethodEdge method : classEdge.getMethods()) {
+                exclusions.add(MethodUtil.getInvokeDynamicTargets(method.methodNode()));
+
                 if (context.jar().isDependency(method.getRoot().getOwnerName())) {
                     exclusions.add(MethodMatchEntry.of(classNode.name, method.methodNode()));
                 }
