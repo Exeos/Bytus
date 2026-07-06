@@ -1,5 +1,7 @@
 package me.exeos.bytus.core.asm;
 
+import me.exeos.bytus.asmplus.InsnFactory;
+import me.exeos.bytus.asmplus.obfuscation.salt.SaltSource;
 import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.transformer.extensions.ClassExtension;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
@@ -11,56 +13,64 @@ import org.objectweb.asm.tree.*;
  * Class handling the heavy lifting. Should be accessed trough extensions
  */
 public class ObfCodenGen implements Opcodes {
-    
+
     public static final int SAFE_MIN = -9000000;
     public static final int SAFE_MAX = 9000000;
 
     public static InsnList getObfuscatedIntPush(
-            int value, 
+            int value,
             boolean isClinit,
-            ClassExtension.ClassSaltInfo classSaltInfo, 
-            MethodExtension.MethodSaltInfo methodSaltInfo, 
+            ClassExtension.ClassSaltInfo classSaltInfo,
+            MethodExtension.MethodSaltInfo methodSaltInfo,
             MethodExtension.ParamObfInfo paramObfInfo
     ) {
-        InsnList insn = new InsnList();
+        boolean hasMethodSalt = methodSaltInfo.hasSalt();
+        boolean hasClassSalt = classSaltInfo.hasSalt() && !isClinit;
 
-        InsnList methodSaltPush = new InsnList();
-        if (methodSaltInfo.hasSalt()) {
+        if (!hasMethodSalt && !hasClassSalt) {
+            return InsnUtil.getIntPushList(value);
+        }
+
+        SaltSource methodSalt = new SaltSource(methodSaltInfo.getSaltOrDefault(), getMethodSaltPush(methodSaltInfo, paramObfInfo));
+        SaltSource classSalt = new SaltSource(classSaltInfo.getSaltOrDefault(), getClassSaltPush(classSaltInfo));
+
+        if (hasMethodSalt && hasClassSalt) {
+            return InsnUtil.getIntPushSalted(value, methodSalt, classSalt);
+        }
+
+        if (hasMethodSalt) {
+            return InsnUtil.getIntPushSalted(value, methodSalt);
+        }
+
+        return InsnUtil.getIntPushSalted(value, classSalt);
+    }
+
+    private static InsnFactory getMethodSaltPush(MethodExtension.MethodSaltInfo methodSaltInfo, MethodExtension.ParamObfInfo paramObfInfo) {
+        return () -> {
+            InsnList push = new InsnList();
+
             int saltSlot = paramObfInfo.getArrayIndexBySlotOrSlot(methodSaltInfo.getSaltSlotOrDefault());
             if (paramObfInfo.hasParamObf()) {
-                methodSaltPush.add(new VarInsnNode(ALOAD, paramObfInfo.getObjArrSlotOrDefault()));
-                methodSaltPush.add(InsnUtil.getIntPush(saltSlot));
-                methodSaltPush.add(new InsnNode(AALOAD));
-                methodSaltPush.add(new TypeInsnNode(CHECKCAST, "java/lang/Integer"));
-                methodSaltPush.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I"));
-
+                push.add(new VarInsnNode(ALOAD, paramObfInfo.getObjArrSlotOrDefault()));
+                push.add(InsnUtil.getIntPush(saltSlot));
+                push.add(new InsnNode(AALOAD));
+                push.add(new TypeInsnNode(CHECKCAST, "java/lang/Integer"));
+                push.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I"));
             } else {
-                methodSaltPush.add(new VarInsnNode(ILOAD, saltSlot));
+                push.add(new VarInsnNode(ILOAD, saltSlot));
             }
-        }
 
-        InsnList classSaltPush = new InsnList();
-        if (classSaltInfo.hasSalt()) {
+            return push;
+        };
+    }
+
+    private static InsnFactory getClassSaltPush(ClassExtension.ClassSaltInfo classSaltInfo) {
+        return () -> {
+            InsnList classSaltPush = new InsnList();
             classSaltPush.add(new FieldInsnNode(GETSTATIC, classSaltInfo.getOwner(), classSaltInfo.getName(), classSaltInfo.getDesc()));
-        }
 
-        if (methodSaltInfo.hasSalt() && classSaltInfo.hasSalt() && !isClinit) {
-            int obf = value + methodSaltInfo.getSalt() + classSaltInfo.getSalt();
-
-            insn.add(InsnUtil.getIntPush(obf));
-            insn.add(methodSaltPush);
-            insn.add(new InsnNode(ISUB));
-            insn.add(classSaltPush);
-            insn.add(new InsnNode(ISUB));
-        } else if (methodSaltInfo.hasSalt()) {
-            insn.add(InsnUtil.getIntPushSalted(value, true, methodSaltInfo.getSalt(), methodSaltPush));
-        } else if (classSaltInfo.hasSalt() && !isClinit) {
-            insn.add(InsnUtil.getIntPushSalted(value, true, classSaltInfo.getSalt(), classSaltPush));
-        } else {
-            insn.add(InsnUtil.getIntPush(value));
-        }
-
-        return insn;
+            return classSaltPush;
+        };
     }
 
     public static InsnList getRandomJump(

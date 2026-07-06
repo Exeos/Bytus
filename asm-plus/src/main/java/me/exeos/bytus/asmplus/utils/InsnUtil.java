@@ -1,8 +1,11 @@
 package me.exeos.bytus.asmplus.utils;
 
+import me.exeos.bytus.asmplus.obfuscation.salt.SaltArithmetic;
+import me.exeos.bytus.asmplus.obfuscation.salt.SaltSource;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -69,29 +72,17 @@ public class InsnUtil implements Opcodes {
         return new IntInsnNode(SIPUSH, value);
     }
 
-    public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, int saltSlot) {
-        InsnList pushSalt = new InsnList();
-        pushSalt.add(new VarInsnNode(ILOAD, saltSlot));
-        return getIntPushSalted(value, hasSalt, salt, pushSalt);
+    public static InsnList getIntPushSalted(int value, SaltSource... saltSources) {
+        return RandomUtil.chance(70)
+                ? SaltArithmetic.xorIntSaltPush(value, saltSources)
+                : SaltArithmetic.rotateIntSaltPush(value, saltSources);
     }
 
-    public static InsnList getIntPushSalted(int value, boolean hasSalt, int salt, InsnList pushSaltInsn) {
-        InsnList pushInsn = new InsnList();
+    public static InsnList getIntPushList(int value) {
+        InsnList push = new InsnList();
+        push.add(getIntPush(value));
 
-        if (!hasSalt) {
-            pushInsn.add(getIntPush(value));
-            return pushInsn;
-        }
-
-        pushInsn.add(pushSaltInsn);
-
-        int diff = salt - value;
-        if (diff != 0) {
-            pushInsn.add(getIntPush(Math.abs(diff)));
-            pushInsn.add(new InsnNode(diff < 0 ? IADD : ISUB));
-        }
-
-        return pushInsn;
+        return push;
     }
 
     public static AbstractInsnNode getIntPush(int value) {
@@ -139,6 +130,15 @@ public class InsnUtil implements Opcodes {
         for (AbstractInsnNode insnNode : source) {
             target.add(insnNode);
         }
+    }
+
+    public static List<AbstractInsnNode> fromInsnList(InsnList from) {
+        List<AbstractInsnNode> list = new ArrayList<>();
+        for (AbstractInsnNode insnNode : from) {
+            list.add(insnNode);
+        }
+
+        return list;
     }
 
     /**

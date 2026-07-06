@@ -7,7 +7,8 @@ import me.exeos.bytus.core.transformer.impl.PreProcessor;
 import me.exeos.bytus.core.transformer.impl.Renamer;
 import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
 import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
-import me.exeos.bytus.core.transformer.impl.constants.number.OverUnderFlowIntTransformer;
+import me.exeos.bytus.core.transformer.impl.constants.number.FloatingPointToIntTransformer;
+import me.exeos.bytus.core.transformer.impl.constants.number.IntEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.control.*;
@@ -38,7 +39,8 @@ public class TransformerManager {
 
     static {
         REGISTRY.add(MBATransformer::new);
-        REGISTRY.add(OverUnderFlowIntTransformer::new);
+        REGISTRY.add(FloatingPointToIntTransformer::new);
+        REGISTRY.add(IntEncryptionTransformer::new);
         REGISTRY.add(SplitStringsTransformer::new);
         REGISTRY.add(StringEncryptionTransformer::new);
         REGISTRY.add(ConstantArrayTransformer::new);
