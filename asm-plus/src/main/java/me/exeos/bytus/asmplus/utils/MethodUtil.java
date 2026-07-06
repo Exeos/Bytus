@@ -11,7 +11,10 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class MethodUtil implements Opcodes {
 
@@ -41,8 +44,8 @@ public class MethodUtil implements Opcodes {
     /**
      * Adds a Parameter to the method, by updating its descriptor, remapping locals and increasing maxLocals
      *
-     * @param to    Method to add param to
-     * @param param Param to add to method
+     * @param to          Method to add param to
+     * @param param       Param to add to method
      * @param remapLocals Should instructions loading locals be remapped
      * @return Local slot of the newly added Param
      */
@@ -72,6 +75,7 @@ public class MethodUtil implements Opcodes {
 
     /**
      * Remaps indexes of locals so they don't collide with newly added params
+     *
      * @param container Instructions to remap
      * @param threshold The index threshold marking the end of the method params
      */
@@ -87,6 +91,7 @@ public class MethodUtil implements Opcodes {
 
     /**
      * Returns the start slot of the locals in a method
+     *
      * @param methodNode Method node to get the offset for
      * @return The start slot of the locals in a method
      */
@@ -96,6 +101,7 @@ public class MethodUtil implements Opcodes {
 
     /**
      * Finds all methods targeted by invokedynamic insn in the provided methods instructions
+     *
      * @param methodNode The MethodNode to scan for indy instructions
      * @return Set of owner + name + desc of targeted methods
      */
@@ -116,7 +122,8 @@ public class MethodUtil implements Opcodes {
 
     /**
      * Finds all methods targeted by invokedynamic and maps them into their owner classes
-     * @param jar JarArchive containing the relevant classes
+     *
+     * @param jar        JarArchive containing the relevant classes
      * @param methodNode The MethodNode to scan for indy instructions
      * @return Map mapping classes and theirs methods if that method is targeted by invoke dynamic
      */
@@ -126,7 +133,7 @@ public class MethodUtil implements Opcodes {
             if (insnNode instanceof InvokeDynamicInsnNode indy) {
                 for (Object bsmArg : indy.bsmArgs) {
                     if (bsmArg instanceof Handle handle) {
-                        JarUtil.findClass(jar, handle.getOwner()).ifPresent(classNode -> {
+                        jar.getClassNode(handle.getOwner(), false).ifPresent(classNode -> {
                             targeted.putIfAbsent(classNode, new HashSet<>());
                             ClassUtil.findMethod(classNode, handle.getName(), handle.getDesc()).ifPresent(targeted.get(classNode)::add);
                         });
@@ -154,7 +161,7 @@ public class MethodUtil implements Opcodes {
      *   <li>the bootstrap method-handle target {@code (handle.owner, handle.name, handle.desc)}</li>
      * </ul>
      *
-     * @param jar archive being transformed
+     * @param jar        archive being transformed
      * @param exclusions mutable matcher to expand
      */
     public static void excludeUnrewritableIndyTargets(JarArchive jar, MethodMatcher exclusions) {

@@ -11,6 +11,16 @@
   },
   "rename": false,
   "salt": false,
+  "classInitOrder": [
+    [
+      "class/initializedFirst/name",
+      "class/initializedAfter/name"
+    ],
+    [
+      "class/initializedFirst/name",
+      "otherClass/initializedAfter/name"
+    ]
+  ],
   "constants": {
     "enable": false,
     "constantArray": false,

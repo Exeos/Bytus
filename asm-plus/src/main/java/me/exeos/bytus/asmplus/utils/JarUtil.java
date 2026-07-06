@@ -7,17 +7,11 @@ import java.util.Optional;
 
 public class JarUtil {
 
-
-    public static Optional<ClassNode> findClass(JarArchive jar, String name) {
-        ClassNode cn = jar.getClasses().getOrDefault(name, null);
-        return cn == null ? Optional.empty() : Optional.of(cn);
-    }
-
     public static Optional<ClassNode> getMainClass(JarArchive jar) {
         if (jar.getManifest() != null) {
             String mainClassName = jar.getManifest().getMainAttributes().getValue("Main-Class");
             if (mainClassName != null) {
-                return JarUtil.findClass(jar, mainClassName.replace(".", "/"));
+                return jar.getClassNode(mainClassName.replace(".", "/"), false);
             }
         }
         return Optional.empty();

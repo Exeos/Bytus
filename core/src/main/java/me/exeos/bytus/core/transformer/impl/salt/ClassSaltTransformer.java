@@ -3,7 +3,11 @@ package me.exeos.bytus.core.transformer.impl.salt;
 import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.bytus.asmplus.analysis.init.ClassInitAnalyzer;
 import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.utils.*;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.bytus.asmplus.utils.AsmUtil;
+import me.exeos.bytus.asmplus.utils.ClassUtil;
+import me.exeos.bytus.asmplus.utils.HierarchyUtil;
+import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.asm.ObfCodenGen;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -13,8 +17,9 @@ import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 
 public class ClassSaltTransformer extends AbstractTransformer {
 
@@ -48,17 +53,23 @@ public class ClassSaltTransformer extends AbstractTransformer {
     }
 
     private Map<String, Set<String>> buildInitMap(JarArchive jar) {
-        AtomicReference<Map<String, Set<String>>> initMap = new AtomicReference<>(new HashMap<>());
+        Map<String, Set<String>> initMap = new HashMap<>(config.classInitOrder);
+        Set<MethodMatchEntry> entries = config.getEntryPoints(jar);
 
-        config.getEntryPoints(jar).stream().findFirst().ifPresent(entry -> {
-            JarUtil.findClass(jar, entry.owner()).ifPresent(entryClass -> {
+        if (entries.size() != 1) {
+            System.out.println("Can't analyze InitMap with more than one entry point");
+            return initMap;
+        }
+
+        entries.stream().findFirst().ifPresent(entry -> {
+            jar.getClassNode(entry.owner(), false).ifPresent(entryClass -> {
                 ClassUtil.findMethod(entryClass, entry.name(), entry.desc()).ifPresent(entryMethod -> {
-                    initMap.set(ClassInitAnalyzer.analyzeInitOrder(jar, entryClass, entryMethod));
+                    initMap.putAll(ClassInitAnalyzer.analyzeInitOrder(jar, entryClass, entryMethod));
                 });
             });
         });
 
-        return initMap.get();
+        return initMap;
     }
 
     private void mapSaltAndCreateField(JarContext context, Map<ClassNode, ClassEdge> hierarchy, Map<String, Integer> classSaltMap, Map<String, String> saltFieldNameMap) {
@@ -116,6 +127,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
             } else {
                 saltStoreInsn.add(InsnUtil.getIntPush(currentSalt));
             }
+            System.out.println("");
             saltStoreInsn.add(new FieldInsnNode(Opcodes.PUTSTATIC, classNode.name, saltFieldNameMap.get(classNode.name), SALT_FIELD_DESC));
 
             clinit.instructions.insertBefore(clinit.instructions.getFirst(), saltStoreInsn);

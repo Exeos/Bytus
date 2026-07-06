@@ -2,8 +2,8 @@ package me.exeos.bytus.core.config;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.bytus.asmplus.matcher.method.MethodMatcher;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
 import me.exeos.bytus.asmplus.utils.JarUtil;
@@ -18,9 +18,7 @@ import org.objectweb.asm.Opcodes;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class BytusConfig {
 
@@ -31,6 +29,7 @@ public class BytusConfig {
     public final EntryPointsConfigMember entryPoints;
     public final boolean rename;
     public final boolean salt;
+    public final Map<String, Set<String>> classInitOrder = new HashMap<>();
     public final ConstantsConfigMember constants;
     public final MbaConfigMember mba;
     public final FlowConfigMember flow;
@@ -43,6 +42,7 @@ public class BytusConfig {
             @JsonProperty("entryPoints") EntryPointsConfigMember entryPoints,
             @JsonProperty("rename") boolean rename,
             @JsonProperty("salt") boolean salt,
+            @JsonProperty("classInitOrder") String[][] classInitOrderRaw,
             @JsonProperty("constants") ConstantsConfigMember constants,
             @JsonProperty("mba") MbaConfigMember mba,
             @JsonProperty("flow") FlowConfigMember flow,
@@ -56,6 +56,16 @@ public class BytusConfig {
         this.mba = mba;
         this.flow = flow;
         this.references = references;
+
+        for (int i = 0; i < classInitOrderRaw.length; i++) {
+            String[] initEntry = classInitOrderRaw[i];
+            if (initEntry.length != 2) {
+                System.out.println("Invalid classInitOrder entry at index: " + i);
+                continue;
+            }
+
+            classInitOrder.computeIfAbsent(initEntry[0], _ -> new HashSet<>()).add(initEntry[1]);
+        }
     }
 
     public static BytusConfig fromJson(String json) throws JacksonException {
@@ -74,7 +84,7 @@ public class BytusConfig {
             });
         }
         entryPoints.custom().forEach((className, methodName) -> {
-            JarUtil.findClass(jar, className).flatMap(classNode -> ClassUtil.findMethod(classNode, methodName, "([Ljava/lang/String;)V")).ifPresent(entryMethod -> entries.add(new MethodMatchEntry(className, methodName, entryMethod.desc, MethodMatcher.Mode.OWNER_NAME_DESC)));
+            jar.getClassNode(className, false).flatMap(classNode -> ClassUtil.findMethod(classNode, methodName, "([Ljava/lang/String;)V")).ifPresent(entryMethod -> entries.add(new MethodMatchEntry(className, methodName, entryMethod.desc, MethodMatcher.Mode.OWNER_NAME_DESC)));
         });
 
         return entries;

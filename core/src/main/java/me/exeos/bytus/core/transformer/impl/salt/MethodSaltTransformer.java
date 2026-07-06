@@ -21,11 +21,7 @@ import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.*;
 
 public class MethodSaltTransformer extends AbstractTransformer {
 
@@ -54,7 +50,6 @@ public class MethodSaltTransformer extends AbstractTransformer {
         if (SALT_BY_METHOD == null) {
             SALT_BY_METHOD = buildSaltMap(context);
         }
-        System.out.println("SALTED: " + SALT_BY_METHOD.size());
 
         MethodMatcher exclusions = buildExclusions(context);
         Map<String, ClassEdge> hierarchy = context.getExtension().getHierarchyNameMapped();
@@ -142,16 +137,22 @@ public class MethodSaltTransformer extends AbstractTransformer {
                         return;
                     }
 
-                    AtomicReference<String> calleeId = new AtomicReference<>(null);
-                    hierarchy.get(callInsn.owner).findNearestMethod(callInsn.name, callInsn.desc).ifPresent(methodEdge -> {
-                        String id = methodEdge.owner().classNode.name + callInsn.name + callInsn.desc;
-                        if (SALT_BY_METHOD.containsKey(id) && calleeId.get() == null) {
-                            calleeId.set(id);
-                        }
-                    });
-
-                    if (calleeId.get() == null) {
+                    Optional<MethodEdge> nearestMethod = hierarchy.get(callInsn.owner).findNearestMethod(callInsn.name, callInsn.desc);
+                    if (nearestMethod.isEmpty()) {
                         return;
+                    }
+
+                    String ownerName = nearestMethod.get().owner().classNode.name;
+                    String calleeId = ownerName + callInsn.name + callInsn.desc;
+
+                    if (!SALT_BY_METHOD.containsKey(calleeId)) {
+                        return;
+                    }
+
+                    Optional<ClassNode> calleeOwner = jar.getClassNode(ownerName, false);
+                    Optional<MethodNode> calleeMethod = Optional.empty();
+                    if (calleeOwner.isPresent()) {
+                        calleeMethod = ClassUtil.findMethod(calleeOwner.get(), callInsn.name, callInsn.desc);
                     }
 
                     MethodExtension.MethodSaltInfo msi = new MethodExtension.MethodSaltInfo();
@@ -163,11 +164,13 @@ public class MethodSaltTransformer extends AbstractTransformer {
                     methodNode.instructions.insertBefore(
                             callInsn,
                             ObfCodenGen.getObfuscatedIntPush(
-                                    SALT_BY_METHOD.get(calleeId.get()),
+                                    SALT_BY_METHOD.get(calleeId),
                                     methodNode.name.equals("<clinit>"),
                                     pipeline.getExtension(classNode).saltInfo(),
                                     msi,
-                                    new MethodExtension.ParamObfInfo()
+                                    calleeMethod.isPresent()
+                                            ? pipeline.getExtension(calleeOwner.get(), calleeMethod.get()).paramObfInfo
+                                            : new MethodExtension.ParamObfInfo()
                             )
                     );
                     // update call description to match salted descriptor

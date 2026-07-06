@@ -2,17 +2,20 @@ package me.exeos.bytus.core.transformer;
 
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.core.transformer.extensions.ClassExtension;
-import me.exeos.bytus.core.transformer.extensions.JarExtension;
-import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import me.exeos.bytus.core.transformer.extensions.ClassExtension;
+import me.exeos.bytus.core.transformer.extensions.JarExtension;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**

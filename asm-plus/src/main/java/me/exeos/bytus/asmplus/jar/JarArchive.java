@@ -26,10 +26,15 @@ public class JarArchive {
     }
 
     public Optional<ClassNode> getClassNode(String className) {
+        return getClassNode(className, true);
+    }
+
+    public Optional<ClassNode> getClassNode(String className, boolean includeDependencies) {
         if (classes.containsKey(className)) {
             return Optional.of(classes.get(className));
         }
-        if (dependencies.containsKey(className)) {
+
+        if (includeDependencies && dependencies.containsKey(className)) {
             return Optional.of(dependencies.get(className));
         }
 

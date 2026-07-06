@@ -2,7 +2,6 @@ package me.exeos.bytus.asmplus.analysis.init;
 
 import me.exeos.bytus.asmplus.jar.JarArchive;
 import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.asmplus.utils.JarUtil;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
@@ -28,7 +27,7 @@ public class ClassInitAnalyzer {
     }
 
     private static void analyzeInitOrder(JarArchive jar, ClassNode startClass, MethodNode startMethod,
-                                  Map<String, Set<String>> initOrder, Set<String> visitedMethods) {
+                                         Map<String, Set<String>> initOrder, Set<String> visitedMethods) {
         String methodSignature = startClass.name + startMethod.name + startMethod.desc;
         if (!visitedMethods.add(methodSignature)) {
             return;
@@ -38,7 +37,7 @@ public class ClassInitAnalyzer {
             if (insn instanceof MethodInsnNode methodInsn) {
                 initOrder.computeIfAbsent(startClass.name, _ -> new HashSet<>()).add(methodInsn.owner);
 
-                JarUtil.findClass(jar, methodInsn.owner).ifPresent(targetClass -> {
+                jar.getClassNode(methodInsn.owner, false).ifPresent(targetClass -> {
                     ClassUtil.findMethod(targetClass, methodInsn.name, methodInsn.desc).ifPresent(targetMethod ->
                             analyzeInitOrder(jar, targetClass, targetMethod, initOrder, visitedMethods)
                     );
