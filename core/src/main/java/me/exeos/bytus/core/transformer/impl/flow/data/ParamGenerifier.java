@@ -75,6 +75,13 @@ public class ParamGenerifier extends AbstractTransformer {
                 classNode.methods.forEach(methodNode -> exclusions.add(MethodMatchEntry.of(classNode.name, methodNode)));
             } else {
                 excludeMethodsWithCollidingSignatures(classEdge, exclusions);
+
+                // exclude all methods declared outside of jar
+                for (MethodEdge method : classEdge.getMethods()) {
+                    if (context.jar().isDependency(method.getRoot().getOwnerName())) {
+                        exclusions.add(MethodMatchEntry.of(classNode.name, method.methodNode()));
+                    }
+                }
             }
         }
 

@@ -53,6 +53,12 @@ public class MethodDescriptor {
         return this;
     }
 
+    public MethodDescriptor insertParam(int index, DescriptorMember param) {
+        params.add(index, param);
+
+        return this;
+    }
+
     public MethodDescriptor addParam(DescriptorMember param) {
         params.add(param);
 

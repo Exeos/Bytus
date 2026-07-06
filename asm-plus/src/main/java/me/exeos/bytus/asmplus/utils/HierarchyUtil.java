@@ -38,9 +38,6 @@ public class HierarchyUtil {
 
     public static void hierarchyExpandMethodMatcher(MethodMatcher matcher, Map<String, ClassEdge> hierarchy) {
         for (MethodMatchEntry wrapper : matcher.get().toArray(new MethodMatchEntry[0])) {
-            if (wrapper.name().equals("build")) {
-                System.out.println();
-            }
             if (!hierarchy.containsKey(wrapper.owner())) {
                 continue;
             }
