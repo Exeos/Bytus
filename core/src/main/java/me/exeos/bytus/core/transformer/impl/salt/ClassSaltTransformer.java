@@ -13,13 +13,16 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.extensions.ClassExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ClassSaltTransformer extends AbstractTransformer {
 
@@ -48,7 +51,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
         Map<String, Integer> classSaltMap = new HashMap<>();
         Map<String, String> saltFieldNameMap = new HashMap<>();
 
-        mapSaltAndCreateField(context, context.getExtension().getHierarchy(), classSaltMap, saltFieldNameMap);
+        mapSaltAndCreateField(context, context.getExtension().getHierarchy(), initMap, classSaltMap, saltFieldNameMap);
         initClassSaltFields(jar, initMap, classSaltMap, saltFieldNameMap);
     }
 
@@ -72,7 +75,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
         return initMap;
     }
 
-    private void mapSaltAndCreateField(JarContext context, Map<ClassNode, ClassEdge> hierarchy, Map<String, Integer> classSaltMap, Map<String, String> saltFieldNameMap) {
+    private void mapSaltAndCreateField(JarContext context, Map<ClassNode, ClassEdge> hierarchy, Map<String, Set<String>> initMap, Map<String, Integer> classSaltMap, Map<String, String> saltFieldNameMap) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             int access = ACC_PUBLIC | ACC_STATIC;
             if (AsmUtil.hasAccess(classNode.access, ACC_INTERFACE)) {
@@ -97,6 +100,21 @@ public class ClassSaltTransformer extends AbstractTransformer {
             classSaltMap.put(classNode.name, salt);
             saltFieldNameMap.put(classNode.name, saltField.name);
             context.pipeline().getExtension(classNode).saltInfo().setSalt(salt, classNode.name, saltField.name, SALT_FIELD_DESC);
+        }
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            Set<String> predecessors = initMap.get(classNode.name);
+            if (predecessors == null || predecessors.isEmpty()) {
+                continue;
+            }
+
+            Set<ClassExtension.ClassSaltInfo> preInitSalts = predecessors.stream()
+                    .map(context.jar()::getClassNode)
+                    .flatMap(Optional::stream)
+                    .map(node -> context.pipeline().getExtension(node).saltInfo())
+                    .collect(Collectors.toSet());
+
+            context.pipeline().getExtension(classNode).saltInfo().setPreInitingSalts(preInitSalts);
         }
     }
 

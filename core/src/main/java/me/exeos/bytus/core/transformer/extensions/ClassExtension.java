@@ -1,5 +1,7 @@
 package me.exeos.bytus.core.transformer.extensions;
 
+import java.util.Set;
+
 public record ClassExtension(ClassSaltInfo saltInfo) {
 
     public ClassExtension() {
@@ -9,20 +11,14 @@ public record ClassExtension(ClassSaltInfo saltInfo) {
     public static class ClassSaltInfo {
         private int salt;
         private boolean hasSalt;
+        private Set<ClassSaltInfo> preInitingSalts;
         private String owner;
         private String name;
         private String desc;
 
         public ClassSaltInfo() {
             hasSalt = false;
-        }
-
-        public ClassSaltInfo(int salt, String owner, String name, String desc) {
-            this.salt = salt;
-            this.hasSalt = true;
-            this.owner = owner;
-            this.name = name;
-            this.desc = desc;
+            preInitingSalts = Set.of();
         }
 
         public int getSalt() {
@@ -43,6 +39,14 @@ public record ClassExtension(ClassSaltInfo saltInfo) {
 
         public boolean hasSalt() {
             return hasSalt;
+        }
+
+        public boolean hasPreInitializingSalts() {
+            return !preInitingSalts.isEmpty();
+        }
+
+        public Set<ClassSaltInfo> getPreInitingSalts() {
+            return preInitingSalts;
         }
 
         public String getOwner() {
@@ -67,6 +71,10 @@ public record ClassExtension(ClassSaltInfo saltInfo) {
             }
 
             return desc;
+        }
+
+        public void setPreInitingSalts(Set<ClassSaltInfo> preInitingSalts) {
+            this.preInitingSalts = preInitingSalts;
         }
 
         public void setSalt(int salt, String owner, String name, String desc) {

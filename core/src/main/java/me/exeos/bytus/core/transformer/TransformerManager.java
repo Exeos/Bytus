@@ -5,6 +5,7 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;
 import me.exeos.bytus.core.transformer.impl.Renamer;
+import me.exeos.bytus.core.transformer.impl.TestTransformer;
 import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
 import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.FloatingPointToIntTransformer;
@@ -38,6 +39,7 @@ public class TransformerManager {
     private static final Set<Function<BytusConfig, AbstractTransformer>> REGISTRY = new HashSet<>();
 
     static {
+        REGISTRY.add(TestTransformer::new);
         REGISTRY.add(MBATransformer::new);
         REGISTRY.add(FloatingPointToIntTransformer::new);
         REGISTRY.add(IntEncryptionTransformer::new);

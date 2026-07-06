@@ -18,8 +18,10 @@ import java.util.Set;
  */
 public class ClassInitAnalyzer {
 
-    // these methods analyze in what order classes get initialized
 
+    /**
+     * @return Key = Class that gets initialized AFTER Values
+     */
     public static Map<String, Set<String>> analyzeInitOrder(JarArchive jar, ClassNode startClass, MethodNode startMethod) {
         Map<String, Set<String>> initOrder = new HashMap<>();
         analyzeInitOrder(jar, startClass, startMethod, initOrder, new HashSet<>());

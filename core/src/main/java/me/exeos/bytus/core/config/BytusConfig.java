@@ -29,6 +29,7 @@ public class BytusConfig {
     public final EntryPointsConfigMember entryPoints;
     public final boolean rename;
     public final boolean salt;
+    // Key = Class that gets initialized AFTER Values
     public final Map<String, Set<String>> classInitOrder = new HashMap<>();
     public final ConstantsConfigMember constants;
     public final MbaConfigMember mba;
@@ -64,7 +65,7 @@ public class BytusConfig {
                 continue;
             }
 
-            classInitOrder.computeIfAbsent(initEntry[0], _ -> new HashSet<>()).add(initEntry[1]);
+            classInitOrder.computeIfAbsent(initEntry[1], _ -> new HashSet<>()).add(initEntry[0]);
         }
     }
 

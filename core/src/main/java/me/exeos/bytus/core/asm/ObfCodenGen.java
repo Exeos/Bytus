@@ -25,14 +25,20 @@ public class ObfCodenGen implements Opcodes {
             MethodExtension.ParamObfInfo paramObfInfo
     ) {
         boolean hasMethodSalt = methodSaltInfo.hasSalt();
-        boolean hasClassSalt = classSaltInfo.hasSalt() && !isClinit;
+        boolean hasClassSalt = classSaltInfo.hasSalt() && (!isClinit || classSaltInfo.hasPreInitializingSalts());
 
         if (!hasMethodSalt && !hasClassSalt) {
             return InsnUtil.getIntPushList(value);
         }
 
         SaltSource methodSalt = new SaltSource(methodSaltInfo.getSaltOrDefault(), getMethodSaltPush(methodSaltInfo, paramObfInfo));
-        SaltSource classSalt = new SaltSource(classSaltInfo.getSaltOrDefault(), getClassSaltPush(classSaltInfo));
+        SaltSource classSalt;
+        if (classSaltInfo.hasPreInitializingSalts() && isClinit) {
+            ClassExtension.ClassSaltInfo randomPre = RandomUtil.getRandomEntry(classSaltInfo.getPreInitingSalts());
+            classSalt = new SaltSource(randomPre.getSaltOrDefault(), getClassSaltPush(randomPre));
+        } else {
+            classSalt = new SaltSource(classSaltInfo.getSaltOrDefault(), getClassSaltPush(classSaltInfo));
+        }
 
         if (hasMethodSalt && hasClassSalt) {
             return InsnUtil.getIntPushSalted(value, methodSalt, classSalt);
