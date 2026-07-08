@@ -15,7 +15,7 @@ public class TestTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return false;
     }
 
     @Override
