@@ -37,7 +37,9 @@ public class ClassInitAnalyzer {
 
         for (AbstractInsnNode insn : startMethod.instructions) {
             if (insn instanceof MethodInsnNode methodInsn) {
-                initOrder.computeIfAbsent(startClass.name, _ -> new HashSet<>()).add(methodInsn.owner);
+                if (!startClass.name.equals(methodInsn.owner)) {
+                    initOrder.computeIfAbsent(startClass.name, _ -> new HashSet<>()).add(methodInsn.owner);
+                }
 
                 jar.getClassNode(methodInsn.owner, false).ifPresent(targetClass -> {
                     ClassUtil.findMethod(targetClass, methodInsn.name, methodInsn.desc).ifPresent(targetMethod ->

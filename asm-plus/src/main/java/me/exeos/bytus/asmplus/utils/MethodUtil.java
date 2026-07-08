@@ -25,9 +25,9 @@ public class MethodUtil implements Opcodes {
     public static InsnList endMethodByThrow() {
         InsnList insnList = new InsnList();
 
-        insnList.add(new TypeInsnNode(Opcodes.NEW, "java/lang/IllegalStateException"));
+        insnList.add(new TypeInsnNode(Opcodes.NEW, "java/lang/RuntimeException"));
         insnList.add(new InsnNode(Opcodes.DUP));
-        insnList.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/IllegalStateException", "<init>", "()V", false));
+        insnList.add(new MethodInsnNode(Opcodes.INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "()V", false));
         insnList.add(new InsnNode(Opcodes.ATHROW));
 
         return insnList;

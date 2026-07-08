@@ -35,7 +35,7 @@ public class ObfCodenGen implements Opcodes {
         SaltSource classSalt;
         if (classSaltInfo.hasPreInitializingSalts() && isClinit) {
             ClassExtension.ClassSaltInfo randomPre = RandomUtil.getRandomEntry(classSaltInfo.getPreInitingSalts());
-            classSalt = new SaltSource(randomPre.getSaltOrDefault(), getClassSaltPush(randomPre));
+            classSalt = new SaltSource(randomPre.getSalt(), getClassSaltPush(randomPre));
         } else {
             classSalt = new SaltSource(classSaltInfo.getSaltOrDefault(), getClassSaltPush(classSaltInfo));
         }
