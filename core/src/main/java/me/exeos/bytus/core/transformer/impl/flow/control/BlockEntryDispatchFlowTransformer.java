@@ -53,18 +53,18 @@ public class BlockEntryDispatchFlowTransformer extends AbstractTransformer {
         }
         MethodUtil.removeAllInsn(methodNode);
 
+        LabelNode entry = new LabelNode();
         InsnList handlerInsn = new InsnList();
         handlerInsn.add(context.getExtension().getObfuscatedIntPush(blockKeys.get(blocks.getFirst())));
         handlerInsn.add(new VarInsnNode(ISTORE, stateVarIndex));
+        handlerInsn.add(entry);
         for (BasicBlock block : blocks) {
             LabelNode blockExit = new LabelNode();
-            boolean isNotLast = blocks.indexOf(block) < blocks.size() - 1;
+            boolean isLast = blocks.indexOf(block) == blocks.size() - 1;
 
-            if (isNotLast) {
-                handlerInsn.add(new VarInsnNode(ILOAD, stateVarIndex));
-                handlerInsn.add(context.getExtension().getObfuscatedIntPush(blockKeys.get(block)));
-                handlerInsn.add(new JumpInsnNode(IF_ICMPNE, blockExit));
-            }
+            handlerInsn.add(new VarInsnNode(ILOAD, stateVarIndex));
+            handlerInsn.add(context.getExtension().getObfuscatedIntPush(blockKeys.get(block)));
+            handlerInsn.add(new JumpInsnNode(IF_ICMPNE, blockExit));
 
             switch (block) {
                 case JumpBlock jumpBlock -> {
@@ -120,8 +120,10 @@ public class BlockEntryDispatchFlowTransformer extends AbstractTransformer {
                 }
                 default -> throw new IllegalStateException("Invalid block: " + block.getClass().getName());
             }
-            if (isNotLast) {
-                handlerInsn.add(blockExit);
+            handlerInsn.add(blockExit);
+
+            if (isLast) {
+                handlerInsn.add(new JumpInsnNode(GOTO, entry));
             }
         }
 
