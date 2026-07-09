@@ -49,6 +49,7 @@ public class TransformerManager {
         REGISTRY.add(BlockSplitTransformer::new);
         REGISTRY.add(FlowFlatteningTransformer::new);
         REGISTRY.add(JumpFlatteningTransformer::new);
+        REGISTRY.add(BlockEntryDispatchFlowTransformer::new);
         REGISTRY.add(BlockRearranger::new);
         REGISTRY.add(GotoReplacerTransformer::new);
         REGISTRY.add(ParamGenerifier::new);

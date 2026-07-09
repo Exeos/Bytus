@@ -1,6 +1,6 @@
 package me.exeos.bytus.asmplus.analysis.flow;
 
-import me.exeos.bytus.asmplus.analysis.flow.block.*;
+import me.exeos.bytus.asmplus.analysis.flow.block.BasicBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.FallTroughBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.JumpBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.SwitchBlock;
@@ -9,10 +9,8 @@ import me.exeos.bytus.asmplus.utils.InsnUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-import java.lang.classfile.instruction.DiscontinuedInstruction;
 import java.util.*;
 
-// TODO handle RET 
 public class FlowAnalyzer {
 
     public static void printDOT(List<BasicBlock> blocks) {
@@ -39,6 +37,7 @@ public class FlowAnalyzer {
 
     /**
      * Map method instructions to List of BasicBlock.
+     *
      * @param methodNode The method to be analyzed
      * @return List of BasicBlock
      */
@@ -57,6 +56,7 @@ public class FlowAnalyzer {
 
     /**
      * Returns a set of all instructions where a new BasicBlock starts
+     *
      * @param methodNode The method to be analyzed
      * @return Returns a Set of all instructions where a new BasicBlock starts
      */
@@ -100,9 +100,10 @@ public class FlowAnalyzer {
 
     /**
      * Loops trough instructions and starts block if blockEntires matches current insn. Blocks don't get linked here
+     *
      * @param instructions List of instructions to construct from
      * @param blockEntries List of instructions marking beginning of a block
-     * @param blocks Output list of blocks from instructions
+     * @param blocks       Output list of blocks from instructions
      * @param insnBlockMap Maps Block-start-instruction -> BasicBlock
      */
     private static void constructBlocks(InsnList instructions, Set<AbstractInsnNode> blockEntries, List<BasicBlock> blocks, Map<AbstractInsnNode, BasicBlock> insnBlockMap) {
@@ -129,8 +130,9 @@ public class FlowAnalyzer {
 
     /**
      * Determines the type of block based on its dispatcher
+     *
      * @param nextBlockStart Instruction where the next block starts
-     * @param blockEntries Set of instructions marking block entries
+     * @param blockEntries   Set of instructions marking block entries
      * @return New instance of BasicBlock with correct child
      */
     private static BasicBlock getNextBlockType(AbstractInsnNode nextBlockStart, Set<AbstractInsnNode> blockEntries) {
@@ -148,6 +150,7 @@ public class FlowAnalyzer {
 
     /**
      * Creates the correct impl of BasicBlock based on its dispatcher
+     *
      * @param dispatcher The dispatcher of the Block
      * @return Correct subclass of BasicBlock for dispatcher
      */
@@ -174,9 +177,10 @@ public class FlowAnalyzer {
 
     /**
      * Links Blocks to one another
+     *
      * @param methodNode Method node being analyzed, required for exception flow linking
-     * @param blocks List of blocks to be linked
-     * @param blockMap Map, mapping instructions where blocks start to Block
+     * @param blocks     List of blocks to be linked
+     * @param blockMap   Map, mapping instructions where blocks start to Block
      */
     private static void linkBlocks(MethodNode methodNode, List<BasicBlock> blocks, Map<AbstractInsnNode, BasicBlock> blockMap) {
         for (BasicBlock block : blocks) {
@@ -191,7 +195,7 @@ public class FlowAnalyzer {
                         block.normalSuccessors.add(branchTarget);
 
                         jumpBlock.trueBranchBlock = branchTarget;
-                    }  else {
+                    } else {
                         throw new IllegalStateException("Block mapping incomplete, could not find Block for dispatcher target");
                     }
 
@@ -313,8 +317,9 @@ public class FlowAnalyzer {
 
     /**
      * Maps instructions that can result in exceptional control flow transfer to all their possible handlers
+     *
      * @param methodNode Method containing block to analyze
-     * @param block Block in method to analyze
+     * @param block      Block in method to analyze
      * @return Map, mapping instructions that can result in exceptional control flow transfer to all their possible handlers
      */
     private static Map<AbstractInsnNode, ArrayList<TryCatchBlockNode>> mapExceptionDispatchersToHandlers(MethodNode methodNode, BasicBlock block) {

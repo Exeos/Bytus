@@ -2,7 +2,9 @@ package me.exeos.bytus.core.utils;
 
 import me.exeos.bytus.core.asm.ObfCodenGen;
 
-import java.util.*;
+import java.util.Iterator;
+import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class RandomUtil {
@@ -37,6 +39,14 @@ public class RandomUtil {
         do {
             i = getInt();
         } while (ArrayUtil.contains(except, i));
+        return i;
+    }
+
+    public static int getIntExcept(Set<Integer> except) {
+        int i;
+        do {
+            i = getInt();
+        } while (except.contains(i));
         return i;
     }
 
