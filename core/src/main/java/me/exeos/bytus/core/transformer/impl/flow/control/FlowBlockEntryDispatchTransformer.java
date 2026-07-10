@@ -20,9 +20,9 @@ import org.objectweb.asm.tree.*;
 
 import java.util.*;
 
-public class BlockEntryDispatchFlowTransformer extends AbstractTransformer {
+public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
 
-    public BlockEntryDispatchFlowTransformer(BytusConfig config) {
+    public FlowBlockEntryDispatchTransformer(BytusConfig config) {
         super(config);
     }
 
