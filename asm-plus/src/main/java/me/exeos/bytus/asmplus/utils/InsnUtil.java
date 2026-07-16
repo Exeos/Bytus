@@ -5,9 +5,7 @@ import me.exeos.bytus.asmplus.obfuscation.salt.SaltSource;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
 
 public class InsnUtil implements Opcodes {
@@ -171,5 +169,27 @@ public class InsnUtil implements Opcodes {
         return indy.bsm.getOwner().equals("java/lang/invoke/LambdaMetafactory")
                 && indy.bsm.getName().equals("metafactory")
                 && indy.bsm.getDesc().equals("(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;");
+    }
+
+    public static Map<LabelNode, LabelNode> mapLabels(InsnList source) {
+        Map<LabelNode, LabelNode> labelMap = new HashMap<>();
+        for (AbstractInsnNode insnNode : source) {
+            if (insnNode instanceof LabelNode labelNode) {
+                labelMap.put(labelNode, new LabelNode());
+            }
+        }
+
+        return labelMap;
+    }
+
+    public static InsnList copy(InsnList source) {
+        InsnList copy = new InsnList();
+        Map<LabelNode, LabelNode> labelMap = mapLabels(source);
+
+        for (AbstractInsnNode insnNode : source) {
+            copy.add(insnNode.clone(labelMap));
+        }
+
+        return copy;
     }
 }

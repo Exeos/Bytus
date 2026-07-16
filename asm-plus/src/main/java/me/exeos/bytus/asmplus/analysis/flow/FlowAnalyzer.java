@@ -13,28 +13,6 @@ import java.util.*;
 
 public class FlowAnalyzer {
 
-    public static void printDOT(List<BasicBlock> blocks) {
-        int idx = 0;
-        Map<BasicBlock, Integer> blockIds = new HashMap<>();
-        for (BasicBlock block : blocks) blockIds.put(block, idx++);
-
-        System.out.println("digraph CFG {");
-        for (BasicBlock block : blocks) {
-            String type1 = block.instructions.getFirst().getClass().getSimpleName();
-            if (block.successors.isEmpty()) {
-                // Print node without any outgoing edges
-                System.out.println("  block" + blockIds.get(block) + type1 + ";");
-            } else {
-                for (BasicBlock succ : block.successors) {
-                    String type2 = succ.instructions.getFirst().getClass().getSimpleName();
-                    System.out.println("  block" + blockIds.get(block) + type1
-                            + " -> block" + blockIds.get(succ) + type2 + ";");
-                }
-            }
-        }
-        System.out.println("}");
-    }
-
     /**
      * Map method instructions to List of BasicBlock.
      *
@@ -42,17 +20,30 @@ public class FlowAnalyzer {
      * @return List of BasicBlock
      */
     public static List<BasicBlock> getBasicBlocks(MethodNode methodNode) {
-        Set<AbstractInsnNode> blockEntries = getBlockEntries(methodNode);
-
         List<BasicBlock> blocks = new ArrayList<>();
         Map<AbstractInsnNode, BasicBlock> insnBlockMap = new HashMap<>();
 
-        constructBlocks(methodNode.instructions, blockEntries, blocks, insnBlockMap);
+        constructBlocks(methodNode, blocks, insnBlockMap);
         linkBlocks(methodNode, blocks, insnBlockMap);
 
         return blocks;
     }
 
+    public static Map<LabelNode, LabelNode> detachBasicBlocks(List<BasicBlock> basicBlocks, MethodNode fromMethod) {
+        Map<LabelNode, LabelNode> labelMap = InsnUtil.mapLabels(fromMethod.instructions);
+
+        for (BasicBlock basicBlock : basicBlocks) {
+            InsnList detached = new InsnList();
+
+            for (AbstractInsnNode attachedInsn : basicBlock.instructions) {
+                detached.add(attachedInsn.clone(labelMap));
+            }
+
+            basicBlock.instructions = InsnUtil.fromInsnList(detached);
+        }
+
+        return labelMap;
+    }
 
     /**
      * Returns a set of all instructions where a new BasicBlock starts
@@ -101,14 +92,16 @@ public class FlowAnalyzer {
     /**
      * Loops trough instructions and starts block if blockEntires matches current insn. Blocks don't get linked here
      *
-     * @param instructions List of instructions to construct from
-     * @param blockEntries List of instructions marking beginning of a block
+     * @param methodNode   MethodNode to contruct from
      * @param blocks       Output list of blocks from instructions
      * @param insnBlockMap Maps Block-start-instruction -> BasicBlock
      */
-    private static void constructBlocks(InsnList instructions, Set<AbstractInsnNode> blockEntries, List<BasicBlock> blocks, Map<AbstractInsnNode, BasicBlock> insnBlockMap) {
+    private static void constructBlocks(MethodNode methodNode, List<BasicBlock> blocks, Map<AbstractInsnNode, BasicBlock> insnBlockMap) {
+        Set<AbstractInsnNode> blockEntries = getBlockEntries(methodNode);
+//        Map<LabelNode, LabelNode> labelMap = InsnUtil.mapLabels(methodNode.instructions);
+
         BasicBlock currentBlock = null;
-        for (AbstractInsnNode insnNode : instructions) {
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
             if (blockEntries.contains(insnNode)) {
                 if (currentBlock != null && currentBlock.instructions.size() > 0) {
                     blocks.add(currentBlock);
@@ -119,6 +112,7 @@ public class FlowAnalyzer {
             }
 
             assert currentBlock != null;
+//            currentBlock.instructions.add(insnNode.clone(labelMap));
             currentBlock.instructions.add(insnNode);
         }
 

@@ -203,4 +203,12 @@ public class MethodUtil implements Opcodes {
             methodNode.instructions.remove(insnNode);
         }
     }
+
+    public static void remapTryCatchBlock(MethodNode methodNode, Map<LabelNode, LabelNode> labelMap) {
+        for (TryCatchBlockNode tryCatchBlock : methodNode.tryCatchBlocks) {
+            tryCatchBlock.start = labelMap.get(tryCatchBlock.start);
+            tryCatchBlock.end = labelMap.get(tryCatchBlock.end);
+            tryCatchBlock.handler = labelMap.get(tryCatchBlock.handler);
+        }
+    }
 }

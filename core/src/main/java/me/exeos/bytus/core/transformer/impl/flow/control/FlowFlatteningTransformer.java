@@ -53,7 +53,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable();
+        return config.flow.controlFlow().enable() || true;
     }
 
     @Override
@@ -74,6 +74,8 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         if (blocks.isEmpty()) {
             return;
         }
+        Map<LabelNode, LabelNode> labelMap = FlowAnalyzer.detachBasicBlocks(blocks, methodNode);
+        MethodUtil.remapTryCatchBlock(methodNode, labelMap);
 
         // shuffle blocks, keep first at same pos
         BasicBlock first = blocks.getFirst();
@@ -83,9 +85,6 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
 
         // locals mapping needs to be removed as it will be invalid
         methodNode.localVariables = null;
-
-        // Remove all original instructions. We rebuild method from scratch.
-        MethodUtil.removeAllInsn(methodNode);
 
         Map<BasicBlock, int[]> blockPathMap = genBlockKeys(blocks);
         int stateVarIndex = methodNode.maxLocals++;
