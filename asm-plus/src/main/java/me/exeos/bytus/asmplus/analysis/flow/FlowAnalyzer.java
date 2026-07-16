@@ -20,23 +20,61 @@ public class FlowAnalyzer {
      * @return List of BasicBlock
      */
     public static List<BasicBlock> getBasicBlocks(MethodNode methodNode) {
+        return getBasicBlocks(methodNode, false);
+    }
+
+    /**
+     * Map method instructions to List of BasicBlock.
+     *
+     * @param methodNode The method to be analyzed
+     * @return List of BasicBlock
+     */
+    public static List<BasicBlock> getBasicBlocks(MethodNode methodNode, boolean detachBlocks) {
         List<BasicBlock> blocks = new ArrayList<>();
         Map<AbstractInsnNode, BasicBlock> insnBlockMap = new HashMap<>();
 
         constructBlocks(methodNode, blocks, insnBlockMap);
         linkBlocks(methodNode, blocks, insnBlockMap);
 
+        if (detachBlocks) {
+            detachBasicBlocks(blocks, methodNode.instructions);
+        }
+
         return blocks;
     }
 
-    public static Map<LabelNode, LabelNode> detachBasicBlocks(List<BasicBlock> basicBlocks, MethodNode fromMethod) {
-        Map<LabelNode, LabelNode> labelMap = InsnUtil.mapLabels(fromMethod.instructions);
+    /**
+     * Detaches all instruction references in BasicBlock from owning InsnList
+     *
+     * @param basicBlocks BasicBlocks to detach
+     * @param from        InsnList to detach from
+     * @return Label map used from cloning, computed from provided InsnList.
+     */
+    public static Map<LabelNode, LabelNode> detachBasicBlocks(List<BasicBlock> basicBlocks, InsnList from) {
+        Map<LabelNode, LabelNode> labelMap = InsnUtil.mapLabels(from);
 
         for (BasicBlock basicBlock : basicBlocks) {
             InsnList detached = new InsnList();
+            Map<AbstractInsnNode, AbstractInsnNode> insnMap = new HashMap<>();
 
             for (AbstractInsnNode attachedInsn : basicBlock.instructions) {
-                detached.add(attachedInsn.clone(labelMap));
+                AbstractInsnNode detachedInsn = attachedInsn.clone(labelMap);
+                detached.add(detachedInsn);
+                insnMap.put(attachedInsn, detachedInsn);
+            }
+
+            switch (basicBlock) {
+                case JumpBlock jumpBlock -> {
+                    jumpBlock.dispatcher = (JumpInsnNode) insnMap.get(jumpBlock.dispatcher);
+                }
+                case SwitchBlock switchBlock -> {
+                    switchBlock.dispatcher = insnMap.get(switchBlock.dispatcher);
+                }
+                case TerminalBlock terminalBlock -> {
+                    terminalBlock.dispatcher = insnMap.get(terminalBlock.dispatcher);
+                }
+                default -> {
+                }
             }
 
             basicBlock.instructions = InsnUtil.fromInsnList(detached);

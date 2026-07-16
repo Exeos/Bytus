@@ -9,7 +9,7 @@ import java.util.Map;
 
 public class SwitchBlock extends BasicBlock {
 
-    public final AbstractInsnNode dispatcher;
+    public AbstractInsnNode dispatcher;
     public final Map<Integer, BasicBlock> keyCaseMap = new HashMap<>();
     public final Map<LabelNode, BasicBlock> labelCaseMap = new HashMap<>();
     public BasicBlock defaultBlock;

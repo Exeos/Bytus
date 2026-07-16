@@ -70,12 +70,10 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
             return;
         }
 
-        List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode);
+        List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
         if (blocks.isEmpty()) {
             return;
         }
-        Map<LabelNode, LabelNode> labelMap = FlowAnalyzer.detachBasicBlocks(blocks, methodNode);
-        MethodUtil.remapTryCatchBlock(methodNode, labelMap);
 
         // shuffle blocks, keep first at same pos
         BasicBlock first = blocks.getFirst();

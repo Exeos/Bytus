@@ -7,7 +7,7 @@ import java.util.Optional;
 
 public class JumpBlock extends BasicBlock {
 
-    public final JumpInsnNode dispatcher;
+    public JumpInsnNode dispatcher;
     public BasicBlock trueBranchBlock;
     public Optional<BasicBlock> falseBranchBlock = Optional.empty();
 

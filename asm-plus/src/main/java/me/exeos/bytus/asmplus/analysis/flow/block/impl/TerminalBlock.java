@@ -5,7 +5,7 @@ import org.objectweb.asm.tree.AbstractInsnNode;
 
 public class TerminalBlock extends BasicBlock {
 
-    public final AbstractInsnNode dispatcher;
+    public AbstractInsnNode dispatcher;
 
     public TerminalBlock(AbstractInsnNode dispatcher) {
         this.dispatcher = dispatcher;

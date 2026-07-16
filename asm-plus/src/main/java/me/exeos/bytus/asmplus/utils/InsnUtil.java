@@ -139,6 +139,13 @@ public class InsnUtil implements Opcodes {
         return list;
     }
 
+    public static InsnList fromInsnList(List<AbstractInsnNode> from) {
+        InsnList list = new InsnList();
+        addToInsnList(from, list);
+
+        return list;
+    }
+
     /**
      * Safely loop trough instructions, you can insert, delete, etc without breaking iteration
      *

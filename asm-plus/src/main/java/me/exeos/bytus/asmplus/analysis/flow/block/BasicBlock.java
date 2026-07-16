@@ -1,12 +1,19 @@
 package me.exeos.bytus.asmplus.analysis.flow.block;
 
+import me.exeos.bytus.asmplus.utils.InsnUtil;
 import org.objectweb.asm.tree.AbstractInsnNode;
+import org.objectweb.asm.tree.InsnList;
 
 import java.util.*;
 
 public class BasicBlock {
 
     public List<AbstractInsnNode> instructions = new ArrayList<>();
+
+    /**
+     * Cached InsnList, is populated when insnList() is called
+     */
+    private InsnList cachedInsnList = null;
 
     /**
      * All possible immediate following blocks after this Block
@@ -28,4 +35,18 @@ public class BasicBlock {
      */
     public Map<AbstractInsnNode, HashSet<BasicBlock>> exceptionDispatchMap = new HashMap<>();
 
+    public InsnList insnList() {
+        return insnList(true);
+    }
+
+    public InsnList insnList(boolean useCache) {
+        if (useCache && cachedInsnList != null) {
+            return cachedInsnList;
+        }
+
+        InsnList list = InsnUtil.fromInsnList(instructions);
+        cachedInsnList = list;
+
+        return list;
+    }
 }
