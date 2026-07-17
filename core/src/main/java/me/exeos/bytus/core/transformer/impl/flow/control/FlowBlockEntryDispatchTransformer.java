@@ -26,7 +26,7 @@ public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable();
+        return config.flow.controlFlow().enable() || true;
     }
 
     @Override
@@ -118,11 +118,8 @@ public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
                 default -> throw new IllegalStateException("Invalid block: " + block.getClass().getName());
             }
             handlerInsn.add(blockExit);
-
-            if (isLast) {
-                handlerInsn.add(new JumpInsnNode(GOTO, entry));
-            }
         }
+        handlerInsn.add(new JumpInsnNode(GOTO, entry));
 
         methodNode.instructions = handlerInsn;
     }
