@@ -12,9 +12,7 @@ import me.exeos.bytus.core.transformer.impl.constants.number.FloatingPointToIntT
 import me.exeos.bytus.core.transformer.impl.constants.number.IntEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.FlowBlockEntryDispatchTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlatteningTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlatteningTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.*;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
@@ -51,9 +49,9 @@ public class TransformerManager {
 //        REGISTRY.add(BlockSplitTransformer::new); // unstable
         REGISTRY.add(FlowFlatteningTransformer::new);
         REGISTRY.add(JumpFlatteningTransformer::new);
-        REGISTRY.add(FlowBlockEntryDispatchTransformer::new); // unstable
-//        REGISTRY.add(BlockRearranger::new);
-//        REGISTRY.add(GotoReplacerTransformer::new);
+//        REGISTRY.add(FlowBlockEntryDispatchTransformer::new); // unstable
+        REGISTRY.add(BlockRearranger::new);
+        REGISTRY.add(GotoReplacerTransformer::new);
         REGISTRY.add(ParamGenerifier::new);
         REGISTRY.add(ReferenceEncryptionTransformer::new);
         REGISTRY.add(ReferenceProxyTransformer::new);

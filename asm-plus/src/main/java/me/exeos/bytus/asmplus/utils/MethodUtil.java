@@ -99,6 +99,23 @@ public class MethodUtil implements Opcodes {
         return MethodUtil.hasAccess(methodNode, ACC_STATIC) ? 0 : 1;
     }
 
+    public static int getFirstFreeSlot(MethodNode methodNode) {
+        int max = DescriptorParser.parseMethodDesc(methodNode.desc).getParamsSize() + getLocalsOffset(methodNode);
+
+        for (AbstractInsnNode insnNode : methodNode.instructions) {
+            if (insnNode instanceof VarInsnNode varInsn) {
+                int size = InsnUtil.isWide(varInsn.getOpcode()) ? 2 : 1;
+                max = Math.max(max, varInsn.var + size);
+            }
+
+            if (insnNode instanceof IincInsnNode) {
+                max = Math.max(max, ((IincInsnNode) insnNode).var + 1);
+            }
+        }
+
+        return max;
+    }
+
     /**
      * Finds all methods targeted by invokedynamic insn in the provided methods instructions
      *

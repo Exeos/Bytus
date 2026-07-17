@@ -26,6 +26,14 @@ public class MethodDescriptor {
         return descBuilder.toString();
     }
 
+    public int getParamsSize() {
+        int size = 0;
+        for (DescriptorMember param : params) {
+            size += param.getSlotWidth();
+        }
+        return size;
+    }
+
     public int getRelativeSlot(DescriptorMember of) {
         return getAbsoluteSlot(of, 0);
     }

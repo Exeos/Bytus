@@ -199,4 +199,11 @@ public class InsnUtil implements Opcodes {
 
         return copy;
     }
+
+    public static boolean isWide(int opcode) {
+        return switch (opcode) {
+            case Opcodes.LLOAD, Opcodes.LSTORE, Opcodes.DLOAD, Opcodes.DSTORE -> true;
+            default -> false;
+        };
+    }
 }
