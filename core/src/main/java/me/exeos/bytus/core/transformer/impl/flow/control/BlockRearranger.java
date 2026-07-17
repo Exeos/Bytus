@@ -6,14 +6,15 @@ import me.exeos.bytus.asmplus.analysis.flow.block.impl.FallTroughBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.JumpBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.SwitchBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.TerminalBlock;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,17 +42,15 @@ public class BlockRearranger extends AbstractTransformer {
         MethodNode methodNode = context.methodNode();
         MethodExtension extension = context.getExtension();
 
-        if (!methodNode.tryCatchBlocks.isEmpty()) {
+        if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
             return;
         }
 
-        List<BasicBlock> basicBlocks = FlowAnalyzer.getBasicBlocks(methodNode);
+        List<BasicBlock> basicBlocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
         Map<BasicBlock, LabelNode> labelByBlock = labelMap(basicBlocks);
         if (basicBlocks.isEmpty()) {
             return;
         }
-
-        MethodUtil.removeAllInsn(methodNode);
 
         BasicBlock first = basicBlocks.getFirst();
         Collections.shuffle(basicBlocks);
@@ -60,18 +59,20 @@ public class BlockRearranger extends AbstractTransformer {
 
         InsnList rearranged = new InsnList();
         for (BasicBlock basicBlock : basicBlocks) {
-            InsnUtil.addToInsnList(basicBlock.instructions, rearranged);
+            rearranged.add(basicBlock.insnList());
             switch (basicBlock) {
                 case JumpBlock jumpBlock -> {
                     jumpBlock.falseBranchBlock.ifPresent(falseBlock -> {
                         rearranged.add(new JumpInsnNode(GOTO, labelByBlock.get(falseBlock)));
                     });
                 }
-                case SwitchBlock switchBlock -> {}
+                case SwitchBlock switchBlock -> {
+                }
                 case FallTroughBlock fallTroughBlock -> {
                     rearranged.add(new JumpInsnNode(GOTO, labelByBlock.get(fallTroughBlock.fallTroughBlock)));
                 }
-                case TerminalBlock terminalBlock -> {}
+                case TerminalBlock terminalBlock -> {
+                }
                 default -> {
                     throw new IllegalStateException("Invalid block type: " + basicBlock.getClass().getName());
                 }

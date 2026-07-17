@@ -8,8 +8,6 @@ import me.exeos.bytus.asmplus.analysis.flow.block.impl.SwitchBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.TerminalBlock;
 import me.exeos.bytus.asmplus.codegen.xswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -28,7 +26,7 @@ public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable() && false;
+        return config.flow.controlFlow().enable();
     }
 
     @Override
@@ -44,14 +42,13 @@ public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
         }
 
         int stateVarIndex = methodNode.maxLocals++;
-        List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode);
+        List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
 
         Map<BasicBlock, Integer> blockKeys = new HashMap<>();
         Set<Integer> usedKeys = new HashSet<>();
         for (BasicBlock block : blocks) {
             blockKeys.put(block, RandomUtil.getIntExcept(usedKeys));
         }
-        MethodUtil.removeAllInsn(methodNode);
 
         LabelNode entry = new LabelNode();
         InsnList handlerInsn = new InsnList();
@@ -68,7 +65,7 @@ public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
 
             switch (block) {
                 case JumpBlock jumpBlock -> {
-                    InsnUtil.addToInsnList(jumpBlock.instructions, handlerInsn);
+                    handlerInsn.add(jumpBlock.insnList());
                     handlerInsn.remove(jumpBlock.dispatcher);
 
                     jumpBlock.falseBranchBlock.ifPresent(falseBlock -> {
@@ -106,17 +103,17 @@ public class FlowBlockEntryDispatchTransformer extends AbstractTransformer {
                     InsnList defaultCaseInsn = new InsnList();
                     defaultCaseInsn.add(updateStateVar(switchBlock.defaultBlock, stateVarIndex, blockExit, blockKeys, context.getExtension()));
 
-                    InsnUtil.addToInsnList(switchBlock.instructions, handlerInsn);
+                    handlerInsn.add(switchBlock.insnList());
                     handlerInsn.remove(switchBlock.dispatcher);
                     handlerInsn.add(LookupSwitchGenerator.gen(newSwitch, new SwitchCase(0, defaultCaseInsn), false));
                 }
                 case FallTroughBlock fallTroughBlock -> {
-                    InsnUtil.addToInsnList(fallTroughBlock.instructions, handlerInsn);
+                    handlerInsn.add(fallTroughBlock.insnList());
                     handlerInsn.add(context.getExtension().getObfuscatedIntPush(blockKeys.get(fallTroughBlock.fallTroughBlock)));
                     handlerInsn.add(new VarInsnNode(ISTORE, stateVarIndex));
                 }
                 case TerminalBlock terminalBlock -> {
-                    InsnUtil.addToInsnList(terminalBlock.instructions, handlerInsn);
+                    handlerInsn.add(terminalBlock.insnList());
                 }
                 default -> throw new IllegalStateException("Invalid block: " + block.getClass().getName());
             }

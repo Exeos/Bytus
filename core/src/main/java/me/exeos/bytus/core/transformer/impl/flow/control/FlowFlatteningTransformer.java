@@ -8,7 +8,6 @@ import me.exeos.bytus.asmplus.analysis.flow.block.impl.SwitchBlock;
 import me.exeos.bytus.asmplus.analysis.flow.block.impl.TerminalBlock;
 import me.exeos.bytus.asmplus.codegen.xswitch.LookupSwitchGenerator;
 import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -53,7 +52,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable() || true;
+        return config.flow.controlFlow().enable();
     }
 
     @Override
@@ -122,7 +121,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
                 // updates
                 case JumpBlock jumpBlock -> {
                     // Copy original block instructions, excluding the block's own dispatcher.
-                    InsnUtil.addToInsnList(jumpBlock.instructions, handlerInsns);
+                    handlerInsns.add(jumpBlock.insnList());
                     handlerInsns.remove(jumpBlock.dispatcher);
 
                     if (jumpBlock.falseBranchBlock.isPresent()) {
@@ -169,19 +168,19 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
                     SwitchCase defaultCase = new SwitchCase(0, defaultCaseInsn);
 
                     // original instructions up to the switch
-                    InsnUtil.addToInsnList(switchBlock.instructions, handlerInsns);
+                    handlerInsns.add(switchBlock.insnList());
                     // remove original switch
                     handlerInsns.remove(switchBlock.dispatcher);
                     // replace original switch
                     handlerInsns.add(LookupSwitchGenerator.gen(innerHandlers, defaultCase, false));
                 }
                 case FallTroughBlock fallTroughBlock -> {
-                    InsnUtil.addToInsnList(block.instructions, handlerInsns);
+                    handlerInsns.add(block.insnList());
                     handlerInsns.add(updateStateMachine(blockPathMap.get(fallTroughBlock.fallTroughBlock)[0], stateVarIndex, dispatcherEntry, methodExtension));
                 }
                 case TerminalBlock _ -> {
                     // Ends method. Just copy insn.
-                    InsnUtil.addToInsnList(block.instructions, handlerInsns);
+                    handlerInsns.add(block.insnList());
                 }
                 default -> throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
             }

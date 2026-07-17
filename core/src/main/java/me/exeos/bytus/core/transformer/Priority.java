@@ -17,9 +17,9 @@ public class Priority {
     public static final int NUM_ENC = 5;
     public static final int FLOW_BLOCK_SPLIT = 6;
     public static final int FLOW_CTRL_FLATTENING = 7;
-    public static final int FLOW_BLOCK_REARRANGE = 8;
-    public static final int FLOW_JUMP_FLATTENING = 9;
-    public static final int FLOW_ENTRY_DISPATCH = 10;
+    public static final int FLOW_ENTRY_DISPATCH = 8;
+    public static final int FLOW_BLOCK_REARRANGE = 9;
+    public static final int FLOW_JUMP_FLATTENING = 10;
     public static final int CONST_ARRAY = 11;
     public static final int FLOW_PARAM_GENERIFY = 12;
     public static final int STR_ENCRYPT_STRINGS = 13;

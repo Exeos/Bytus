@@ -35,10 +35,21 @@ public class BasicBlock {
      */
     public Map<AbstractInsnNode, HashSet<BasicBlock>> exceptionDispatchMap = new HashMap<>();
 
+    /**
+     * Should only be used when instructions are detached see FlowAnalyzer.detachBasicBlocks
+     *
+     * @return Converted InsnList
+     */
     public InsnList insnList() {
         return insnList(true);
     }
 
+    /**
+     * Should only be used when instructions are detached see FlowAnalyzer.detachBasicBlocks
+     *
+     * @param useCache Should it used cached InsnList, (cached when this method is called)
+     * @return Converted InsnList
+     */
     public InsnList insnList(boolean useCache) {
         if (useCache && cachedInsnList != null) {
             return cachedInsnList;

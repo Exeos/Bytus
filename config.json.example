@@ -1,12 +1,12 @@
 {
   "io": {
-    "inputPath": "./in.jar",
-    "outputPath": "./out.jar",
-    "dependenciesPath": "./libs"
+    "inputPath": "./wd/in.jar",
+    "outputPath": "./wd/out.jar",
+    "dependenciesPath": "./wd/libs"
   },
   "exclusions": [],
   "entryPoints": {
-    "fromManifest": true,
+    "fromManifest": false,
     "custom": {}
   },
   "rename": false,
@@ -31,13 +31,14 @@
   "mba": {
     "enable": false,
     "minPasses": 1,
-    "maxPasses": 3
+    "maxPasses": 1
   },
   "flow": {
     "controlFlow": {
-      "enable": true,
+      "enable": false,
+      "replaceGotos": false,
       "minDispatcherChainLength": 1,
-      "maxDispatcherChainLength": 3
+      "maxDispatcherChainLength": 1
     },
     "dataFlow": false
   },

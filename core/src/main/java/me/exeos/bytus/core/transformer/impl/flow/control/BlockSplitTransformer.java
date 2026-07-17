@@ -2,16 +2,13 @@ package me.exeos.bytus.core.transformer.impl.flow.control;
 
 import me.exeos.bytus.asmplus.analysis.flow.FlowAnalyzer;
 import me.exeos.bytus.asmplus.analysis.flow.block.BasicBlock;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
-import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,8 +21,7 @@ public class BlockSplitTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        // way to unstable
-        return config.flow.controlFlow().enable() && false;
+        return config.flow.controlFlow().enable();
     }
 
     @Override
@@ -41,10 +37,7 @@ public class BlockSplitTransformer extends AbstractTransformer {
         }
 
         InsnList newInsn = new InsnList();
-        List<BasicBlock> basicBlocks = FlowAnalyzer.getBasicBlocks(methodNode);
-        for (AbstractInsnNode insn : methodNode.instructions.toArray()) {
-            methodNode.instructions.remove(insn);
-        }
+        List<BasicBlock> basicBlocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
 
         int splitAmount = 2;
 
