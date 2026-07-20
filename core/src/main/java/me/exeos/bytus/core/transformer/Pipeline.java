@@ -1,7 +1,7 @@
 package me.exeos.bytus.core.transformer;
 
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;

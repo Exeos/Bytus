@@ -1,7 +1,7 @@
 package me.exeos.bytus.core;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.jar.JarLoader;
+import me.exeos.asmplus.jar.JarArchive;
+import me.exeos.asmplus.jar.JarLoader;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.exceptions.BytusInitException;
 import me.exeos.bytus.core.exceptions.BytusPosTransformException;

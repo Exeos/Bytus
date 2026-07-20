@@ -1,8 +1,9 @@
 package me.exeos.bytus.core.asm;
 
-import me.exeos.bytus.asmplus.InsnFactory;
-import me.exeos.bytus.asmplus.obfuscation.salt.SaltSource;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.InsnProvider;
+import me.exeos.asmplus.codegen.value.ValueSource;
+import me.exeos.asmplus.codegen.value.impl.ConstantPusher;
+import me.exeos.asmplus.codegen.value.impl.IntObfuscation;
 import me.exeos.bytus.core.transformer.extensions.ClassExtension;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
@@ -28,37 +29,37 @@ public class ObfCodenGen implements Opcodes {
         boolean hasClassSalt = classSaltInfo.hasSalt() && (!isClinit || classSaltInfo.hasPreInitializingSalts());
 
         if (!hasMethodSalt && !hasClassSalt) {
-            return InsnUtil.getIntPushList(value);
+            return ConstantPusher.getIntPushList(value);
         }
 
-        SaltSource methodSalt = new SaltSource(methodSaltInfo.getSaltOrDefault(), getMethodSaltPush(methodSaltInfo, paramObfInfo));
-        SaltSource classSalt;
+        ValueSource<Integer> methodSalt = new ValueSource<>(methodSaltInfo.getSaltOrDefault(), getMethodSaltPush(methodSaltInfo, paramObfInfo));
+        ValueSource<Integer> classSalt;
         if (classSaltInfo.hasPreInitializingSalts() && isClinit) {
             ClassExtension.ClassSaltInfo randomPre = RandomUtil.getRandomEntry(classSaltInfo.getPreInitingSalts());
-            classSalt = new SaltSource(randomPre.getSalt(), getClassSaltPush(randomPre));
+            classSalt = new ValueSource<>(randomPre.getSalt(), getClassSaltPush(randomPre));
         } else {
-            classSalt = new SaltSource(classSaltInfo.getSaltOrDefault(), getClassSaltPush(classSaltInfo));
+            classSalt = new ValueSource<>(classSaltInfo.getSaltOrDefault(), getClassSaltPush(classSaltInfo));
         }
 
         if (hasMethodSalt && hasClassSalt) {
-            return InsnUtil.getIntPushSalted(value, methodSalt, classSalt);
+            return IntObfuscation.getIntPush(value, methodSalt, classSalt);
         }
 
         if (hasMethodSalt) {
-            return InsnUtil.getIntPushSalted(value, methodSalt);
+            return IntObfuscation.getIntPush(value, methodSalt);
         }
 
-        return InsnUtil.getIntPushSalted(value, classSalt);
+        return IntObfuscation.getIntPush(value, classSalt);
     }
 
-    private static InsnFactory getMethodSaltPush(MethodExtension.MethodSaltInfo methodSaltInfo, MethodExtension.ParamObfInfo paramObfInfo) {
+    private static InsnProvider getMethodSaltPush(MethodExtension.MethodSaltInfo methodSaltInfo, MethodExtension.ParamObfInfo paramObfInfo) {
         return () -> {
             InsnList push = new InsnList();
 
             int saltSlot = paramObfInfo.getArrayIndexBySlotOrSlot(methodSaltInfo.getSaltSlotOrDefault());
             if (paramObfInfo.hasParamObf()) {
                 push.add(new VarInsnNode(ALOAD, paramObfInfo.getObjArrSlotOrDefault()));
-                push.add(InsnUtil.getIntPush(saltSlot));
+                push.add(ConstantPusher.getIntPush(saltSlot));
                 push.add(new InsnNode(AALOAD));
                 push.add(new TypeInsnNode(CHECKCAST, "java/lang/Integer"));
                 push.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I"));
@@ -70,7 +71,7 @@ public class ObfCodenGen implements Opcodes {
         };
     }
 
-    private static InsnFactory getClassSaltPush(ClassExtension.ClassSaltInfo classSaltInfo) {
+    private static InsnProvider getClassSaltPush(ClassExtension.ClassSaltInfo classSaltInfo) {
         return () -> {
             InsnList classSaltPush = new InsnList();
             classSaltPush.add(new FieldInsnNode(GETSTATIC, classSaltInfo.getOwner(), classSaltInfo.getName(), classSaltInfo.getDesc()));

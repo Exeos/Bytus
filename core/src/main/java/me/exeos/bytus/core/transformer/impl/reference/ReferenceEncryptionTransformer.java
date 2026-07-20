@@ -1,9 +1,12 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
-import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
-import me.exeos.bytus.asmplus.codegen.xswitch.TableSwitchGenerator;
-import me.exeos.bytus.asmplus.utils.*;
+import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.asmplus.codegen.xswitch.SwitchCase;
+import me.exeos.asmplus.codegen.xswitch.impl.TableSwitchGenerator;
+import me.exeos.asmplus.utils.AsmUtil;
+import me.exeos.asmplus.utils.ClassUtil;
+import me.exeos.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -11,7 +14,6 @@ import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
-import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;

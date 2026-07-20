@@ -1,8 +1,8 @@
 package me.exeos.bytus.core.transformer.extensions;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.HierarchyAnalyzer;
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
-import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.asmplus.analysis.hierarchy.HierarchyAnalyzer;
+import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.asmplus.jar.JarArchive;
 import org.objectweb.asm.tree.ClassNode;
 
 import java.util.HashMap;

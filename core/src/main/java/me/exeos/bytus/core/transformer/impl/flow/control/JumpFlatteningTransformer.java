@@ -1,9 +1,9 @@
 package me.exeos.bytus.core.transformer.impl.flow.control;
 
-import me.exeos.bytus.asmplus.codegen.xswitch.LookupSwitchGenerator;
-import me.exeos.bytus.asmplus.codegen.xswitch.SwitchCase;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
+import me.exeos.asmplus.codegen.xswitch.SwitchCase;
+import me.exeos.asmplus.codegen.xswitch.impl.LookupSwitchGenerator;
+import me.exeos.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.exceptions.BytusTransformException;
 import me.exeos.bytus.core.transformer.AbstractTransformer;

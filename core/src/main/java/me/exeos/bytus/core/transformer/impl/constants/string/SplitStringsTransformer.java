@@ -1,6 +1,6 @@
 package me.exeos.bytus.core.transformer.impl.constants.string;
 
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;

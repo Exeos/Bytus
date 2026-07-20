@@ -6,6 +6,7 @@ group = "me.exeos.bytus"
 version = "1.0-SNAPSHOT"
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 

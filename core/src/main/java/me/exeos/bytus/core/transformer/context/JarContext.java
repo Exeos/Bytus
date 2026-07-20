@@ -1,6 +1,6 @@
 package me.exeos.bytus.core.transformer.context;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.transformer.Pipeline;
 import me.exeos.bytus.core.transformer.extensions.JarExtension;
 

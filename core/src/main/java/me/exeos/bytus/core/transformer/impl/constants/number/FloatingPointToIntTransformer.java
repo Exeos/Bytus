@@ -1,6 +1,7 @@
 package me.exeos.bytus.core.transformer.impl.constants.number;
 
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.codegen.value.impl.ConstantPusher;
+import me.exeos.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -37,7 +38,7 @@ public class FloatingPointToIntTransformer extends AbstractTransformer {
             if (ldcInsnNode.cst instanceof Double cstDouble) {
                 long value = Double.doubleToLongBits(cstDouble);
 
-                replacement.add(InsnUtil.getLongPush(value));
+                replacement.add(ConstantPusher.getLongPush(value));
                 replacement.add(new MethodInsnNode(INVOKESTATIC, "java/lang/Double", "longBitsToDouble", "(J)D"));
             }
 

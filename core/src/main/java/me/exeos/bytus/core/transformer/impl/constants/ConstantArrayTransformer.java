@@ -1,10 +1,11 @@
 package me.exeos.bytus.core.transformer.impl.constants;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
-import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.asmplus.codegen.value.impl.ConstantPusher;
+import me.exeos.asmplus.jar.JarArchive;
+import me.exeos.asmplus.utils.ClassUtil;
+import me.exeos.asmplus.utils.HierarchyUtil;
+import me.exeos.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -28,7 +29,7 @@ import java.util.*;
 public final class ConstantArrayTransformer extends AbstractTransformer {
 
     private final static String CONST_FIELD_DESC = "[Ljava/lang/Object;";
-    
+
     public ConstantArrayTransformer(BytusConfig config) {
         super(config);
     }
@@ -50,7 +51,7 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
         if (constants.isEmpty() || owner == null) return;
 
         Map<Object, Integer> constantIndexMap = this.assignIndices(constants);
-        
+
         String constantFieldName = HierarchyUtil.genNoneCollidingFieldName(owner, CONST_FIELD_DESC, RandomUtil::getString);
 
         replaceConstants(context.classNode(), constantIndexMap, constantFieldName);
@@ -82,7 +83,7 @@ public final class ConstantArrayTransformer extends AbstractTransformer {
                 int index = constants.get(cst);
                 InsnList replacement = new InsnList();
                 replacement.add(new FieldInsnNode(GETSTATIC, classNode.name, constantFieldName, CONST_FIELD_DESC));
-                replacement.add(InsnUtil.getIntPush(index));
+                replacement.add(ConstantPusher.getIntPush(index));
                 replacement.add(new InsnNode(AALOAD));
 
                 switch (cst) {

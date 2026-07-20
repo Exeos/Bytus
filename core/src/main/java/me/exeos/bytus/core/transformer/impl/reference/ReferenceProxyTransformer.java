@@ -1,9 +1,9 @@
 package me.exeos.bytus.core.transformer.impl.reference;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
-import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.asmplus.jar.JarArchive;
+import me.exeos.asmplus.utils.HierarchyUtil;
+import me.exeos.asmplus.utils.InsnUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;

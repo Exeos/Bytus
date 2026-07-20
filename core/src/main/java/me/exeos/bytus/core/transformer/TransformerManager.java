@@ -1,6 +1,6 @@
 package me.exeos.bytus.core.transformer;
 
-import me.exeos.bytus.asmplus.jar.JarArchive;
+import me.exeos.asmplus.jar.JarArchive;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.impl.PreProcessor;

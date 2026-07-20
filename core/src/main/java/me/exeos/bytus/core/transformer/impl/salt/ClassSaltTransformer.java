@@ -1,13 +1,13 @@
 package me.exeos.bytus.core.transformer.impl.salt;
 
-import me.exeos.bytus.asmplus.analysis.hierarchy.edge.ClassEdge;
-import me.exeos.bytus.asmplus.analysis.init.ClassInitAnalyzer;
-import me.exeos.bytus.asmplus.jar.JarArchive;
-import me.exeos.bytus.asmplus.matcher.method.MethodMatchEntry;
-import me.exeos.bytus.asmplus.utils.AsmUtil;
-import me.exeos.bytus.asmplus.utils.ClassUtil;
-import me.exeos.bytus.asmplus.utils.HierarchyUtil;
-import me.exeos.bytus.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
+import me.exeos.asmplus.analysis.init.ClassInitAnalyzer;
+import me.exeos.asmplus.codegen.value.impl.ConstantPusher;
+import me.exeos.asmplus.jar.JarArchive;
+import me.exeos.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.asmplus.utils.AsmUtil;
+import me.exeos.asmplus.utils.ClassUtil;
+import me.exeos.asmplus.utils.HierarchyUtil;
 import me.exeos.bytus.core.asm.ObfCodenGen;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -139,11 +139,11 @@ public class ClassSaltTransformer extends AbstractTransformer {
                 saltStoreInsn.add(new FieldInsnNode(Opcodes.GETSTATIC, initPick, saltFieldNameMap.get(initPick), SALT_FIELD_DESC));
                 // use diff to create salt for current class
                 if (diff != 0) {
-                    saltStoreInsn.add(InsnUtil.getIntPush(Math.abs(diff)));
+                    saltStoreInsn.add(ConstantPusher.getIntPush(Math.abs(diff)));
                     saltStoreInsn.add(new InsnNode(diff < 0 ? Opcodes.IADD : Opcodes.ISUB));
                 }
             } else {
-                saltStoreInsn.add(InsnUtil.getIntPush(currentSalt));
+                saltStoreInsn.add(ConstantPusher.getIntPush(currentSalt));
             }
             saltStoreInsn.add(new FieldInsnNode(Opcodes.PUTSTATIC, classNode.name, saltFieldNameMap.get(classNode.name), SALT_FIELD_DESC));
 

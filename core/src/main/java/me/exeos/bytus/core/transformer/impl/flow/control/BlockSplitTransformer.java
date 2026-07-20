@@ -1,7 +1,7 @@
 package me.exeos.bytus.core.transformer.impl.flow.control;
 
-import me.exeos.bytus.asmplus.analysis.flow.FlowAnalyzer;
-import me.exeos.bytus.asmplus.analysis.flow.block.BasicBlock;
+import me.exeos.asmplus.analysis.flow.FlowAnalyzer;
+import me.exeos.asmplus.analysis.flow.block.BasicBlock;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;

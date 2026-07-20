@@ -1,7 +1,7 @@
 package me.exeos.bytus.core.transformer.impl.arithmetic;
 
-import me.exeos.bytus.asmplus.utils.InsnUtil;
-import me.exeos.bytus.asmplus.utils.MethodUtil;
+import me.exeos.asmplus.utils.InsnUtil;
+import me.exeos.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
@@ -43,7 +43,8 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(IAND));
                         expression.add(new InsnNode(IADD));
                     }
-                    case LADD -> {}
+                    case LADD -> {
+                    }
                     case ISUB -> {
                         expression.add(context.getExtension().getObfuscatedIntPush(-1));
                         expression.add(new InsnNode(IXOR));
@@ -59,9 +60,12 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(context.getExtension().getObfuscatedIntPush(1));
                         expression.add(new InsnNode(IADD));
                     }
-                    case LSUB -> {}
-                    case IAND -> {}
-                    case LAND -> {}
+                    case LSUB -> {
+                    }
+                    case IAND -> {
+                    }
+                    case LAND -> {
+                    }
                     case IOR -> {
                         // a + b - (a & b)
                         expression.add(new InsnNode(DUP2));
@@ -71,9 +75,12 @@ public class MBATransformer extends AbstractTransformer {
                         expression.add(new InsnNode(IAND));
                         expression.add(new InsnNode(ISUB));
                     }
-                    case LOR -> {}
-                    case IXOR -> {}
-                    case LXOR -> {}
+                    case LOR -> {
+                    }
+                    case IXOR -> {
+                    }
+                    case LXOR -> {
+                    }
                 }
 
                 if (expression.size() > 0) {
