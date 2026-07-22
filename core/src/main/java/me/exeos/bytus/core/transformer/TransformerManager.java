@@ -7,15 +7,15 @@ import me.exeos.bytus.core.transformer.impl.PreProcessor;
 import me.exeos.bytus.core.transformer.impl.Renamer;
 import me.exeos.bytus.core.transformer.impl.TestTransformer;
 import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
-import me.exeos.bytus.core.transformer.impl.constants.ConstantArrayTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.FloatingPointToIntTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.IntEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.constants.string.SplitStringsTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.*;
+import me.exeos.bytus.core.transformer.impl.flow.control.BlockRearranger;
+import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlatteningTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.GotoReplacerTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlatteningTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.reference.ReferenceProxyTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.ClassSaltTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 
@@ -43,9 +43,7 @@ public class TransformerManager {
         REGISTRY.add(MBATransformer::new);
         REGISTRY.add(FloatingPointToIntTransformer::new);
         REGISTRY.add(IntEncryptionTransformer::new);
-        REGISTRY.add(SplitStringsTransformer::new);
         REGISTRY.add(StringEncryptionTransformer::new);
-        REGISTRY.add(ConstantArrayTransformer::new);
 //        REGISTRY.add(BlockSplitTransformer::new); // unstable
         REGISTRY.add(FlowFlatteningTransformer::new);
         REGISTRY.add(JumpFlatteningTransformer::new);
@@ -54,7 +52,6 @@ public class TransformerManager {
         REGISTRY.add(GotoReplacerTransformer::new);
         REGISTRY.add(ParamGenerifier::new);
         REGISTRY.add(ReferenceEncryptionTransformer::new);
-        REGISTRY.add(ReferenceProxyTransformer::new);
         REGISTRY.add(ClassSaltTransformer::new);
         REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);

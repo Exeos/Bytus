@@ -51,6 +51,10 @@ public abstract class AbstractTransformer implements Opcodes {
      * @param context class context
      */
     public void transform(ClassContext context) {
+        if (context.pipeline().isExcluded(getClass(), context.classNode())) {
+            return;
+        }
+
         for (MethodNode methodNode : context.classNode().methods) {
             transform(new MethodContext(context, methodNode));
         }
@@ -62,6 +66,10 @@ public abstract class AbstractTransformer implements Opcodes {
      * @param context method context
      */
     public void transform(MethodContext context) {
+        if (context.pipeline().isExcluded(getClass(), context.methodNode())) {
+            return;
+        }
+
         transform(new InsnListContext(context, context.methodNode().instructions));
     }
 

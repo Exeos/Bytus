@@ -32,6 +32,9 @@ public class Pipeline {
     private final Map<FieldNode, FieldExtension> fieldExtensions = new HashMap<>();
     private final Map<MethodNode, MethodExtension> methodExtensions = new HashMap<>();
 
+    private final Map<Class<? extends AbstractTransformer>, Set<ClassNode>> transformerExcludedClasses = new HashMap<>();
+    private final Map<Class<? extends AbstractTransformer>, Set<MethodNode>> transformerExcludedMethods = new HashMap<>();
+
     /**
      * Creates a pipeline
      *
@@ -71,6 +74,11 @@ public class Pipeline {
     public void emit(ClassContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
         context.jarCtx().jar().getClasses().put(context.classNode().name, context.classNode());
         context.jarCtx().getExtension().invalidateHierarchy();
+
+        for (Class<? extends AbstractTransformer> exclusion : exclusions) {
+            transformerExcludedClasses.computeIfAbsent(exclusion, _ -> new HashSet<>()).add(context.classNode());
+        }
+
         transform(context, exclusions);
     }
 
@@ -83,6 +91,11 @@ public class Pipeline {
     public void emit(MethodContext context, Set<Class<? extends AbstractTransformer>> exclusions) {
         context.ownerCtx().classNode().methods.add(context.methodNode());
         context.jarCtx().getExtension().invalidateHierarchy();
+
+        for (Class<? extends AbstractTransformer> exclusion : exclusions) {
+            transformerExcludedMethods.computeIfAbsent(exclusion, _ -> new HashSet<>()).add(context.methodNode());
+        }
+
         transform(context, exclusions);
     }
 
@@ -158,5 +171,13 @@ public class Pipeline {
 
     public JarExtension getExtension(JarArchive jar) {
         return jarExtensions.computeIfAbsent(jar, JarExtension::new);
+    }
+
+    public boolean isExcluded(Class<? extends AbstractTransformer> transformer, ClassNode classNode) {
+        return transformerExcludedClasses.containsKey(transformer) && transformerExcludedClasses.get(transformer).contains(classNode);
+    }
+
+    public boolean isExcluded(Class<? extends AbstractTransformer> transformer, MethodNode methodNode) {
+        return transformerExcludedMethods.containsKey(transformer) && transformerExcludedMethods.get(transformer).contains(methodNode);
     }
 }

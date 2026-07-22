@@ -23,8 +23,6 @@
   ],
   "constants": {
     "enable": false,
-    "constantArray": false,
-    "splitStrings": false,
     "strings": false,
     "numbers": false
   },
@@ -42,15 +40,8 @@
     },
     "dataFlow": false
   },
-  "references": {
-    "encryption": {
-      "enable": false,
-      "firstClassOnly": false
-    },
-    "proxy": {
-      "enable": false,
-      "minDepth": 1,
-      "maxDepth": 3
-    }
+  "referenceEncryption": {
+    "enable": false,
+    "firstClassOnly": false
   }
 }
