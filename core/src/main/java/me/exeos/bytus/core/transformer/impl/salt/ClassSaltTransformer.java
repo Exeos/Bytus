@@ -87,7 +87,8 @@ public class ClassSaltTransformer extends AbstractTransformer {
                     HierarchyUtil.genNoneCollidingFieldName(
                             hierarchy.get(classNode),
                             SALT_FIELD_DESC,
-                            RandomUtil::getString
+                            RandomUtil::getString,
+                            false
                     ),
                     SALT_FIELD_DESC,
                     null,

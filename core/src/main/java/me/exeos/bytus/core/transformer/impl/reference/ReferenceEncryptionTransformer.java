@@ -3,6 +3,7 @@ package me.exeos.bytus.core.transformer.impl.reference;
 import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.asmplus.codegen.xswitch.SwitchCase;
 import me.exeos.asmplus.codegen.xswitch.impl.TableSwitchGenerator;
+import me.exeos.asmplus.jar.JarArchive;
 import me.exeos.asmplus.utils.AsmUtil;
 import me.exeos.asmplus.utils.ClassUtil;
 import me.exeos.asmplus.utils.InsnUtil;
@@ -45,14 +46,14 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        bsmOwner = ClassUtil.getNoneCollidingClassName(context.jar(), RandomUtil::getString);
-        bsmName = RandomUtil.getString(1);
+        ensureNamesSet(context.jar());
         getBootstrap(context);
         super.transform(context);
     }
 
     @Override
     public void transform(MethodContext context) {
+        ensureNamesSet(context.jarCtx().jar());
         if (context.ownerCtx().classNode().name.equals(bsmOwner) && context.methodNode().name.equals(bsmName) && context.methodNode().desc.equals(BSM_DESC)) {
             return;
         }
@@ -118,6 +119,16 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                 context.methodNode().instructions.remove(insnNode);
             }
         });
+    }
+
+    private void ensureNamesSet(JarArchive jar) {
+        if (bsmOwner == null) {
+            bsmOwner = ClassUtil.getNoneCollidingClassName(jar, RandomUtil::getString);
+        }
+
+        if (bsmName == null) {
+            bsmName = RandomUtil.getString(1);
+        }
     }
 
     private String fixMethodDesc(MethodInsnNode methodInsnNode) {
