@@ -14,11 +14,14 @@ import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
+import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlatteningTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,7 +31,10 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
     private final static int CLASS_VERSION = V1_8;
     private static String bsmOwner = null;
     private static String bsmName = null;
+    private static String cryptName = null;
+    private static final String cryptFieldKeyName = RandomUtil.getString(1);
     private static final String BSM_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
+    private final Map<ClassNode, Integer> keyMap = new HashMap<>();
 
     public ReferenceEncryptionTransformer(BytusConfig config) {
         super(config);
@@ -54,36 +60,43 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         ensureNamesSet(context.jarCtx().jar());
-        if (context.ownerCtx().classNode().name.equals(bsmOwner) && context.methodNode().name.equals(bsmName) && context.methodNode().desc.equals(BSM_DESC)) {
+        if (context.ownerCtx().classNode().name.equals(bsmOwner)) {
             return;
         }
 
+        int key = keyMap.computeIfAbsent(context.ownerCtx().classNode(), _ -> RandomUtil.getInt());
         Map<String, ClassEdge> hierarchy = context.jarCtx().getExtension().getHierarchyNameMapped();
         InsnUtil.loop(context.methodNode().instructions, insnNode -> {
             InsnList indyCall = new InsnList();
+
             switch (insnNode) {
                 case MethodInsnNode methodInsnNode -> {
                     if (methodInsnNode.name.equals("<init>")
                             || methodInsnNode.owner.startsWith("[")
                             || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(methodInsnNode.owner))
+                            || (methodInsnNode.owner.equals(bsmOwner))
                     ) {
                         return;
                     }
 
+                    indyCall.add(context.getExtension().getObfuscatedIntPush(key));
+                    indyCall.add(new FieldInsnNode(PUTSTATIC, bsmOwner, cryptFieldKeyName, "I"));
                     indyCall.add(new InvokeDynamicInsnNode(
                             RandomUtil.getString(1),
                             fixMethodDesc(methodInsnNode),
                             new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, false),
-                            methodInsnNode.owner.replace("/", "."),
-                            methodInsnNode.name,
-                            methodInsnNode.desc,
-                            context.ownerCtx().classNode().name.replace("/", "."),
-                            getType(insnNode)
+                            StringEncryptionTransformer.crypt(methodInsnNode.owner.replace("/", "."), key),
+                            StringEncryptionTransformer.crypt(methodInsnNode.name, key),
+                            StringEncryptionTransformer.crypt(methodInsnNode.desc, key),
+                            StringEncryptionTransformer.crypt(context.ownerCtx().classNode().name.replace("/", "."), key),
+                            getType(insnNode) ^ key
                     ));
                 }
                 case FieldInsnNode fieldInsnNode -> {
                     if (!hierarchy.containsKey(fieldInsnNode.owner)
-                            || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(fieldInsnNode.owner))) {
+                            || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(fieldInsnNode.owner))
+                            || (fieldInsnNode.owner.equals(bsmOwner))
+                    ) {
                         return;
                     }
 
@@ -98,15 +111,17 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                                     return;
                                 }
 
+                                indyCall.add(context.getExtension().getObfuscatedIntPush(key));
+                                indyCall.add(new FieldInsnNode(PUTSTATIC, bsmOwner, cryptFieldKeyName, "I"));
                                 indyCall.add(new InvokeDynamicInsnNode(
                                         RandomUtil.getString(1),
                                         fixFieldDescriptor(fieldInsnNode),
                                         new Handle(H_INVOKESTATIC, bsmOwner, bsmName, BSM_DESC, false),
-                                        declaringEdge.classNode.name.replace("/", "."),
-                                        fieldInsnNode.name,
-                                        fieldInsnNode.desc,
-                                        context.ownerCtx().classNode().name.replace("/", "."),
-                                        getType(insnNode)
+                                        StringEncryptionTransformer.crypt(declaringEdge.classNode.name.replace("/", "."), key),
+                                        StringEncryptionTransformer.crypt(fieldInsnNode.name, key),
+                                        StringEncryptionTransformer.crypt(fieldInsnNode.desc, key),
+                                        StringEncryptionTransformer.crypt(context.ownerCtx().classNode().name.replace("/", "."), key),
+                                        getType(insnNode) ^ key
                                 ));
                             });
                 }
@@ -128,6 +143,15 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
         if (bsmName == null) {
             bsmName = RandomUtil.getString(1);
+        }
+
+        if (cryptName == null) {
+            String name;
+            do {
+                name = RandomUtil.getString(1);
+            } while (name.equals(bsmName));
+
+            cryptName = name;
         }
     }
 
@@ -212,6 +236,17 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         bsm.tryCatchBlocks.add(new TryCatchBlockNode(start, end, handler, "java/lang/Exception"));
 
         bsm.instructions.add(start);
+
+        bsm.instructions.add(decryptStringSlot(ownerSlot));
+        bsm.instructions.add(decryptStringSlot(nameSlot));
+        bsm.instructions.add(decryptStringSlot(descSlot));
+        bsm.instructions.add(decryptStringSlot(callerSlot));
+
+        bsm.instructions.add(new VarInsnNode(ILOAD, typeSlot));
+        bsm.instructions.add(new FieldInsnNode(GETSTATIC, bsmOwner, cryptFieldKeyName, "I"));
+        bsm.instructions.add(new InsnNode(IXOR));
+        bsm.instructions.add(new VarInsnNode(ISTORE, typeSlot));
+
         // store lookup.lookupClass().getClassLoader() in classLoaderSlot
         bsm.instructions.add(new VarInsnNode(ALOAD, lookupSlot));
         bsm.instructions.add(new MethodInsnNode(INVOKEVIRTUAL, "java/lang/invoke/MethodHandles$Lookup", "lookupClass", "()Ljava/lang/Class;"));
@@ -275,8 +310,11 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         bsm.instructions.add(new MethodInsnNode(INVOKESPECIAL, "java/lang/RuntimeException", "<init>", "(Ljava/lang/String;)V"));
         bsm.instructions.add(new InsnNode(ATHROW));
 
+        container.fields.add(new FieldNode(ACC_PUBLIC | ACC_STATIC, cryptFieldKeyName, "I", null, null));
         container.methods.add(bsm);
-        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class, MethodSaltTransformer.class));
+        container.methods.add(StringEncryptionTransformer.cryptMethod(cryptName));
+
+        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class, MethodSaltTransformer.class, FlowFlatteningTransformer.class));
     }
 
     private SwitchCase staticMethodHandler(int lookupSlot, int nameSlot, int ownerClassSlot, int methodTypeSlot, int targetMHandleSlot, LabelNode switchEnd) {
@@ -394,6 +432,17 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         caseInsn.add(new VarInsnNode(ASTORE, targetMHandleSlot));
 
         return new SwitchCase(0, caseInsn);
+    }
+
+    private InsnList decryptStringSlot(int slot) {
+        InsnList insns = new InsnList();
+
+        insns.add(new VarInsnNode(ALOAD, slot));
+        insns.add(new FieldInsnNode(GETSTATIC, bsmOwner, cryptFieldKeyName, "I"));
+        insns.add(new MethodInsnNode(INVOKESTATIC, bsmOwner, cryptName, StringEncryptionTransformer.DEC_METHOD_DESC));
+        insns.add(new VarInsnNode(ASTORE, slot));
+
+        return insns;
     }
 
     private SwitchCase defaultHandler() {
