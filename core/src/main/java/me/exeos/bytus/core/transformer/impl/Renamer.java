@@ -18,8 +18,7 @@ import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class Renamer extends AbstractTransformer {
@@ -49,13 +48,27 @@ public class Renamer extends AbstractTransformer {
     }
 
     private void renameClasses(JarContext context) {
-        new ClassRemapper(
-                ClassMapper.map(
-                        context.jar(),
-                        RandomUtil::getString,
-                        classNode -> isEntrypoint(context.jar(), classNode.name)
-                )
-        ).remap(context.jar());
+        var mapping = ClassMapper.map(
+                context.jar(),
+                RandomUtil::getString,
+                classNode -> isEntrypoint(context.jar(), classNode.name)
+        );
+
+        new ClassRemapper(mapping).remap(context.jar());
+
+        // remap class init order provided by user
+        Map<String, Set<String>> remappedInitOrder = new HashMap<>();
+        for (Map.Entry<String, Set<String>> entry : config.classInitOrder.entrySet()) {
+            String key = mapping.getOrDefault(entry.getKey(), entry.getKey());
+            for (String value : entry.getValue()) {
+                remappedInitOrder.computeIfAbsent(
+                        key, _ -> new HashSet<>()
+                ).add(mapping.getOrDefault(value, value));
+            }
+        }
+
+        config.classInitOrder.clear();
+        config.classInitOrder.putAll(remappedInitOrder);
     }
 
     private void renameFields(JarContext context) {

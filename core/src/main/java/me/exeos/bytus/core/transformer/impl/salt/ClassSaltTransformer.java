@@ -100,6 +100,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
             classSaltMap.put(classNode.name, salt);
             saltFieldNameMap.put(classNode.name, saltField.name);
             context.pipeline().getExtension(classNode).saltInfo().setSalt(salt, classNode.name, saltField.name, SALT_FIELD_DESC);
+            context.pipeline().getExtension(classNode, saltField).isSaltField = true;
         }
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
