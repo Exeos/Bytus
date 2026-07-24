@@ -52,7 +52,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable();
+        return config.flow.controlFlow().enable() || true;
     }
 
     @Override
@@ -65,7 +65,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         MethodNode methodNode = context.methodNode();
         MethodExtension methodExtension = context.getExtension();
 
-        if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
+        if (!methodNode.tryCatchBlocks.isEmpty()) {
             return;
         }
 

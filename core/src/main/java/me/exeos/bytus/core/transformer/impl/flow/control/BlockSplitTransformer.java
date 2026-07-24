@@ -6,12 +6,12 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.MethodContext;
-import me.exeos.bytus.core.utils.RandomUtil;
-import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.InsnList;
+import org.objectweb.asm.tree.JumpInsnNode;
+import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.MethodNode;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class BlockSplitTransformer extends AbstractTransformer {
 
@@ -21,7 +21,7 @@ public class BlockSplitTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable();
+        return config.flow.controlFlow().enable() || true;
     }
 
     @Override
@@ -32,52 +32,27 @@ public class BlockSplitTransformer extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
-        if (!methodNode.tryCatchBlocks.isEmpty() || methodNode.instructions.size() > 4000) {
+        if (!methodNode.tryCatchBlocks.isEmpty()) {
             return;
         }
 
-        InsnList newInsn = new InsnList();
-        List<BasicBlock> basicBlocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
-
-        int splitAmount = 2;
-
-        for (BasicBlock block : basicBlocks) {
-            int size = block.instructions.size();
-            AtomicInteger threshold = new AtomicInteger(getThreshold(size, splitAmount));
-            AtomicInteger count = new AtomicInteger(0);
-            AtomicReference<LabelNode> label = new AtomicReference<>();
-            int i = 0;
-            for (AbstractInsnNode abstractInsnNode : block.instructions) {
-                if (i == size - 1) {
-                    newInsn.add(abstractInsnNode);
-                    break;
-                }
-
-                if (count.get() == 0) {
-                    label.set(new LabelNode());
-                    newInsn.add(label.get());
-                }
-
-                newInsn.add(abstractInsnNode);
-
-                if (count.incrementAndGet() > threshold.get()) {
-                    threshold.set(getThreshold(size, splitAmount));
-                    newInsn.add(context.getExtension().getObfuscatedIntPush(1));
-                    newInsn.add(new JumpInsnNode(IFEQ, label.get()));
-                    count.set(0);
-                }
-                i++;
-            }
+        List<BasicBlock> basicBlocks = FlowAnalyzer.getBasicBlocks(methodNode);
+        if (basicBlocks.isEmpty() || basicBlocks.size() > 10) {
+            return;
         }
 
-        methodNode.instructions = newInsn;
-    }
+        for (BasicBlock basicBlock : basicBlocks) {
+            if (basicBlock.instructions.size() < 3) {
+                continue;
+            }
 
-    private int getThreshold(int size, int splitAmount) {
-        int splitAt = size / splitAmount;
-        return RandomUtil.getInt(
-                Math.max(0, splitAt - 2),
-                Math.min(size, splitAt + 2)
-        );
+            InsnList fakeJump = new InsnList();
+            LabelNode fakeJumpTarget = new LabelNode();
+
+            fakeJump.add(new JumpInsnNode(GOTO, fakeJumpTarget));
+            fakeJump.add(fakeJumpTarget);
+
+            methodNode.instructions.insert(basicBlock.instructions.get(basicBlock.instructions.size() / 2), fakeJump);
+        }
     }
 }
