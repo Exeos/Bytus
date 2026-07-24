@@ -45,14 +45,17 @@ public class FlowFlattening2 extends AbstractTransformer {
         if (blocks.isEmpty()) {
             return;
         }
+
+        BasicBlock first = blocks.getFirst();
+        Collections.shuffle(blocks);
+
         Map<BasicBlock, int[]> keyByBlock = generateKeyMap(blocks);
         int stateVarSlot = MethodUtil.getFirstFreeSlot(methodNode);
+        methodNode.maxLocals = stateVarSlot + 1;
 
         InsnList flattened = new InsnList();
-
-        flattened.add(ConstantPusher.getIntPush(keyByBlock.get(blocks.getFirst())[0]));
+        flattened.add(ConstantPusher.getIntPush(keyByBlock.get(first)[0]));
         flattened.add(new VarInsnNode(ISTORE, stateVarSlot));
-
         flattened.add(generateDispatcher(blocks, keyByBlock, stateVarSlot));
 
         methodNode.instructions = flattened;
@@ -70,14 +73,17 @@ public class FlowFlattening2 extends AbstractTransformer {
 
         InsnList dispatcher = new InsnList();
         LabelNode dispatcherEntry = new LabelNode();
-        LabelNode defaultCase = new LabelNode();
+        LabelNode defaultCaseLabel = new LabelNode();
 
         dispatcher.add(dispatcherEntry);
         dispatcher.add(new VarInsnNode(ILOAD, stateVarSlot));
-        dispatcher.add(new LookupSwitchInsnNode(defaultCase, switchKeys, labelByBlock.values().toArray(new LabelNode[0])));
+        dispatcher.add(new LookupSwitchInsnNode(defaultCaseLabel, switchKeys, labelByBlock.values().toArray(new LabelNode[0])));
+
+        List<InsnList> cases = new ArrayList<>();
 
         for (BasicBlock block : blocks) {
-            dispatcher.add(labelByBlock.get(block));
+            InsnList caseInsn = new InsnList();
+            caseInsn.add(labelByBlock.get(block));
             switch (block) {
                 case JumpBlock jumpBlock -> {
                     InsnList updatedJump = jumpBlock.insnList();
@@ -90,9 +96,11 @@ public class FlowFlattening2 extends AbstractTransformer {
                         updatedJump.add(new JumpInsnNode(GOTO, dispatcherEntry));
                     });
 
-                    dispatcher.add(updatedJump);
+                    caseInsn.add(updatedJump);
                 }
                 case SwitchBlock switchBlock -> {
+                    caseInsn.add(switchBlock.insnList());
+
                     List<LabelNode> labels = null;
                     if (switchBlock.dispatcher instanceof LookupSwitchInsnNode ls) {
                         labels = new ArrayList<>(ls.labels.size());
@@ -104,29 +112,42 @@ public class FlowFlattening2 extends AbstractTransformer {
                         LabelNode newLabel = new LabelNode();
                         Objects.requireNonNull(labels).add(newLabel);
 
-                        dispatcher.add(newLabel);
-                        dispatcher.add(updateStateVar(caseBlock, dispatcherEntry, keyByBlock, stateVarSlot));
+                        caseInsn.add(newLabel);
+                        caseInsn.add(updateStateVar(caseBlock, dispatcherEntry, keyByBlock, stateVarSlot));
                     }
+
+                    LabelNode newDefault = new LabelNode();
+                    caseInsn.add(newDefault);
+                    caseInsn.add(updateStateVar(switchBlock.defaultBlock, defaultCaseLabel, keyByBlock, stateVarSlot));
 
                     if (switchBlock.dispatcher instanceof LookupSwitchInsnNode ls) {
                         ls.labels = labels;
+                        ls.dflt = newDefault;
                     } else if (switchBlock.dispatcher instanceof TableSwitchInsnNode ts) {
                         ts.labels = labels;
+                        ts.dflt = newDefault;
                     }
                 }
                 case FallTroughBlock fallTroughBlock -> {
-                    dispatcher.add(fallTroughBlock.insnList());
-                    dispatcher.add(updateStateVar(fallTroughBlock.fallTroughBlock, dispatcherEntry, keyByBlock, stateVarSlot));
+                    caseInsn.add(fallTroughBlock.insnList());
+                    caseInsn.add(updateStateVar(fallTroughBlock.fallTroughBlock, dispatcherEntry, keyByBlock, stateVarSlot));
                 }
-                case TerminalBlock terminalBlock -> {
-                    dispatcher.add(terminalBlock.insnList());
-                }
+                case TerminalBlock terminalBlock -> caseInsn.add(terminalBlock.insnList());
                 default -> throw new IllegalStateException("Invalid block: " + block.getClass().getSimpleName());
             }
+
+            cases.add(caseInsn);
         }
 
-        dispatcher.add(defaultCase);
-        dispatcher.add(MethodUtil.endMethodByThrow());
+        InsnList defaultCase = new InsnList();
+        defaultCase.add(defaultCaseLabel);
+        defaultCase.add(MethodUtil.endMethodByThrow());
+        cases.add(defaultCase);
+
+        Collections.shuffle(cases);
+        for (InsnList insnList : cases) {
+            dispatcher.add(insnList);
+        }
 
         return dispatcher;
     }
