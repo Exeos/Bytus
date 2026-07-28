@@ -7,15 +7,14 @@ import me.exeos.bytus.core.transformer.context.InsnListContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.ClassExtension;
+import me.exeos.bytus.core.transformer.extensions.FieldExtension;
 import me.exeos.bytus.core.transformer.extensions.JarExtension;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import org.objectweb.asm.tree.ClassNode;
+import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 
 /**
@@ -30,6 +29,7 @@ public class Pipeline {
     private final List<AbstractTransformer> transformers;
     private final Map<JarArchive, JarExtension> jarExtensions = new HashMap<>();
     private final Map<ClassNode, ClassExtension> classExtensions = new HashMap<>();
+    private final Map<FieldNode, FieldExtension> fieldExtensions = new HashMap<>();
     private final Map<MethodNode, MethodExtension> methodExtensions = new HashMap<>();
 
     /**
@@ -132,14 +132,24 @@ public class Pipeline {
         return classExtensions.get(classNode);
     }
 
+    public Optional<FieldExtension> getExtension(FieldNode fieldNode) {
+        if (fieldExtensions.containsKey(fieldNode)) {
+            return Optional.of(fieldExtensions.get(fieldNode));
+        }
+
+        return Optional.empty();
+    }
+
+    public FieldExtension getExtension(ClassNode owner, FieldNode fieldNode) {
+        return fieldExtensions.computeIfAbsent(fieldNode, _ -> new FieldExtension(owner, fieldNode));
+    }
+
     public MethodExtension getExtension(MethodContext context) {
         return getExtension(context.ownerCtx().classNode(), context.methodNode());
     }
 
     public MethodExtension getExtension(ClassNode owner, MethodNode methodNode) {
-        methodExtensions.putIfAbsent(methodNode, new MethodExtension(this, owner, methodNode));
-
-        return methodExtensions.get(methodNode);
+        return methodExtensions.computeIfAbsent(methodNode, _ -> new MethodExtension(this, owner, methodNode));
     }
 
     public JarExtension getExtension(JarContext context) {
@@ -147,8 +157,6 @@ public class Pipeline {
     }
 
     public JarExtension getExtension(JarArchive jar) {
-        jarExtensions.putIfAbsent(jar, new JarExtension(jar));
-
-        return jarExtensions.get(jar);
+        return jarExtensions.computeIfAbsent(jar, JarExtension::new);
     }
 }

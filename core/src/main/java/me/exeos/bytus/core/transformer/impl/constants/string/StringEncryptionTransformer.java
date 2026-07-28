@@ -37,7 +37,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
      * Target ClassFile version for generated decryptor class.
      */
     private final static int CLASS_VERSION = V1_8;
-    private final static String DEC_METHOD_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
+    public final static String DEC_METHOD_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
     private static String DEC_CLASS_NAME = null;
     private static String DEC_METHOD_NAME = null;
 
@@ -109,7 +109,12 @@ public class StringEncryptionTransformer extends AbstractTransformer {
         ClassNode cc = new ClassNode();
         cc.visit(CLASS_VERSION, ACC_PUBLIC, DEC_CLASS_NAME, null, "java/lang/Object", null);
 
-        MethodNode cm = new MethodNode(ACC_PUBLIC | ACC_STATIC, DEC_METHOD_NAME, DEC_METHOD_DESC, null, null);
+        cc.methods.add(cryptMethod(DEC_METHOD_NAME));
+        return cc;
+    }
+
+    public static MethodNode cryptMethod(String name) {
+        MethodNode cm = new MethodNode(ACC_PUBLIC | ACC_STATIC, name, DEC_METHOD_DESC, null, null);
         cm.maxLocals = 2;
 
         // load string from params
@@ -171,11 +176,10 @@ public class StringEncryptionTransformer extends AbstractTransformer {
         cm.instructions.add(new MethodInsnNode(INVOKESPECIAL, "java/lang/String", "<init>", "([C)V"));
         cm.instructions.add(new InsnNode(ARETURN));
 
-        cc.methods.add(cm);
-        return cc;
+        return cm;
     }
 
-    private String crypt(String string, int key) {
+    public static String crypt(String string, int key) {
         char[] chars = string.toCharArray();
         char[] cryptedChars = new char[chars.length];
 
