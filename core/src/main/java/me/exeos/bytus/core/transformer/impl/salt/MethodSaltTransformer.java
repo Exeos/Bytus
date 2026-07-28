@@ -240,8 +240,10 @@ public class MethodSaltTransformer extends AbstractTransformer {
             for (MethodEdge method : classEdge.getMethods()) {
                 exclusions.add(MethodUtil.getInvokeDynamicTargets(method.methodNode()));
 
-                if (context.jar().isDependency(method.getRoot().getOwnerName())) {
-                    exclusions.add(MethodMatchEntry.of(classNode.name, method.methodNode()));
+                for (MethodEdge topDeclaration : method.findTopDeclarations()) {
+                    if (context.jar().isDependency(topDeclaration.getOwnerName())) {
+                        exclusions.add(MethodMatchEntry.of(classNode.name, method.methodNode()));
+                    }
                 }
             }
         }

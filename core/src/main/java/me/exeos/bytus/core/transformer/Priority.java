@@ -10,9 +10,9 @@ package me.exeos.bytus.core.transformer;
 public class Priority {
 
     public static final int PRE_PROCESSOR = 0;
-    public static final int RENAME = 1;
-    public static final int SALT_CLASS = 2;
-    public static final int SALT_METHOD = 3;
+    public static final int SALT_CLASS = 1;
+    public static final int SALT_METHOD = 2;
+    public static final int RENAME = 3;
     public static final int FLOATING_TO_INT = 4;
     public static final int NUM_ENC = 5;
     public static final int FLOW_BLOCK_SPLIT = 6;

@@ -5,7 +5,7 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
-import org.objectweb.asm.tree.FieldNode;
+import org.objectweb.asm.tree.ClassNode;
 
 public class PreProcessor extends AbstractTransformer {
 
@@ -25,10 +25,17 @@ public class PreProcessor extends AbstractTransformer {
 
     @Override
     public void transform(ClassContext context) {
-        context.classNode().sourceDebug = null;
-        context.classNode().sourceFile = null;
-        context.classNode().signature = null;
-        context.classNode().fields.forEach(fieldNode -> fieldNode.signature = null);
+        ClassNode classNode = context.classNode();
+        classNode.sourceDebug = null;
+        classNode.sourceFile = null;
+        classNode.signature = null;
+        classNode.nestHostClass = null;
+        classNode.outerMethod = null;
+        classNode.outerMethodDesc = null;
+        classNode.innerClasses.clear();
+        classNode.nestMembers = null;
+        classNode.permittedSubclasses = null;
+        classNode.fields.forEach(fieldNode -> fieldNode.signature = null);
 
         super.transform(context);
     }

@@ -78,8 +78,10 @@ public class ParamGenerifier extends AbstractTransformer {
 
                 // exclude all methods declared outside of jar
                 for (MethodEdge method : classEdge.getMethods()) {
-                    if (context.jar().isDependency(method.getRoot().getOwnerName())) {
-                        exclusions.add(MethodMatchEntry.of(classNode.name, method.methodNode()));
+                    for (MethodEdge topDeclaration : method.findTopDeclarations()) {
+                        if (context.jar().isDependency(topDeclaration.getOwnerName())) {
+                            exclusions.add(MethodMatchEntry.of(classNode.name, method.methodNode()));
+                        }
                     }
                 }
             }
