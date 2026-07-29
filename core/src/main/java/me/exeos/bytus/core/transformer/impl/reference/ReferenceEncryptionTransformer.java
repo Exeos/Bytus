@@ -19,6 +19,7 @@ import me.exeos.bytus.core.transformer.impl.flow.control.BlockRearranger;
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlatteningTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlatteningTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
+import me.exeos.bytus.core.utils.NameUtil;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.tree.*;
@@ -31,11 +32,11 @@ import java.util.Set;
 public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     private final static int CLASS_VERSION = V1_8;
+    private static final String cryptFieldKeyName = RandomUtil.getString(1);
+    private static final String BSM_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
     private static String bsmOwner = null;
     private static String bsmName = null;
     private static String cryptName = null;
-    private static final String cryptFieldKeyName = RandomUtil.getString(1);
-    private static final String BSM_DESC = "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;I)Ljava/lang/invoke/CallSite;";
     private final Map<ClassNode, Integer> keyMap = new HashMap<>();
 
     public ReferenceEncryptionTransformer(BytusConfig config) {
@@ -140,7 +141,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     private void ensureNamesSet(JarArchive jar) {
         if (bsmOwner == null) {
-            bsmOwner = ClassUtil.getNoneCollidingClassName(jar, RandomUtil::getString);
+            bsmOwner = ClassUtil.getNoneCollidingClassName(jar, NameUtil::getName);
         }
 
         if (bsmName == null) {
