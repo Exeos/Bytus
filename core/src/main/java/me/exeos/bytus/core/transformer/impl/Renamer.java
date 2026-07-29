@@ -14,7 +14,7 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
-import me.exeos.bytus.core.utils.RandomUtil;
+import me.exeos.bytus.core.utils.NameUtil;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodNode;
 
@@ -50,7 +50,7 @@ public class Renamer extends AbstractTransformer {
     private void renameClasses(JarContext context) {
         var mapping = ClassMapper.map(
                 context.jar(),
-                RandomUtil::getString,
+                NameUtil::getName,
                 classNode -> isEntrypoint(context.jar(), classNode.name)
         );
 
@@ -76,7 +76,7 @@ public class Renamer extends AbstractTransformer {
                 FieldMapper.map(
                         context.jar(),
                         context.getExtension().getHierarchy(),
-                        RandomUtil::getString
+                        NameUtil::getName
                 )
         ).remap(context.jar(), context.getExtension().getHierarchyNameMapped());
     }
@@ -86,7 +86,7 @@ public class Renamer extends AbstractTransformer {
                 MethodMapper.map(
                         context.jar(),
                         context.getExtension().getHierarchyNameMapped(),
-                        RandomUtil::getString,
+                        NameUtil::getName,
                         mappingContext -> {
                             ClassNode classNode = mappingContext.classNode();
                             Optional<MethodNode> methodNode = mappingContext.methodNode();
