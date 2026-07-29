@@ -14,6 +14,7 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.extensions.ClassExtension;
+import me.exeos.bytus.core.utils.NameUtil;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
@@ -87,7 +88,7 @@ public class ClassSaltTransformer extends AbstractTransformer {
                     HierarchyUtil.genNoneCollidingFieldName(
                             hierarchy.get(classNode),
                             SALT_FIELD_DESC,
-                            RandomUtil::getString,
+                            NameUtil::getName,
                             false
                     ),
                     SALT_FIELD_DESC,

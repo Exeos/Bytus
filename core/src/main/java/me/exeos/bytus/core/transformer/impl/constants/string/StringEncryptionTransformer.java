@@ -11,6 +11,7 @@ import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
+import me.exeos.bytus.core.utils.NameUtil;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
@@ -35,11 +36,11 @@ import java.util.Set;
  */
 public class StringEncryptionTransformer extends AbstractTransformer {
 
+    public final static String DEC_METHOD_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
     /**
      * Target ClassFile version for generated decryptor class.
      */
     private final static int CLASS_VERSION = V1_8;
-    public final static String DEC_METHOD_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
     private static String DEC_CLASS_NAME = null;
     private static String DEC_METHOD_NAME = null;
     /**
@@ -49,74 +50,6 @@ public class StringEncryptionTransformer extends AbstractTransformer {
 
     public StringEncryptionTransformer(BytusConfig config) {
         super(config);
-    }
-
-    @Override
-    public boolean applies() {
-        return config.constants.enable() && config.constants.strings();
-    }
-
-    @Override
-    public int priority() {
-        return Priority.STR_ENCRYPT_STRINGS;
-    }
-
-    @Override
-    public void transform(JarContext context) {
-        DEC_CLASS_NAME = ClassUtil.getNoneCollidingClassName(context.jar(), RandomUtil::getString);
-        DEC_METHOD_NAME = RandomUtil.getString(1);
-
-        super.transform(context);
-        ClassNode cn = cryptClass();
-        context.pipeline().emit(new ClassContext(context, cryptClass()), Set.of(StringEncryptionTransformer.class, MethodSaltTransformer.class));
-    }
-
-    @Override
-    public void transform(MethodContext context) {
-        applyTransformation(context.methodNode().instructions, context.getExtension());
-    }
-
-    @Override
-    public void transform(InsnListContext context) {
-        applyTransformation(context.insnList(), new MethodExtension());
-    }
-
-    private void applyTransformation(InsnList target, MethodExtension extension) {
-        InsnUtil.loop(target, insnNode -> {
-            if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
-                int key = stringKeys.computeIfAbsent(cstString, _ -> RandomUtil.getInt(1, 100));
-
-                // stack goes from: plain_str -> encrypted_str, key
-                // then decrypt method is called
-                // stack after: plain_str
-                InsnList callToDecrypt = new InsnList();
-                callToDecrypt.add(extension.getObfuscatedIntPush(key));
-                callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, DEC_CLASS_NAME, DEC_METHOD_NAME, DEC_METHOD_DESC));
-
-                ldcInsnNode.cst = crypt(cstString, key);
-                target.insert(insnNode, callToDecrypt);
-            }
-        });
-    }
-
-    /**
-     * Generates:
-     * <pre>
-     * public static String decrypt(String encrypted int key) {
-     *   char[] in = encrypted.toCharArray();
-     *   int len = in.length;
-     *   char[] out = new char[len];
-     *   for (int i=0; i<len; i++) out[i] = (char)(in[i] ^ key);
-     *   return new String(out);
-     * }
-     * </pre>
-     */
-    private ClassNode cryptClass() {
-        ClassNode cc = new ClassNode();
-        cc.visit(CLASS_VERSION, ACC_PUBLIC, DEC_CLASS_NAME, null, "java/lang/Object", null);
-
-        cc.methods.add(cryptMethod(DEC_METHOD_NAME));
-        return cc;
     }
 
     public static MethodNode cryptMethod(String name) {
@@ -194,5 +127,72 @@ public class StringEncryptionTransformer extends AbstractTransformer {
         }
 
         return new String(cryptedChars);
+    }
+
+    @Override
+    public boolean applies() {
+        return config.constants.enable() && config.constants.strings();
+    }
+
+    @Override
+    public int priority() {
+        return Priority.STR_ENCRYPT_STRINGS;
+    }
+
+    @Override
+    public void transform(JarContext context) {
+        DEC_CLASS_NAME = ClassUtil.getNoneCollidingClassName(context.jar(), NameUtil::getName);
+        DEC_METHOD_NAME = RandomUtil.getString(1);
+
+        super.transform(context);
+        context.pipeline().emit(new ClassContext(context, cryptClass()), Set.of(StringEncryptionTransformer.class, MethodSaltTransformer.class));
+    }
+
+    @Override
+    public void transform(MethodContext context) {
+        applyTransformation(context.methodNode().instructions, context.getExtension());
+    }
+
+    @Override
+    public void transform(InsnListContext context) {
+        applyTransformation(context.insnList(), new MethodExtension());
+    }
+
+    private void applyTransformation(InsnList target, MethodExtension extension) {
+        InsnUtil.loop(target, insnNode -> {
+            if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
+                int key = stringKeys.computeIfAbsent(cstString, _ -> RandomUtil.getInt(1, 100));
+
+                // stack goes from: plain_str -> encrypted_str, key
+                // then decrypt method is called
+                // stack after: plain_str
+                InsnList callToDecrypt = new InsnList();
+                callToDecrypt.add(extension.getObfuscatedIntPush(key));
+                callToDecrypt.add(new MethodInsnNode(INVOKESTATIC, DEC_CLASS_NAME, DEC_METHOD_NAME, DEC_METHOD_DESC));
+
+                ldcInsnNode.cst = crypt(cstString, key);
+                target.insert(insnNode, callToDecrypt);
+            }
+        });
+    }
+
+    /**
+     * Generates:
+     * <pre>
+     * public static String decrypt(String encrypted int key) {
+     *   char[] in = encrypted.toCharArray();
+     *   int len = in.length;
+     *   char[] out = new char[len];
+     *   for (int i=0; i<len; i++) out[i] = (char)(in[i] ^ key);
+     *   return new String(out);
+     * }
+     * </pre>
+     */
+    private ClassNode cryptClass() {
+        ClassNode cc = new ClassNode();
+        cc.visit(CLASS_VERSION, ACC_PUBLIC, DEC_CLASS_NAME, null, "java/lang/Object", null);
+
+        cc.methods.add(cryptMethod(DEC_METHOD_NAME));
+        return cc;
     }
 }
