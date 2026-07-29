@@ -21,7 +21,7 @@ public class BlockSplitTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable() || false;
+        return config.flow.controlFlow().enable();
     }
 
     @Override

@@ -18,6 +18,9 @@ import org.objectweb.asm.tree.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * Rewrite of original flow flattening to see if that fucked smt up: spoiler this one also buggy really need to impl frame checks
+ */
 public class FlowFlattening2 extends AbstractTransformer {
 
     public FlowFlattening2(BytusConfig config) {
@@ -26,7 +29,7 @@ public class FlowFlattening2 extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable() || true;
+        return config.flow.controlFlow().enable();
     }
 
     @Override
