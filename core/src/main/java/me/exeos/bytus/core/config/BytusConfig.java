@@ -8,12 +8,8 @@ import me.exeos.asmplus.matcher.method.MethodMatcher;
 import me.exeos.asmplus.utils.ClassUtil;
 import me.exeos.asmplus.utils.JarUtil;
 import me.exeos.asmplus.utils.MethodUtil;
-import me.exeos.bytus.core.config.members.ConstantsConfigMember;
-import me.exeos.bytus.core.config.members.EntryPointsConfigMember;
-import me.exeos.bytus.core.config.members.IOConfigMember;
-import me.exeos.bytus.core.config.members.MbaConfigMember;
+import me.exeos.bytus.core.config.members.*;
 import me.exeos.bytus.core.config.members.flow.FlowConfigMember;
-import me.exeos.bytus.core.config.members.reference.ReferencesConfigMember;
 import org.objectweb.asm.Opcodes;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -47,7 +43,7 @@ public class BytusConfig {
             @JsonProperty("constants") ConstantsConfigMember constants,
             @JsonProperty("mba") MbaConfigMember mba,
             @JsonProperty("flow") FlowConfigMember flow,
-            @JsonProperty("references") ReferencesConfigMember references) {
+            @JsonProperty("referenceEncryption") ReferencesConfigMember references) {
         this.io = io;
         this.exclusions = exclusions;
         this.entryPoints = entryPoints;

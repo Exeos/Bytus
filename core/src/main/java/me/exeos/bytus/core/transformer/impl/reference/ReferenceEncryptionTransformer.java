@@ -15,7 +15,9 @@ import me.exeos.bytus.core.transformer.context.ClassContext;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.BlockRearranger;
 import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlatteningTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlatteningTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
@@ -42,7 +44,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.references.encryption().enable();
+        return config.references.enable();
     }
 
     @Override
@@ -73,7 +75,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                 case MethodInsnNode methodInsnNode -> {
                     if (methodInsnNode.name.equals("<init>")
                             || methodInsnNode.owner.startsWith("[")
-                            || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(methodInsnNode.owner))
+                            || (config.references.firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(methodInsnNode.owner))
                             || (methodInsnNode.owner.equals(bsmOwner))
                     ) {
                         return;
@@ -94,7 +96,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
                 }
                 case FieldInsnNode fieldInsnNode -> {
                     if (!hierarchy.containsKey(fieldInsnNode.owner)
-                            || (config.references.encryption().firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(fieldInsnNode.owner))
+                            || (config.references.firstClassOnly() && !context.jarCtx().jar().getClasses().containsKey(fieldInsnNode.owner))
                             || (fieldInsnNode.owner.equals(bsmOwner))
                     ) {
                         return;
@@ -314,7 +316,7 @@ public class ReferenceEncryptionTransformer extends AbstractTransformer {
         container.methods.add(bsm);
         container.methods.add(StringEncryptionTransformer.cryptMethod(cryptName));
 
-        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class, MethodSaltTransformer.class, FlowFlatteningTransformer.class));
+        context.pipeline().emit(new ClassContext(context, container), Set.of(ReferenceEncryptionTransformer.class, MethodSaltTransformer.class, FlowFlatteningTransformer.class, BlockRearranger.class, JumpFlatteningTransformer.class));
     }
 
     private SwitchCase staticMethodHandler(int lookupSlot, int nameSlot, int ownerClassSlot, int methodTypeSlot, int targetMHandleSlot, LabelNode switchEnd) {

@@ -42,12 +42,17 @@ public class MethodExtension {
     }
 
     public InsnList getObfuscatedJump(LabelNode to) {
+        return getObfuscatedJump(to, true);
+    }
+
+    public InsnList getObfuscatedJump(LabelNode to, boolean shouldJump) {
         return ObfCodenGen.getRandomJump(
                 to,
                 methodNode == null || methodNode.name.equals("<clinit>"),
                 pipeline == null ? new ClassExtension.ClassSaltInfo() : pipeline.getExtension(owner).saltInfo(),
                 saltInfo,
-                paramObfInfo
+                paramObfInfo,
+                shouldJump
         );
     }
 

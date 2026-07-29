@@ -14,6 +14,8 @@ import me.exeos.bytus.core.transformer.impl.salt.MethodSaltTransformer;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.tree.*;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -40,6 +42,10 @@ public class StringEncryptionTransformer extends AbstractTransformer {
     public final static String DEC_METHOD_DESC = "(Ljava/lang/String;I)Ljava/lang/String;";
     private static String DEC_CLASS_NAME = null;
     private static String DEC_METHOD_NAME = null;
+    /**
+     * Map used to use same keys for identical strings, this improves compression
+     */
+    private final Map<String, Integer> stringKeys = new HashMap<>();
 
     public StringEncryptionTransformer(BytusConfig config) {
         super(config);
@@ -78,7 +84,7 @@ public class StringEncryptionTransformer extends AbstractTransformer {
     private void applyTransformation(InsnList target, MethodExtension extension) {
         InsnUtil.loop(target, insnNode -> {
             if (insnNode instanceof LdcInsnNode ldcInsnNode && ldcInsnNode.cst instanceof String cstString) {
-                int key = RandomUtil.getInt(1, 100);
+                int key = stringKeys.computeIfAbsent(cstString, _ -> RandomUtil.getInt(1, 100));
 
                 // stack goes from: plain_str -> encrypted_str, key
                 // then decrypt method is called

@@ -10,7 +10,6 @@ import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.MethodContext;
-import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.JumpInsnNode;
 import org.objectweb.asm.tree.LabelNode;
@@ -40,7 +39,6 @@ public class BlockRearranger extends AbstractTransformer {
     @Override
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
-        MethodExtension extension = context.getExtension();
 
         if (methodNode.instructions.size() == 0 || !methodNode.tryCatchBlocks.isEmpty()) {
             return;
