@@ -8,6 +8,7 @@ import me.exeos.asmplus.analysis.flow.block.impl.SwitchBlock;
 import me.exeos.asmplus.analysis.flow.block.impl.TerminalBlock;
 import me.exeos.asmplus.codegen.xswitch.SwitchCase;
 import me.exeos.asmplus.codegen.xswitch.impl.LookupSwitchGenerator;
+import me.exeos.asmplus.utils.InsnUtil;
 import me.exeos.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -17,6 +18,7 @@ import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
+import org.objectweb.asm.tree.analysis.*;
 
 import java.util.*;
 
@@ -52,7 +54,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return config.flow.controlFlow().enable();
+        return config.flow.controlFlow().enable() || true;
     }
 
     @Override
@@ -64,14 +66,27 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
     public void transform(MethodContext context) {
         MethodNode methodNode = context.methodNode();
         MethodExtension methodExtension = context.getExtension();
-
         if (!methodNode.tryCatchBlocks.isEmpty()) {
+            return;
+        }
+
+        Analyzer<BasicValue> analyzer = new Analyzer<>(new BasicInterpreter());
+        Frame<BasicValue>[] frames;
+        try {
+            frames = analyzer.analyze(context.ownerCtx().classNode().name, methodNode);
+        } catch (AnalyzerException e) {
+            System.out.println("Failed to analyze stack for: " + context.ownerCtx().classNode().name + "." + methodNode.name);
             return;
         }
 
         List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
         if (blocks.isEmpty()) {
             return;
+        }
+
+        List<AbstractInsnNode> insnList = new ArrayList<>();
+        for (BasicBlock block : blocks) {
+            insnList.addAll(block.instructions);
         }
 
         // shuffle blocks, keep first at same pos
@@ -97,7 +112,9 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         LabelNode dispatcherEntry = new LabelNode();
         flattened.add(dispatcherEntry);
         flattened.add(new VarInsnNode(Opcodes.ILOAD, stateVarIndex));
-        flattened.add(createDispatcher(blocks, blockPathMap, stateVarIndex, dispatcherEntry, methodExtension));
+        flattened.add(createDispatcher(insnList, blocks, blockPathMap, stateVarIndex, dispatcherEntry, methodExtension, frames));
+
+        MethodUtil.removeAllInsn(methodNode);
 
         // replace method instructions with flattened instructions
         methodNode.instructions = flattened;
@@ -112,27 +129,34 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
      *
      * <p>Default case ends method by throwing (see {@link MethodUtil#endMethodByThrow()}). This should never be reached.</p>
      */
-    private InsnList createDispatcher(List<BasicBlock> blocks, Map<BasicBlock, int[]> blockPathMap, int stateVarIndex, LabelNode dispatcherEntry, MethodExtension methodExtension) {
+    private InsnList createDispatcher(List<AbstractInsnNode> methodNode, List<BasicBlock> blocks, Map<BasicBlock, int[]> blockPathMap, int stateVarIndex, LabelNode dispatcherEntry, MethodExtension methodExtension, Frame<BasicValue>[] frames) {
         List<SwitchCase> cases = new ArrayList<>();
+
+        Map<BasicBlock, LabelNode> blockLables = new HashMap<>();
+        for (BasicBlock block : blocks) {
+            blockLables.put(block, new LabelNode());
+        }
 
         for (BasicBlock block : blocks) {
             InsnList handlerInsns = new InsnList();
+            handlerInsns.add(blockLables.get(block));
+
             switch (block) {
                 // updates
                 case JumpBlock jumpBlock -> {
                     // Copy original block instructions, excluding the block's own dispatcher.
-                    handlerInsns.add(jumpBlock.insnList());
+                    InsnUtil.addToInsnList(jumpBlock.instructions, handlerInsns);
                     handlerInsns.remove(jumpBlock.dispatcher);
 
                     if (jumpBlock.falseBranchBlock.isPresent()) {
                         LabelNode newTrueBranch = new LabelNode();
 
                         handlerInsns.add(new JumpInsnNode(jumpBlock.dispatcher.getOpcode(), newTrueBranch));
-                        handlerInsns.add(updateStateMachine(blockPathMap.get(jumpBlock.falseBranchBlock.get())[0], stateVarIndex, dispatcherEntry, methodExtension));
+                        handlerInsns.add(updateStateMachine(jumpBlock.falseBranchBlock.get(), blockPathMap.get(jumpBlock.falseBranchBlock.get())[0], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                         handlerInsns.add(newTrueBranch);
                     }
 
-                    handlerInsns.add(updateStateMachine(blockPathMap.get(jumpBlock.trueBranchBlock)[0], stateVarIndex, dispatcherEntry, methodExtension));
+                    handlerInsns.add(updateStateMachine(jumpBlock.trueBranchBlock, blockPathMap.get(jumpBlock.trueBranchBlock)[0], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                 }
                 case SwitchBlock switchBlock -> {
                     List<SwitchCase> innerHandlers = new ArrayList<>();
@@ -145,7 +169,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
                                 BasicBlock targetBlock = switchBlock.keyCaseMap.get(originalCaseKey);
 
                                 InsnList innerHandler = new InsnList();
-                                innerHandler.add(updateStateMachine(blockPathMap.get(targetBlock)[0], stateVarIndex, dispatcherEntry, methodExtension));
+                                innerHandler.add(updateStateMachine(targetBlock, blockPathMap.get(targetBlock)[0], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                                 innerHandlers.add(new SwitchCase(originalCaseKey, innerHandler));
                             }
                         }
@@ -155,7 +179,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
                                 BasicBlock targetBlock = switchBlock.keyCaseMap.get(originalCaseKey);
 
                                 InsnList innerHandler = new InsnList();
-                                innerHandler.add(updateStateMachine(blockPathMap.get(targetBlock)[0], stateVarIndex, dispatcherEntry, methodExtension));
+                                innerHandler.add(updateStateMachine(targetBlock, blockPathMap.get(targetBlock)[0], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                                 innerHandlers.add(new SwitchCase(originalCaseKey, innerHandler));
                             }
                         }
@@ -164,23 +188,23 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
 
                     // Create default case, updating the state machine to the actual default case block.
                     InsnList defaultCaseInsn = new InsnList();
-                    defaultCaseInsn.add(updateStateMachine(blockPathMap.get(switchBlock.defaultBlock)[0], stateVarIndex, dispatcherEntry, methodExtension));
+                    defaultCaseInsn.add(updateStateMachine(switchBlock.defaultBlock, blockPathMap.get(switchBlock.defaultBlock)[0], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                     SwitchCase defaultCase = new SwitchCase(0, defaultCaseInsn);
 
                     // original instructions up to the switch
-                    handlerInsns.add(switchBlock.insnList());
+                    InsnUtil.addToInsnList(switchBlock.instructions, handlerInsns);
                     // remove original switch
                     handlerInsns.remove(switchBlock.dispatcher);
                     // replace original switch
                     handlerInsns.add(LookupSwitchGenerator.gen(innerHandlers, defaultCase, false));
                 }
                 case FallTroughBlock fallTroughBlock -> {
-                    handlerInsns.add(block.insnList());
-                    handlerInsns.add(updateStateMachine(blockPathMap.get(fallTroughBlock.fallTroughBlock)[0], stateVarIndex, dispatcherEntry, methodExtension));
+                    InsnUtil.addToInsnList(block.instructions, handlerInsns);
+                    handlerInsns.add(updateStateMachine(fallTroughBlock.fallTroughBlock, blockPathMap.get(fallTroughBlock.fallTroughBlock)[0], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                 }
                 case TerminalBlock _ -> {
                     // Ends method. Just copy insn.
-                    handlerInsns.add(block.insnList());
+                    InsnUtil.addToInsnList(block.instructions, handlerInsns);
                 }
                 default -> throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
             }
@@ -190,7 +214,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
             int[] blockPath = blockPathMap.get(block);
             for (int i = 0; i < blockPath.length - 1; i++) {
                 InsnList pathInsn = new InsnList();
-                pathInsn.add(updateStateMachine(blockPath[i + 1], stateVarIndex, dispatcherEntry, methodExtension));
+                pathInsn.add(updateStateMachine(null, blockPath[i + 1], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
                 cases.add(new SwitchCase(blockPath[i], pathInsn));
             }
 
@@ -208,12 +232,16 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
      *   <li>jump to {@code dispatcherEntry}</li>
      * </ol>
      */
-    private InsnList updateStateMachine(int state, int stateVar, LabelNode dispatcherEntry, MethodExtension methodExtension) {
+    private InsnList updateStateMachine(BasicBlock target, int targetKey, List<AbstractInsnNode> insnList, Frame<BasicValue>[] frames, Map<BasicBlock, LabelNode> blockLabelMap, int stateVar, LabelNode dispatcherEntry, MethodExtension methodExtension) {
         InsnList instructions = new InsnList();
 
-        instructions.add(methodExtension.getObfuscatedIntPush(state));
-        instructions.add(new VarInsnNode(Opcodes.ISTORE, stateVar));
-        instructions.add(new JumpInsnNode(Opcodes.GOTO, dispatcherEntry));
+        if (target == null || isStackEmpty(insnList, frames, target.instructions.getFirst())) {
+            instructions.add(methodExtension.getObfuscatedIntPush(targetKey));
+            instructions.add(new VarInsnNode(Opcodes.ISTORE, stateVar));
+            instructions.add(new JumpInsnNode(Opcodes.GOTO, dispatcherEntry));
+        } else {
+            instructions.add(new JumpInsnNode(GOTO, blockLabelMap.get(target)));
+        }
 
         return instructions;
     }
@@ -245,5 +273,14 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         }
 
         return result;
+    }
+
+    private boolean isStackEmpty(List<AbstractInsnNode> insnList, Frame<BasicValue>[] frames, AbstractInsnNode location) {
+        if (insnList == null || frames == null || location == null) {
+            return true;
+        }
+
+        Frame<BasicValue> frame = frames[insnList.indexOf(location)];
+        return frame != null && frame.getStackSize() == 0;
     }
 }
