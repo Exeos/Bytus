@@ -17,6 +17,7 @@ import me.exeos.bytus.core.transformer.context.MethodContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 import org.objectweb.asm.tree.analysis.*;
 
@@ -79,6 +80,10 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
             return;
         }
 
+        if (!findConflictingLocalSlots(methodNode, frames).isEmpty()) {
+            return;
+        }
+
         List<BasicBlock> blocks = FlowAnalyzer.getBasicBlocks(methodNode, true);
         if (blocks.isEmpty()) {
             return;
@@ -104,6 +109,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         InsnList flattened = new InsnList();
 
         // Initialize state to the first block's path entry
+        flattened.add(initializeLocals(methodNode, frames));
         flattened.add(methodExtension.getObfuscatedIntPush(
                 blockPathMap.get(blocks.getFirst())[0]
         ));
@@ -131,6 +137,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
      */
     private InsnList createDispatcher(List<AbstractInsnNode> methodNode, List<BasicBlock> blocks, Map<BasicBlock, int[]> blockPathMap, int stateVarIndex, LabelNode dispatcherEntry, MethodExtension methodExtension, Frame<BasicValue>[] frames) {
         List<SwitchCase> cases = new ArrayList<>();
+        InsnList directBlocks = new InsnList();
 
         Map<BasicBlock, LabelNode> blockLables = new HashMap<>();
         for (BasicBlock block : blocks) {
@@ -209,20 +216,26 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
                 default -> throw new IllegalStateException("Invalid block at index: " + blocks.indexOf(block));
             }
 
-            // Add path chain of this block
-            // entry -> chain -> chain -> .. -> handler
-            int[] blockPath = blockPathMap.get(block);
-            for (int i = 0; i < blockPath.length - 1; i++) {
-                InsnList pathInsn = new InsnList();
-                pathInsn.add(updateStateMachine(null, blockPath[i + 1], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
-                cases.add(new SwitchCase(blockPath[i], pathInsn));
+            if (isStackEmpty(frames, methodNode.indexOf(block.instructions.getFirst()))) {
+                // Add path chain of this block
+                // entry -> chain -> chain -> .. -> handler
+                int[] blockPath = blockPathMap.get(block);
+                for (int i = 0; i < blockPath.length - 1; i++) {
+                    InsnList pathInsn = new InsnList();
+                    pathInsn.add(updateStateMachine(null, blockPath[i + 1], methodNode, frames, blockLables, stateVarIndex, dispatcherEntry, methodExtension));
+                    cases.add(new SwitchCase(blockPath[i], pathInsn));
+                }
+                // Final case in the chain (the actual block handler)
+                cases.add(new SwitchCase(blockPath[blockPath.length - 1], handlerInsns));
+            } else {
+                directBlocks.add(handlerInsns);
             }
-
-            // Final case in the chain (the actual block handler)
-            cases.add(new SwitchCase(blockPath[blockPath.length - 1], handlerInsns));
         }
 
-        return LookupSwitchGenerator.gen(cases, new SwitchCase(0, MethodUtil.endMethodByThrow()), false);
+        InsnList result = new InsnList();
+        result.add(LookupSwitchGenerator.gen(cases, new SwitchCase(0, MethodUtil.endMethodByThrow()), false));
+        result.add(directBlocks);
+        return result;
     }
 
     /**
@@ -235,7 +248,7 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
     private InsnList updateStateMachine(BasicBlock target, int targetKey, List<AbstractInsnNode> insnList, Frame<BasicValue>[] frames, Map<BasicBlock, LabelNode> blockLabelMap, int stateVar, LabelNode dispatcherEntry, MethodExtension methodExtension) {
         InsnList instructions = new InsnList();
 
-        if (target == null || isStackEmpty(insnList, frames, target.instructions.getFirst())) {
+        if (target == null || isStackEmpty(frames, insnList.indexOf(target.instructions.getFirst()))) {
             instructions.add(methodExtension.getObfuscatedIntPush(targetKey));
             instructions.add(new VarInsnNode(Opcodes.ISTORE, stateVar));
             instructions.add(new JumpInsnNode(Opcodes.GOTO, dispatcherEntry));
@@ -275,12 +288,133 @@ public class FlowFlatteningTransformer extends AbstractTransformer {
         return result;
     }
 
-    private boolean isStackEmpty(List<AbstractInsnNode> insnList, Frame<BasicValue>[] frames, AbstractInsnNode location) {
-        if (insnList == null || frames == null || location == null) {
-            return true;
+    private boolean isStackEmpty(Frame<BasicValue>[] frames, int location) {
+        if (frames == null) {
+            return false;
         }
 
-        Frame<BasicValue> frame = frames[insnList.indexOf(location)];
+        Frame<BasicValue> frame = frames[location];
         return frame != null && frame.getStackSize() == 0;
+    }
+
+    private Set<Integer> findConflictingLocalSlots(MethodNode methodNode, Frame<BasicValue>[] frames) {
+        Set<Integer> conflicting = new HashSet<>();
+
+        boolean isStatic = (methodNode.access & Opcodes.ACC_STATIC) != 0;
+        int firstNonParamSlot = isStatic ? 0 : 1;
+        for (org.objectweb.asm.Type argType : org.objectweb.asm.Type.getArgumentTypes(methodNode.desc)) {
+            firstNonParamSlot += argType.getSize();
+        }
+
+        int maxLocal = 0;
+        for (Frame<BasicValue> frame : frames) {
+            if (frame != null) {
+                maxLocal = Math.max(maxLocal, frame.getLocals());
+            }
+        }
+
+        for (int slot = firstNonParamSlot; slot < maxLocal; slot++) {
+            Integer sortSeen = null; // org.objectweb.asm.Type sort of the first real value seen
+
+            for (Frame<BasicValue> frame : frames) {
+                if (frame == null || slot >= frame.getLocals()) continue;
+
+                BasicValue v = frame.getLocal(slot);
+                if (v == null || v == BasicValue.UNINITIALIZED_VALUE) continue;
+
+                org.objectweb.asm.Type type = v.getType();
+                if (type == null) continue;
+
+                int sort = normalizeSort(type.getSort());
+
+                if (sortSeen == null) {
+                    sortSeen = sort;
+                } else if (sortSeen != sort) {
+                    conflicting.add(slot);
+                    break; // no need to keep scanning this slot, move to next
+                }
+            }
+        }
+
+        return conflicting;
+    }
+
+    private int normalizeSort(int sort) {
+        if (sort == org.objectweb.asm.Type.OBJECT || sort == org.objectweb.asm.Type.ARRAY) {
+            return org.objectweb.asm.Type.OBJECT; // treat all references as one bucket
+        }
+        if (sort == org.objectweb.asm.Type.BOOLEAN || sort == org.objectweb.asm.Type.BYTE
+                || sort == org.objectweb.asm.Type.CHAR || sort == org.objectweb.asm.Type.SHORT) {
+            return org.objectweb.asm.Type.INT; // BasicInterpreter already treats these as INT-sized values
+        }
+        return sort; // INT, LONG, FLOAT, DOUBLE stay distinct
+    }
+
+    private InsnList initializeLocals(MethodNode methodNode, Frame<BasicValue>[] frames) {
+        InsnList init = new InsnList();
+        int maxLocal = 0;
+
+        // Find the widest local index actually used across all frames
+        for (Frame<BasicValue> frame : frames) {
+            if (frame != null) {
+                maxLocal = Math.max(maxLocal, frame.getLocals());
+            }
+        }
+
+        boolean isStatic = (methodNode.access & Opcodes.ACC_STATIC) != 0;
+        int firstNonParamSlot = isStatic ? 0 : 1;
+        for (Type argType : Type.getArgumentTypes(methodNode.desc)) {
+            firstNonParamSlot += argType.getSize();
+        }
+
+        for (int slot = firstNonParamSlot; slot < maxLocal; slot++) {
+            BasicValue widestSeen = null;
+
+            for (Frame<BasicValue> frame : frames) {
+                if (frame == null || slot >= frame.getLocals()) continue;
+                BasicValue v = frame.getLocal(slot);
+                if (v == null || v == BasicValue.UNINITIALIZED_VALUE) continue;
+
+                if (widestSeen == null) {
+                    widestSeen = v;
+                }
+                // if slot holds genuinely different types across different points,
+                // this simple approach isn't enough -- see note below.
+            }
+
+            if (widestSeen == null) continue; // slot never holds a meaningful value
+
+            addDefaultStore(init, widestSeen, slot);
+        }
+
+        return init;
+    }
+
+    private void addDefaultStore(InsnList list, BasicValue value, int slot) {
+        Type type = value.getType();
+        if (type == null) return;
+
+        switch (type.getSort()) {
+            case Type.OBJECT, Type.ARRAY -> {
+                list.add(new InsnNode(Opcodes.ACONST_NULL));
+                list.add(new VarInsnNode(Opcodes.ASTORE, slot));
+            }
+            case Type.LONG -> {
+                list.add(new InsnNode(Opcodes.LCONST_0));
+                list.add(new VarInsnNode(Opcodes.LSTORE, slot));
+            }
+            case Type.FLOAT -> {
+                list.add(new InsnNode(Opcodes.FCONST_0));
+                list.add(new VarInsnNode(Opcodes.FSTORE, slot));
+            }
+            case Type.DOUBLE -> {
+                list.add(new InsnNode(Opcodes.DCONST_0));
+                list.add(new VarInsnNode(Opcodes.DSTORE, slot));
+            }
+            default -> {
+                list.add(new InsnNode(Opcodes.ICONST_0));
+                list.add(new VarInsnNode(Opcodes.ISTORE, slot));
+            }
+        }
     }
 }
