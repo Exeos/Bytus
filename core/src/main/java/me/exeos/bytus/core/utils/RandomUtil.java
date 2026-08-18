@@ -3,6 +3,7 @@ package me.exeos.bytus.core.utils;
 import me.exeos.bytus.core.asm.ObfCodenGen;
 
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -63,6 +64,23 @@ public class RandomUtil {
             builder.append(CHARS.charAt(getInt(0, CHARS.length() - 1)));
         }
         return builder.toString();
+    }
+
+    public static <K, V> Map.Entry<K, V> getRandomMapEntry(Map<K, V> map) {
+        int randomIndex = getInt(0, map.size() - 1);
+
+        var iterator = map.entrySet().iterator();
+        int currentIndex = 0;
+
+        while (iterator.hasNext()) {
+            var element = iterator.next();
+            if (currentIndex == randomIndex) {
+                return element;
+            }
+            currentIndex++;
+        }
+
+        return null;
     }
 
     public static <T> T getRandomEntry(Set<T> set, T... except) {

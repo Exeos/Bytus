@@ -10,10 +10,7 @@ import me.exeos.bytus.core.transformer.impl.arithmetic.MBATransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.FloatingPointToIntTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.number.IntEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.BlockRearranger;
-import me.exeos.bytus.core.transformer.impl.flow.control.FlowFlatteningTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.GotoReplacerTransformer;
-import me.exeos.bytus.core.transformer.impl.flow.control.JumpFlatteningTransformer;
+import me.exeos.bytus.core.transformer.impl.flow.control.*;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.ClassSaltTransformer;
@@ -44,7 +41,7 @@ public class TransformerManager {
         REGISTRY.add(FloatingPointToIntTransformer::new);
         REGISTRY.add(IntEncryptionTransformer::new);
         REGISTRY.add(StringEncryptionTransformer::new);
-//        REGISTRY.add(BlockSplitTransformer::new); // unstable
+        REGISTRY.add(BlockSplitTransformer::new);
 //        REGISTRY.add(FlowFlattening2::new); / needs to go / merge with other flow flattening some things in there are smart
         REGISTRY.add(FlowFlatteningTransformer::new);
         REGISTRY.add(JumpFlatteningTransformer::new);

@@ -18,7 +18,7 @@ public class Priority {
     public static final int FLOW_PARAM_GENERIFY = 6;
     public static final int STR_ENCRYPT_STRINGS = 7;
     public static final int REF_ENC = 8;
-    public static final int FLOW_BLOCK_SPLIT = 9; // unused
+    public static final int FLOW_BLOCK_SPLIT = 9;
     public static final int FLOW_CTRL_FLATTENING = 10;
     public static final int FLOW_ENTRY_DISPATCH = 11; // unused
     public static final int FLOW_BLOCK_REARRANGE = 12;
