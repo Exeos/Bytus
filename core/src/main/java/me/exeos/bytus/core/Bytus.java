@@ -46,7 +46,7 @@ public class Bytus {
         new TransformerManager(config).transform(jar);
 
         try {
-            JarLoader.export(jar, new FileOutputStream(outputFile), !config.flow.controlFlow().enable());
+            JarLoader.export(jar, new FileOutputStream(outputFile), !config.flow.controlFlow().enable() && false);
         } catch (IOException e) {
             throw new BytusPosTransformException("Failed to export transformed archive", e);
         }
