@@ -11,6 +11,7 @@ import me.exeos.asmplus.utils.MethodUtil;
 import me.exeos.bytus.core.config.members.*;
 import me.exeos.bytus.core.config.members.flow.FlowConfigMember;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.tree.MethodNode;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -67,6 +68,14 @@ public class BytusConfig {
 
     public static BytusConfig fromJson(String json) throws JacksonException {
         return MAPPER.readValue(json, BytusConfig.class);
+    }
+
+    public boolean isEntryPoint(JarArchive jar, String className, MethodNode methodNode) {
+        return entryPointMatcher(jar).match(MethodMatchEntry.of(className, methodNode));
+    }
+
+    public MethodMatcher entryPointMatcher(JarArchive jar) {
+        return new MethodMatcher(getEntryPoints(jar));
     }
 
     public Set<MethodMatchEntry> getEntryPoints(JarArchive jar) {
