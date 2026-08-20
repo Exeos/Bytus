@@ -23,6 +23,7 @@ import org.objectweb.asm.tree.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+// todo handle <init> it should work in theory I think hierarchy is fucked for it
 public class ParamGenerify extends AbstractTransformer {
 
     private final static String OBJ_ARR_DESC = "([Ljava/lang/Object;)";
