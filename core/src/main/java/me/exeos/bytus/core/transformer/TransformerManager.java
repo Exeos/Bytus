@@ -11,7 +11,6 @@ import me.exeos.bytus.core.transformer.impl.constants.number.FloatingPointToIntT
 import me.exeos.bytus.core.transformer.impl.constants.number.IntEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.constants.string.StringEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.flow.control.*;
-import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerifier;
 import me.exeos.bytus.core.transformer.impl.flow.data.ParamGenerify;
 import me.exeos.bytus.core.transformer.impl.reference.ReferenceEncryptionTransformer;
 import me.exeos.bytus.core.transformer.impl.salt.ClassSaltTransformer;
@@ -49,13 +48,12 @@ public class TransformerManager {
 //        REGISTRY.add(FlowBlockEntryDispatchTransformer::new); // unstable
         REGISTRY.add(BlockRearranger::new);
         REGISTRY.add(GotoReplacerTransformer::new);
-        REGISTRY.add(ParamGenerifier::new);
+        REGISTRY.add(ParamGenerify::new);
         REGISTRY.add(ReferenceEncryptionTransformer::new);
         REGISTRY.add(ClassSaltTransformer::new);
         REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);
         REGISTRY.add(Renamer::new);
-        REGISTRY.add(ParamGenerify::new);
     }
 
     private final Pipeline pipeline;

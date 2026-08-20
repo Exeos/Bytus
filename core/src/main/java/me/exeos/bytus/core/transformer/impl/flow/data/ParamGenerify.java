@@ -2,7 +2,6 @@ package me.exeos.bytus.core.transformer.impl.flow.data;
 
 import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.asmplus.analysis.hierarchy.edge.MethodEdge;
-import me.exeos.asmplus.codegen.value.impl.ConstantPusher;
 import me.exeos.asmplus.descriptor.DescriptorMember;
 import me.exeos.asmplus.descriptor.DescriptorParser;
 import me.exeos.asmplus.descriptor.descriptors.method.MethodDescriptor;
@@ -12,7 +11,9 @@ import me.exeos.asmplus.matcher.method.MethodMatcher;
 import me.exeos.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
+import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import me.exeos.bytus.core.transformer.extensions.MethodExtension;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -30,12 +31,12 @@ public class ParamGenerify extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return config.flow.dataFlow();
     }
 
     @Override
     public int priority() {
-        return 10;
+        return Priority.FLOW_PARAM_GENERIFY;
     }
 
     @Override
@@ -92,15 +93,16 @@ public class ParamGenerify extends AbstractTransformer {
                             return;
                         }
 
+                        MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
                         MethodDescriptor methodDescriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
                         InsnList packInsn = new InsnList();
 
-                        packInsn.add(ConstantPusher.getIntPush(methodDescriptor.getParams().size()));
+                        packInsn.add(extension.getObfuscatedIntPush(methodDescriptor.getParams().size()));
                         packInsn.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
                         packInsn.add(new VarInsnNode(ASTORE, arrLocal));
 
                         for (int i = methodDescriptor.getParams().size() - 1; i >= 0; i--) {
-                            packInsn.add(storeToObjectArray(methodDescriptor, i, arrLocal, tempStore));
+                            packInsn.add(storeToObjectArray(extension, methodDescriptor, i, arrLocal, tempStore));
                         }
 
                         packInsn.add(new VarInsnNode(ALOAD, arrLocal));
@@ -120,6 +122,7 @@ public class ParamGenerify extends AbstractTransformer {
                     continue;
                 }
 
+                MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
                 MethodDescriptor originalDesc = DescriptorParser.parseMethodDesc(idx);
                 int localStart = AsmUtil.hasAccess(methodNode.access, ACC_STATIC) ? 0 : 1;
                 AtomicBoolean tempLocalUsed = new AtomicBoolean(false);
@@ -132,6 +135,7 @@ public class ParamGenerify extends AbstractTransformer {
                     local += originalDesc.getParams().get(i).getSlotWidth();
                 }
 
+                extension.paramObfInfo.setParamObf(localStart, localArrayIndexMap);
                 InsnUtil.loop(methodNode.instructions, insnNode -> {
                     InsnList replacement = new InsnList();
 
@@ -142,9 +146,9 @@ public class ParamGenerify extends AbstractTransformer {
                         }
 
                         if (InsnUtil.isLoad(insnNode)) {
-                            replacement.add(loadFromObjectArray(originalDesc, localArrayIndex, localStart));
+                            replacement.add(loadFromObjectArray(extension, originalDesc, localArrayIndex, localStart));
                         } else {
-                            replacement.add(storeToObjectArray(originalDesc, localArrayIndex, localStart, tempLocal));
+                            replacement.add(storeToObjectArray(extension, originalDesc, localArrayIndex, localStart, tempLocal));
                             tempLocalUsed.set(true);
                         }
                     } else if (insnNode instanceof IincInsnNode iincInsnNode) {
@@ -153,10 +157,10 @@ public class ParamGenerify extends AbstractTransformer {
                             return;
                         }
 
-                        replacement.add(loadFromObjectArray(originalDesc, localArrayIndex, localStart));
-                        replacement.add(ConstantPusher.getIntPush(iincInsnNode.incr));
+                        replacement.add(loadFromObjectArray(extension, originalDesc, localArrayIndex, localStart));
+                        replacement.add(extension.getObfuscatedIntPush(iincInsnNode.incr));
                         replacement.add(new InsnNode(IADD));
-                        replacement.add(storeToObjectArray(originalDesc, localArrayIndex, localStart, tempLocal));
+                        replacement.add(storeToObjectArray(extension, originalDesc, localArrayIndex, localStart, tempLocal));
                         tempLocalUsed.set(true);
                     } else {
                         return;
@@ -173,21 +177,21 @@ public class ParamGenerify extends AbstractTransformer {
         }
     }
 
-    private InsnList loadFromObjectArray(MethodDescriptor methodDescriptor, int paramIndex, int arrayLocal) {
+    private InsnList loadFromObjectArray(MethodExtension extension, MethodDescriptor methodDescriptor, int paramIndex, int arrayLocal) {
         InsnList loadInsn = new InsnList();
         loadInsn.add(new VarInsnNode(ALOAD, arrayLocal));
-        loadInsn.add(ConstantPusher.getIntPush(paramIndex));
+        loadInsn.add(extension.getObfuscatedIntPush(paramIndex));
         loadInsn.add(new InsnNode(AALOAD));
         loadInsn.add(unbox(methodDescriptor, paramIndex));
         return loadInsn;
     }
 
-    private InsnList storeToObjectArray(MethodDescriptor methodDescriptor, int paramIndex, int arrayLocal, int tempLocal) {
+    private InsnList storeToObjectArray(MethodExtension extension, MethodDescriptor methodDescriptor, int paramIndex, int arrayLocal, int tempLocal) {
         InsnList storeInsn = new InsnList();
         storeInsn.add(box(methodDescriptor, paramIndex));
         storeInsn.add(new VarInsnNode(ASTORE, tempLocal));
         storeInsn.add(new VarInsnNode(ALOAD, arrayLocal));
-        storeInsn.add(ConstantPusher.getIntPush(paramIndex));
+        storeInsn.add(extension.getObfuscatedIntPush(paramIndex));
         storeInsn.add(new VarInsnNode(ALOAD, tempLocal));
         storeInsn.add(new InsnNode(AASTORE));
         return storeInsn;
