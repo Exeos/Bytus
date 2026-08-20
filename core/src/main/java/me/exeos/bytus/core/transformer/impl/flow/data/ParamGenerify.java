@@ -7,12 +7,16 @@ import me.exeos.asmplus.descriptor.DescriptorMember;
 import me.exeos.asmplus.descriptor.DescriptorParser;
 import me.exeos.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.asmplus.jar.JarArchive;
+import me.exeos.asmplus.matcher.method.MethodMatchEntry;
+import me.exeos.asmplus.matcher.method.MethodMatcher;
 import me.exeos.asmplus.utils.AsmUtil;
 import me.exeos.asmplus.utils.InsnUtil;
 import me.exeos.asmplus.utils.TypeUtil;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.context.JarContext;
+import org.objectweb.asm.Handle;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
 import java.util.HashMap;
@@ -39,15 +43,6 @@ public class ParamGenerify extends AbstractTransformer {
         return 10;
     }
 
-    static void test(int i) {
-        // locStart = 1
-        // paramSize = 1
-
-        // .var = 1
-
-        // if (var - localStart) < paramSize
-    }
-
     @Override
     public void transform(JarContext context) {
         RewriteResult result = rewriteDescriptorsAndCollect(context);
@@ -58,6 +53,7 @@ public class ParamGenerify extends AbstractTransformer {
     private RewriteResult rewriteDescriptorsAndCollect(JarContext context) {
         Set<String> rewrittenIdx = new HashSet<>();
         Map<String, String> idxOriginalDescMap = new HashMap<>();
+        MethodMatcher excludedMethods = excludedIndyTargets(context.jar());
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             ClassEdge classEdge = context.getExtension().getHierarchy().get(classNode);
@@ -66,7 +62,7 @@ public class ParamGenerify extends AbstractTransformer {
             }
 
             for (MethodEdge methodEdge : classEdge.methods) {
-                if (!isValidGroup(context.jar(), methodEdge)) {
+                if (!isValidGroup(context.jar(), methodEdge, excludedMethods)) {
                     continue;
                 }
 
@@ -199,10 +195,10 @@ public class ParamGenerify extends AbstractTransformer {
         DescriptorMember param = methodDescriptor.getParams().get(index);
 
         unboxInsn.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toType()));
-        if (param.isPrimitive()) {
+        if (param.isPrimitive() && !param.isArray()) {
             char primitive = param.getValue().charAt(0);
             unboxInsn.add(new MethodInsnNode(
-                    INVOKESTATIC,
+                    INVOKEVIRTUAL,
                     TypeUtil.primitiveToClass(primitive),
                     TypeUtil.clsInstanceToPrimMethodName(primitive),
                     "()" + primitive
@@ -228,9 +224,14 @@ public class ParamGenerify extends AbstractTransformer {
         return OBJ_ARR_DESC + returnDesc;
     }
 
-    private boolean isValidGroup(JarArchive jar, MethodEdge root) {
+    private boolean isValidGroup(JarArchive jar, MethodEdge root, MethodMatcher excludedMethods) {
         for (MethodEdge methodEdge : root.getOverrideGroup()) {
-            if (methodEdge.owner().hasUnresolved() || nameCollides(methodEdge) || config.isEntryPoint(jar, methodEdge.getOwnerName(), methodEdge.methodNode())) {
+            if (methodEdge.owner().hasUnresolved()
+                    || nameCollides(methodEdge)
+                    || config.isEntryPoint(jar, methodEdge.getOwnerName(), methodEdge.methodNode())
+                    || excludedMethods.match(MethodMatchEntry.of(methodEdge))
+                    || AsmUtil.hasAccess(methodEdge.owner().classNode.access, ACC_ANNOTATION)
+            ) {
                 return false;
             }
         }
@@ -241,6 +242,25 @@ public class ParamGenerify extends AbstractTransformer {
     private boolean nameCollides(MethodEdge methodEdge) {
         Set<MethodEdge> sameName = methodEdge.owner().findAllMethods(methodEdge.getName());
         return sameName.size() > 1;
+    }
+
+    private MethodMatcher excludedIndyTargets(JarArchive jar) {
+        MethodMatcher matcher = new MethodMatcher();
+
+        for (ClassNode classNode : jar.getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                for (AbstractInsnNode insnNode : methodNode.instructions) {
+                    if (!(insnNode instanceof InvokeDynamicInsnNode indy) || !(indy.bsmArgs[0] instanceof Type normalType) || !(indy.bsmArgs[1] instanceof Handle handle)) {
+                        continue;
+                    }
+                    DescriptorMember indyRet = DescriptorParser.parseMethodDesc(indy.desc).getReturnType();
+                    matcher.add(MethodMatchEntry.of(indyRet.getValue(), indy.name, normalType.getDescriptor()));
+                    matcher.add(MethodMatchEntry.of(handle.getOwner(), handle.getName(), handle.getDesc()));
+                }
+            }
+        }
+
+        return matcher;
     }
 
     private record RewriteResult(Set<String> rewrittenIdx, Map<String, String> idxOriginalDescMap) {
