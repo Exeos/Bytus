@@ -167,9 +167,8 @@ public class ParamGenerify extends AbstractTransformer {
 
                         packInsn.add(new VarInsnNode(ALOAD, arrLocal));
                         methodNode.instructions.insertBefore(methodInsnNode, packInsn);
-                        methodInsnNode.desc = generifyDesc(methodInsnNode.desc);
-
                         String addedForInsn = idxAntiCollideDescMap.get(root + methodInsnNode.name + methodInsnNode.desc);
+                        methodInsnNode.desc = generifyDesc(methodInsnNode.desc);
                         if (addedForInsn != null) {
                             for (int i = 0; i < addedForInsn.length(); i++) {
                                 methodNode.instructions.insertBefore(insnNode, ConstantPusher.getIntPush(RandomUtil.getInt()));
@@ -305,7 +304,7 @@ public class ParamGenerify extends AbstractTransformer {
                     || config.isEntryPoint(jar, methodEdge.getOwnerName(), methodEdge.methodNode())
                     || excludedMethods.match(MethodMatchEntry.of(methodEdge))
                     || AsmUtil.hasAccess(methodEdge.owner().classNode.access, ACC_ANNOTATION)
-                    || methodEdge.getName().equals("<clinit>")
+                    || MethodUtil.isSpecial(methodEdge.methodNode())
                     || (ClassUtil.isEnum(methodEdge.owner().classNode) && List.of("values", "valueOf").contains(methodEdge.getName()))
             ) {
                 return false;
@@ -313,11 +312,6 @@ public class ParamGenerify extends AbstractTransformer {
         }
 
         return true;
-    }
-
-    private boolean nameCollides(MethodEdge methodEdge) {
-        Set<MethodEdge> sameName = methodEdge.owner().findAllMethods(methodEdge.getName());
-        return sameName.size() > 1;
     }
 
     private MethodMatcher excludedIndyTargets(JarArchive jar) {
