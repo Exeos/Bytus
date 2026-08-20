@@ -153,39 +153,49 @@ public class ParamGenerify extends AbstractTransformer {
         return false;
     }
 
-    private void rewriteCallsites(JarContext context, Set<String> rewritableIdx, Map<String, String> idxAntiCollideDescMap) {
+    /**
+     * Rewrites callsites, so that the pack the params into Object[] and add anti collide params if required. (Only rewrites invokes that match idx with rewritableIdx)
+     *
+     * @param rewritableIdx  Set of method idx that will be generified
+     * @param antiCollideMap Maps method idx to anti collide param desc. See {@link #mapAntiCollideParams(JarContext, Set) mapAntiCollideParams}
+     */
+    private void rewriteCallsites(JarContext context, Set<String> rewritableIdx, Map<String, String> antiCollideMap) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
+                MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
                 int arrLocal = methodNode.maxLocals++;
                 int tempStore = methodNode.maxLocals++;
+
                 InsnUtil.loop(methodNode.instructions, insnNode -> {
                     if (insnNode instanceof MethodInsnNode methodInsnNode) {
-                        String root = HierarchyUtil.findRoot(context.getExtension().getHierarchyNameMapped(), methodInsnNode.owner, methodInsnNode.name, methodInsnNode.desc);
-                        if (!rewritableIdx.contains(root + methodInsnNode.name + methodInsnNode.desc)) {
+                        String invokeDefRoot = HierarchyUtil.findRoot(context.getExtension().getHierarchyNameMapped(), methodInsnNode.owner, methodInsnNode.name, methodInsnNode.desc);
+                        if (!rewritableIdx.contains(invokeDefRoot + methodInsnNode.name + methodInsnNode.desc)) {
                             return;
                         }
 
-                        MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
-                        MethodDescriptor methodDescriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
+                        MethodDescriptor invokeDesc = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
+                        String invokeAntiCollideDesc = antiCollideMap.get(invokeDefRoot + methodInsnNode.name + methodInsnNode.desc);
                         InsnList packInsn = new InsnList();
 
-                        packInsn.add(extension.getObfuscatedIntPush(methodDescriptor.getParams().size()));
+                        packInsn.add(extension.getObfuscatedIntPush(invokeDesc.getParams().size()));
                         packInsn.add(new TypeInsnNode(ANEWARRAY, "java/lang/Object"));
                         packInsn.add(new VarInsnNode(ASTORE, arrLocal));
-
-                        for (int i = methodDescriptor.getParams().size() - 1; i >= 0; i--) {
-                            packInsn.add(storeToObjectArray(extension, methodDescriptor, i, arrLocal, tempStore));
+                        for (int i = invokeDesc.getParams().size() - 1; i >= 0; i--) {
+                            packInsn.add(storeToObjectArray(extension, invokeDesc, i, arrLocal, tempStore));
                         }
-
                         packInsn.add(new VarInsnNode(ALOAD, arrLocal));
+
+                        // insert insn to pack params on stack into Object[]
                         methodNode.instructions.insertBefore(methodInsnNode, packInsn);
-                        String addedForInsn = idxAntiCollideDescMap.get(root + methodInsnNode.name + methodInsnNode.desc);
+                        // generify invokes desc
                         methodInsnNode.desc = generifyDesc(methodInsnNode.desc);
-                        if (addedForInsn != null) {
-                            for (int i = 0; i < addedForInsn.length(); i++) {
+
+                        // add anti collide params to invoke desc and push random values for them
+                        if (invokeAntiCollideDesc != null) {
+                            for (int i = 0; i < invokeAntiCollideDesc.length(); i++) {
                                 methodNode.instructions.insertBefore(insnNode, ConstantPusher.getIntPush(RandomUtil.getInt()));
                             }
-                            methodInsnNode.desc = methodInsnNode.desc.replace(")", addedForInsn + ")");
+                            methodInsnNode.desc = methodInsnNode.desc.replace(")", invokeAntiCollideDesc + ")");
                         }
                     }
                 });
@@ -193,6 +203,11 @@ public class ParamGenerify extends AbstractTransformer {
         }
     }
 
+    /**
+     * Replaces instructions using locals ({@link VarInsnNode} and {@link IincInsnNode}}) with generified Object[] param access and unbox / box
+     *
+     * @param rewritableIdx Set of Method idx that will be generified
+     */
     private void rewriteLocalUsage(JarContext context, Set<String> rewritableIdx) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
@@ -202,46 +217,41 @@ public class ParamGenerify extends AbstractTransformer {
                 }
 
                 MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
-                MethodDescriptor originalDesc = DescriptorParser.parseMethodDesc(idx);
-                int localStart = AsmUtil.hasAccess(methodNode.access, ACC_STATIC) ? 0 : 1;
-                AtomicBoolean tempLocalUsed = new AtomicBoolean(false);
+                MethodDescriptor methodDesc = DescriptorParser.parseMethodDesc(idx);
+                int localStart = MethodUtil.getLocalsOffset(methodNode);
+                Map<Integer, Integer> arrayIndexByLocal = methodDesc.mapLocalToParamIndex(localStart);
                 int tempLocal = methodNode.maxLocals;
+                AtomicBoolean tempLocalUsed = new AtomicBoolean(false);
 
-                Map<Integer, Integer> localArrayIndexMap = new HashMap<>();
-                int local = localStart;
-                for (int i = 0; i < originalDesc.getParams().size(); i++) {
-                    localArrayIndexMap.put(local, i);
-                    local += originalDesc.getParams().get(i).getSlotWidth();
-                }
-
-                extension.paramObfInfo.setParamObf(localStart, localArrayIndexMap);
+                extension.paramObfInfo.setParamObf(localStart, arrayIndexByLocal);
                 InsnUtil.loop(methodNode.instructions, insnNode -> {
                     InsnList replacement = new InsnList();
 
                     if (insnNode instanceof VarInsnNode varInsnNode) {
-                        Integer localArrayIndex = localArrayIndexMap.get(varInsnNode.var);
+                        Integer localArrayIndex = arrayIndexByLocal.get(varInsnNode.var);
                         if (localArrayIndex == null) {
                             return;
                         }
 
                         if (InsnUtil.isLoad(insnNode)) {
-                            replacement.add(loadFromObjectArray(extension, originalDesc, localArrayIndex, localStart));
+                            replacement.add(loadFromObjectArray(extension, methodDesc, localArrayIndex, localStart));
                         } else {
-                            replacement.add(storeToObjectArray(extension, originalDesc, localArrayIndex, localStart, tempLocal));
+                            replacement.add(storeToObjectArray(extension, methodDesc, localArrayIndex, localStart, tempLocal));
                             tempLocalUsed.set(true);
                         }
                     } else if (insnNode instanceof IincInsnNode iincInsnNode) {
-                        Integer localArrayIndex = localArrayIndexMap.get(iincInsnNode.var);
+                        Integer localArrayIndex = arrayIndexByLocal.get(iincInsnNode.var);
                         if (localArrayIndex == null) {
                             return;
                         }
 
-                        replacement.add(loadFromObjectArray(extension, originalDesc, localArrayIndex, localStart));
+                        replacement.add(loadFromObjectArray(extension, methodDesc, localArrayIndex, localStart));
                         replacement.add(extension.getObfuscatedIntPush(iincInsnNode.incr));
                         replacement.add(new InsnNode(IADD));
-                        replacement.add(storeToObjectArray(extension, originalDesc, localArrayIndex, localStart, tempLocal));
+                        replacement.add(storeToObjectArray(extension, methodDesc, localArrayIndex, localStart, tempLocal));
                         tempLocalUsed.set(true);
                     } else {
+                        // don't replace instruction
                         return;
                     }
 
@@ -256,6 +266,12 @@ public class ParamGenerify extends AbstractTransformer {
         }
     }
 
+    /**
+     * Update every method descriptor that should be generified to generified descriptor + anti collide params
+     *
+     * @param rewritableIdx  Set of Method idx that will be generified
+     * @param antiCollideMap Maps method idx to anti collide param desc. See {@link #mapAntiCollideParams(JarContext, Set) mapAntiCollideParams}
+     */
     private void rewriteDescriptors(JarArchive jar, Set<String> rewritableIdx, Map<String, String> antiCollideMap) {
         for (ClassNode classNode : jar.getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
@@ -271,6 +287,7 @@ public class ParamGenerify extends AbstractTransformer {
                 String antiCollideDesc = antiCollideMap.get(idx);
                 if (antiCollideDesc != null) {
                     for (char c : antiCollideDesc.toCharArray()) {
+                        // thank god I made this util <3
                         MethodUtil.addParam(methodNode, new DescriptorMember(String.valueOf(c), true, false, 0));
                     }
                 }
@@ -283,48 +300,19 @@ public class ParamGenerify extends AbstractTransformer {
         loadInsn.add(new VarInsnNode(ALOAD, arrayLocal));
         loadInsn.add(extension.getObfuscatedIntPush(paramIndex));
         loadInsn.add(new InsnNode(AALOAD));
-        loadInsn.add(unbox(methodDescriptor, paramIndex));
+        loadInsn.add(methodDescriptor.getParams().get(paramIndex).unbox());
         return loadInsn;
     }
 
     private InsnList storeToObjectArray(MethodExtension extension, MethodDescriptor methodDescriptor, int paramIndex, int arrayLocal, int tempLocal) {
         InsnList storeInsn = new InsnList();
-        storeInsn.add(box(methodDescriptor, paramIndex));
+        storeInsn.add(methodDescriptor.getParams().get(paramIndex).box());
         storeInsn.add(new VarInsnNode(ASTORE, tempLocal));
         storeInsn.add(new VarInsnNode(ALOAD, arrayLocal));
         storeInsn.add(extension.getObfuscatedIntPush(paramIndex));
         storeInsn.add(new VarInsnNode(ALOAD, tempLocal));
         storeInsn.add(new InsnNode(AASTORE));
         return storeInsn;
-    }
-
-    private InsnList unbox(MethodDescriptor methodDescriptor, int index) {
-        InsnList unboxInsn = new InsnList();
-        DescriptorMember param = methodDescriptor.getParams().get(index);
-
-        unboxInsn.add(new TypeInsnNode(CHECKCAST, (param.isArray() ? param : param.toNonePrimitive()).toType()));
-        if (param.isPrimitive() && !param.isArray()) {
-            char primitive = param.getValue().charAt(0);
-            unboxInsn.add(new MethodInsnNode(
-                    INVOKEVIRTUAL,
-                    TypeUtil.primitiveToClass(primitive),
-                    TypeUtil.clsInstanceToPrimMethodName(primitive),
-                    "()" + primitive
-            ));
-        }
-
-        return unboxInsn;
-    }
-
-    private InsnList box(MethodDescriptor methodDescriptor, int paramIndex) {
-        DescriptorMember param = methodDescriptor.getParams().get(paramIndex);
-        InsnList boxInsn = new InsnList();
-        if (param.isPrimitive() && !param.isArray()) {
-            String primClassName = TypeUtil.primitiveToClass(param.getValue().charAt(0));
-            boxInsn.add(new MethodInsnNode(INVOKESTATIC, primClassName, "valueOf", "(" + param.getValue() + ")L" + primClassName + ";"));
-        }
-
-        return boxInsn;
     }
 
     private MethodMatcher excludedIndyTargets(JarArchive jar) {
