@@ -9,9 +9,7 @@ import me.exeos.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.asmplus.jar.JarArchive;
 import me.exeos.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.asmplus.matcher.method.MethodMatcher;
-import me.exeos.asmplus.utils.AsmUtil;
-import me.exeos.asmplus.utils.InsnUtil;
-import me.exeos.asmplus.utils.TypeUtil;
+import me.exeos.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.context.JarContext;
@@ -19,10 +17,7 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ParamGenerify extends AbstractTransformer {
@@ -45,14 +40,14 @@ public class ParamGenerify extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        RewriteResult result = rewriteDescriptorsAndCollect(context);
-        rewriteCallsites(context, result.rewrittenIdx);
-        rewriteLocalUsage(context, result.idxOriginalDescMap);
+        Set<String> rewritableIdx = collectRewritable(context);
+        rewriteCallsites(context, rewritableIdx);
+        rewriteLocalUsage(context, rewritableIdx);
+        rewriteDescriptors(context.jar(), rewritableIdx);
     }
 
-    private RewriteResult rewriteDescriptorsAndCollect(JarContext context) {
-        Set<String> rewrittenIdx = new HashSet<>();
-        Map<String, String> idxOriginalDescMap = new HashMap<>();
+    private Set<String> collectRewritable(JarContext context) {
+        Set<String> rewritableIdx = new HashSet<>();
         MethodMatcher excludedMethods = excludedIndyTargets(context.jar());
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
@@ -67,28 +62,36 @@ public class ParamGenerify extends AbstractTransformer {
                 }
 
                 for (MethodEdge oge : methodEdge.getOverrideGroup()) {
-                    String genericDesc = generifyDesc(oge.getDesc());
-                    // add to set of idx that need to be refactored (original desc)
-                    rewrittenIdx.add(classNode.name + oge.getName() + oge.getDesc());
-                    // map generified desc idx to original desc
-                    idxOriginalDescMap.put(classNode.name + oge.getName() + genericDesc, oge.getDesc());
-
-                    // update method desc
-                    oge.methodNode().desc = genericDesc;
+                    rewritableIdx.add(classNode.name + oge.getName() + oge.getDesc());
                 }
             }
         }
 
-        return new RewriteResult(rewrittenIdx, idxOriginalDescMap);
+        return rewritableIdx;
     }
 
-    private void rewriteCallsites(JarContext context, Set<String> needRefactoring) {
+    private void rewriteDescriptors(JarArchive jar, Set<String> rewritableIdx) {
+        for (ClassNode classNode : jar.getClasses().values()) {
+            for (MethodNode methodNode : classNode.methods) {
+                if (rewritableIdx.contains(classNode.name + methodNode.name + methodNode.desc)) {
+                    methodNode.desc = generifyDesc(methodNode.desc);
+                }
+            }
+        }
+    }
+
+    private void rewriteCallsites(JarContext context, Set<String> rewritableIdx) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 int arrLocal = methodNode.maxLocals++;
                 int tempStore = methodNode.maxLocals++;
                 InsnUtil.loop(methodNode.instructions, insnNode -> {
-                    if (insnNode instanceof MethodInsnNode methodInsnNode && needRefactoring.contains(methodInsnNode.owner + methodInsnNode.name + methodInsnNode.desc)) {
+                    if (insnNode instanceof MethodInsnNode methodInsnNode) {
+                        String root = HierarchyUtil.findRoot(context.getExtension().getHierarchyNameMapped(), methodInsnNode.owner, methodInsnNode.name, methodInsnNode.desc);
+                        if (!rewritableIdx.contains(root + methodInsnNode.name + methodInsnNode.desc)) {
+                            return;
+                        }
+
                         MethodDescriptor methodDescriptor = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
                         InsnList packInsn = new InsnList();
 
@@ -109,15 +112,15 @@ public class ParamGenerify extends AbstractTransformer {
         }
     }
 
-    private void rewriteLocalUsage(JarContext context, Map<String, String> originalDescMap) {
+    private void rewriteLocalUsage(JarContext context, Set<String> rewritableIdx) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 String idx = classNode.name + methodNode.name + methodNode.desc;
-                if (!originalDescMap.containsKey(idx)) {
+                if (!rewritableIdx.contains(idx)) {
                     continue;
                 }
 
-                MethodDescriptor originalDesc = DescriptorParser.parseMethodDesc(originalDescMap.get(idx));
+                MethodDescriptor originalDesc = DescriptorParser.parseMethodDesc(idx);
                 int localStart = AsmUtil.hasAccess(methodNode.access, ACC_STATIC) ? 0 : 1;
                 AtomicBoolean tempLocalUsed = new AtomicBoolean(false);
                 int tempLocal = methodNode.maxLocals;
@@ -231,6 +234,8 @@ public class ParamGenerify extends AbstractTransformer {
                     || config.isEntryPoint(jar, methodEdge.getOwnerName(), methodEdge.methodNode())
                     || excludedMethods.match(MethodMatchEntry.of(methodEdge))
                     || AsmUtil.hasAccess(methodEdge.owner().classNode.access, ACC_ANNOTATION)
+                    || methodEdge.getName().equals("<clinit>")
+                    || (ClassUtil.isEnum(methodEdge.owner().classNode) && List.of("values", "valueOf").contains(methodEdge.getName()))
             ) {
                 return false;
             }
@@ -261,8 +266,5 @@ public class ParamGenerify extends AbstractTransformer {
         }
 
         return matcher;
-    }
-
-    private record RewriteResult(Set<String> rewrittenIdx, Map<String, String> idxOriginalDescMap) {
     }
 }
