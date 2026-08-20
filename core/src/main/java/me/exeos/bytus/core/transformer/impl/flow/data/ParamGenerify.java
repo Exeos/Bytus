@@ -2,6 +2,7 @@ package me.exeos.bytus.core.transformer.impl.flow.data;
 
 import me.exeos.asmplus.analysis.hierarchy.edge.ClassEdge;
 import me.exeos.asmplus.analysis.hierarchy.edge.MethodEdge;
+import me.exeos.asmplus.codegen.value.impl.ConstantPusher;
 import me.exeos.asmplus.descriptor.DescriptorMember;
 import me.exeos.asmplus.descriptor.DescriptorParser;
 import me.exeos.asmplus.descriptor.descriptors.method.MethodDescriptor;
@@ -14,6 +15,7 @@ import me.exeos.bytus.core.transformer.AbstractTransformer;
 import me.exeos.bytus.core.transformer.Priority;
 import me.exeos.bytus.core.transformer.context.JarContext;
 import me.exeos.bytus.core.transformer.extensions.MethodExtension;
+import me.exeos.bytus.core.utils.RandomUtil;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
@@ -42,10 +44,62 @@ public class ParamGenerify extends AbstractTransformer {
     @Override
     public void transform(JarContext context) {
         Set<String> rewritableIdx = collectRewritable(context);
-        rewriteCallsites(context, rewritableIdx);
+        Map<String, String> antiCollideAdditions = avoidCollisions(context, rewritableIdx);
+        rewriteCallsites(context, rewritableIdx, antiCollideAdditions);
         rewriteLocalUsage(context, rewritableIdx);
-        rewriteDescriptors(context.jar(), rewritableIdx);
+        rewriteDescriptors(context.jar(), rewritableIdx, antiCollideAdditions);
     }
+
+    private Map<String, String> avoidCollisions(JarContext context, Set<String> rewritableIdx) {
+        var hierarchy = context.getExtension().getHierarchy();
+        Map<String, String> idxAntiCollideDescMap = new HashMap<>();
+        Map<String, Set<String>> additionalDescMap = new HashMap<>();
+
+        for (ClassNode classNode : context.jar().getClasses().values()) {
+            ClassEdge classEdge = hierarchy.get(classNode);
+            if (classEdge == null) {
+                continue;
+            }
+
+            for (MethodEdge methodEdge : classEdge.methods) {
+                if (!rewritableIdx.contains(classNode.name + methodEdge.getName() + methodEdge.getDesc())) {
+                    continue;
+                }
+
+                MethodDescriptor md = DescriptorParser.parseMethodDesc(methodEdge.getDesc());
+                String additional = "";
+                while (groupContainsCollides(methodEdge.getOverrideGroup(), md, additional, additionalDescMap)) {
+                    additional += "I";
+                }
+
+                for (MethodEdge oge : methodEdge.getOverrideGroup()) {
+                    idxAntiCollideDescMap.put(oge.getOwnerName() + oge.getName() + oge.getDesc(), additional);
+                    additionalDescMap.computeIfAbsent(oge.getOwnerName() + oge.getName(), _ -> new HashSet<>()).add(additional);
+                }
+            }
+        }
+
+        return idxAntiCollideDescMap;
+    }
+
+    private boolean groupContainsCollides(Set<MethodEdge> group, MethodDescriptor md, String additional, Map<String, Set<String>> usedMap) {
+        for (MethodEdge methodEdge : group) {
+            Set<String> used = usedMap.get(methodEdge.getOwnerName() + methodEdge.getName());
+            if (used != null && used.contains(additional)) {
+                return true;
+            }
+
+            MethodDescriptor mdWithAdditional = new MethodDescriptor(new ArrayList<>(List.of(new DescriptorMember("java/lang/Object", false, true, 1))), md.getReturnType());
+            for (char c : additional.toCharArray()) {
+                mdWithAdditional.addParam(new DescriptorMember(String.valueOf(c), true, false, 0));
+            }
+            Set<MethodEdge> same = methodEdge.owner().findAllMethods(methodEdge.getName(), mdWithAdditional.toDesc());
+            return same.size() > 1;
+        }
+
+        return false;
+    }
+
 
     private Set<String> collectRewritable(JarContext context) {
         Set<String> rewritableIdx = new HashSet<>();
@@ -71,17 +125,23 @@ public class ParamGenerify extends AbstractTransformer {
         return rewritableIdx;
     }
 
-    private void rewriteDescriptors(JarArchive jar, Set<String> rewritableIdx) {
+    private void rewriteDescriptors(JarArchive jar, Set<String> rewritableIdx, Map<String, String> idxAntiCollideDescMap) {
         for (ClassNode classNode : jar.getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 if (rewritableIdx.contains(classNode.name + methodNode.name + methodNode.desc)) {
+                    String added = idxAntiCollideDescMap.get(classNode.name + methodNode.name + methodNode.desc);
                     methodNode.desc = generifyDesc(methodNode.desc);
+                    if (added != null) {
+                        for (char c : added.toCharArray()) {
+                            MethodUtil.addParam(methodNode, new DescriptorMember(String.valueOf(c), true, false, 0));
+                        }
+                    }
                 }
             }
         }
     }
 
-    private void rewriteCallsites(JarContext context, Set<String> rewritableIdx) {
+    private void rewriteCallsites(JarContext context, Set<String> rewritableIdx, Map<String, String> idxAntiCollideDescMap) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 int arrLocal = methodNode.maxLocals++;
@@ -108,6 +168,14 @@ public class ParamGenerify extends AbstractTransformer {
                         packInsn.add(new VarInsnNode(ALOAD, arrLocal));
                         methodNode.instructions.insertBefore(methodInsnNode, packInsn);
                         methodInsnNode.desc = generifyDesc(methodInsnNode.desc);
+
+                        String addedForInsn = idxAntiCollideDescMap.get(root + methodInsnNode.name + methodInsnNode.desc);
+                        if (addedForInsn != null) {
+                            for (int i = 0; i < addedForInsn.length(); i++) {
+                                methodNode.instructions.insertBefore(insnNode, ConstantPusher.getIntPush(RandomUtil.getInt()));
+                            }
+                            methodInsnNode.desc = methodInsnNode.desc.replace(")", addedForInsn + ")");
+                        }
                     }
                 });
             }
@@ -234,7 +302,6 @@ public class ParamGenerify extends AbstractTransformer {
     private boolean isValidGroup(JarArchive jar, MethodEdge root, MethodMatcher excludedMethods) {
         for (MethodEdge methodEdge : root.getOverrideGroup()) {
             if (methodEdge.owner().hasUnresolved()
-                    || nameCollides(methodEdge)
                     || config.isEntryPoint(jar, methodEdge.getOwnerName(), methodEdge.methodNode())
                     || excludedMethods.match(MethodMatchEntry.of(methodEdge))
                     || AsmUtil.hasAccess(methodEdge.owner().classNode.access, ACC_ANNOTATION)
