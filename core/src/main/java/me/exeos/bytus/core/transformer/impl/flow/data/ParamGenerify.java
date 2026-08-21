@@ -9,6 +9,7 @@ import me.exeos.asmplus.descriptor.descriptors.method.MethodDescriptor;
 import me.exeos.asmplus.jar.JarArchive;
 import me.exeos.asmplus.matcher.method.MethodMatchEntry;
 import me.exeos.asmplus.matcher.method.MethodMatcher;
+import me.exeos.asmplus.remapper.mapper.MemberKey;
 import me.exeos.asmplus.utils.*;
 import me.exeos.bytus.core.config.BytusConfig;
 import me.exeos.bytus.core.transformer.AbstractTransformer;
@@ -44,8 +45,8 @@ public class ParamGenerify extends AbstractTransformer {
 
     @Override
     public void transform(JarContext context) {
-        Set<String> rewritableIdx = collectRewritable(context);
-        Map<String, String> antiCollideMap = mapAntiCollideParams(context, rewritableIdx);
+        Set<MemberKey> rewritableIdx = collectRewritable(context);
+        Map<MemberKey, String> antiCollideMap = mapAntiCollideParams(context, rewritableIdx);
         rewriteCallsites(context, rewritableIdx, antiCollideMap);
         rewriteLocalUsage(context, rewritableIdx);
         rewriteDescriptors(context.jar(), rewritableIdx, antiCollideMap);
@@ -56,8 +57,8 @@ public class ParamGenerify extends AbstractTransformer {
      *
      * @return A set of idx composed of className + methodName + methoDesc
      */
-    private Set<String> collectRewritable(JarContext context) {
-        Set<String> rewritableIdx = new HashSet<>();
+    private Set<MemberKey> collectRewritable(JarContext context) {
+        Set<MemberKey> rewritableIdx = new HashSet<>();
         MethodMatcher excludedMethods = excludedIndyTargets(context.jar());
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
@@ -72,7 +73,7 @@ public class ParamGenerify extends AbstractTransformer {
                 }
 
                 for (MethodEdge oge : methodEdge.getOverrideGroup()) {
-                    rewritableIdx.add(classNode.name + oge.getName() + oge.getDesc());
+                    rewritableIdx.add(new MemberKey(classNode.name, oge.getName(), oge.getDesc()));
                 }
             }
         }
@@ -86,12 +87,10 @@ public class ParamGenerify extends AbstractTransformer {
      * @param rewritableIdx Set of method idx that can be generified. See {@link #collectRewritable(JarContext) collectRewritable}
      * @return a map mapping each method idx that can be generified to a descriptor string that should be appended to that method to avoid collisions
      */
-    private Map<String, String> mapAntiCollideParams(JarContext context, Set<String> rewritableIdx) {
+    private Map<MemberKey, String> mapAntiCollideParams(JarContext context, Set<MemberKey> rewritableIdx) {
         var hierarchy = context.getExtension().getHierarchy();
-        Map<String, String> idxAntiCollideParamMap = new HashMap<>();
-        // key = owner + name, value = Set containing all anti collides
-        // todo maybe to use set as value?
-        Map<String, Set<String>> usedAntiCollideMap = new HashMap<>();
+        Map<MemberKey, String> idxAntiCollideParamMap = new HashMap<>();
+        Map<MemberKey, Set<String>> usedAntiCollideMap = new HashMap<>();
 
         for (ClassNode classNode : context.jar().getClasses().values()) {
             ClassEdge classEdge = hierarchy.get(classNode);
@@ -100,19 +99,18 @@ public class ParamGenerify extends AbstractTransformer {
             }
 
             for (MethodEdge methodEdge : classEdge.methods) {
-                if (!rewritableIdx.contains(classNode.name + methodEdge.getName() + methodEdge.getDesc())) {
+                if (!rewritableIdx.contains(new MemberKey(classNode.name, methodEdge.getName(), methodEdge.getDesc()))) {
                     continue;
                 }
 
-                MethodDescriptor methodDesc = DescriptorParser.parseMethodDesc(methodEdge.getDesc());
                 String antiCollideAddition = "";
-                while (groupContainsCollides(methodEdge.getOverrideGroup(), methodDesc, antiCollideAddition, usedAntiCollideMap)) {
+                while (groupContainsCollides(methodEdge.getOverrideGroup(), methodEdge.getDesc(), antiCollideAddition, usedAntiCollideMap)) {
                     antiCollideAddition += "I";
                 }
 
                 for (MethodEdge oge : methodEdge.getOverrideGroup()) {
-                    idxAntiCollideParamMap.put(oge.getOwnerName() + oge.getName() + oge.getDesc(), antiCollideAddition);
-                    usedAntiCollideMap.computeIfAbsent(oge.getOwnerName() + oge.getName(), _ -> new HashSet<>()).add(antiCollideAddition);
+                    idxAntiCollideParamMap.put(new MemberKey(oge.getOwnerName(), oge.getName(), oge.getDesc()), antiCollideAddition);
+                    usedAntiCollideMap.computeIfAbsent(new MemberKey(oge.getOwnerName(), oge.getName(), ""), _ -> new HashSet<>()).add(antiCollideAddition);
                 }
             }
         }
@@ -125,29 +123,23 @@ public class ParamGenerify extends AbstractTransformer {
      * Also the used anti collision map for each method idx so we don't create collisions ourselves
      *
      * @param overrideGroup The overrideGroup to check for collisions
-     * @param methodDesc    Parsed method desc of the desc for provided overrideGroup
+     * @param desc          Parsed method desc of the desc for provided overrideGroup
      * @param acAddition    Descriptor to append to the generified descriptor params
      * @param usedACMap     A map mapping method idx (owner and name) to the anti collision desc that's already been assigned
      * @return true if any of the methods have collisions using the provided params, false if no collision is found
      */
-    private boolean groupContainsCollides(Set<MethodEdge> overrideGroup, MethodDescriptor methodDesc, String acAddition, Map<String, Set<String>> usedACMap) {
+    private boolean groupContainsCollides(Set<MethodEdge> overrideGroup, String desc, String acAddition, Map<MemberKey, Set<String>> usedACMap) {
         for (MethodEdge methodEdge : overrideGroup) {
-            Set<String> usedAntiCollides = usedACMap.get(methodEdge.getOwnerName() + methodEdge.getName());
+            Set<String> usedAntiCollides = usedACMap.get(new MemberKey(methodEdge.getOwnerName(), methodEdge.getName(), ""));
             if (usedAntiCollides != null && usedAntiCollides.contains(acAddition)) {
                 return true;
             }
 
             // build pseudo after transformation method desc (eg. Object[], int(ac), ..)
-            MethodDescriptor mdAfterTransformer = new MethodDescriptor(
-                    new ArrayList<>(List.of(new DescriptorMember("java/lang/Object", false, true, 1))),
-                    methodDesc.getReturnType()
-            );
-            for (char c : acAddition.toCharArray()) {
-                mdAfterTransformer.addParam(new DescriptorMember(String.valueOf(c), true, false, 0));
-            }
+            String pseudo = "([Ljava/lang/Object;" + acAddition + desc.substring(desc.indexOf(")"));
 
             // check if override group contains pseudo after desc
-            Set<MethodEdge> same = methodEdge.owner().findAllMethods(methodEdge.getName(), mdAfterTransformer.toDesc());
+            Set<MethodEdge> same = methodEdge.owner().findAllMethods(methodEdge.getName(), pseudo);
             return same.size() > 1;
         }
 
@@ -160,7 +152,7 @@ public class ParamGenerify extends AbstractTransformer {
      * @param rewritableIdx  Set of method idx that will be generified
      * @param antiCollideMap Maps method idx to anti collide param desc. See {@link #mapAntiCollideParams(JarContext, Set) mapAntiCollideParams}
      */
-    private void rewriteCallsites(JarContext context, Set<String> rewritableIdx, Map<String, String> antiCollideMap) {
+    private void rewriteCallsites(JarContext context, Set<MemberKey> rewritableIdx, Map<MemberKey, String> antiCollideMap) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
                 MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
@@ -170,12 +162,13 @@ public class ParamGenerify extends AbstractTransformer {
                 InsnUtil.loop(methodNode.instructions, insnNode -> {
                     if (insnNode instanceof MethodInsnNode methodInsnNode) {
                         String invokeDefRoot = HierarchyUtil.findRoot(context.getExtension().getHierarchyNameMapped(), methodInsnNode.owner, methodInsnNode.name, methodInsnNode.desc);
-                        if (!rewritableIdx.contains(invokeDefRoot + methodInsnNode.name + methodInsnNode.desc)) {
+                        MemberKey invokeMemberKey = new MemberKey(invokeDefRoot, methodInsnNode.name, methodInsnNode.desc);
+                        if (!rewritableIdx.contains(invokeMemberKey)) {
                             return;
                         }
 
                         MethodDescriptor invokeDesc = DescriptorParser.parseMethodDesc(methodInsnNode.desc);
-                        String invokeAntiCollideDesc = antiCollideMap.get(invokeDefRoot + methodInsnNode.name + methodInsnNode.desc);
+                        String invokeAntiCollideDesc = antiCollideMap.get(invokeMemberKey);
                         InsnList packInsn = new InsnList();
 
                         packInsn.add(extension.getObfuscatedIntPush(invokeDesc.getParams().size()));
@@ -209,16 +202,15 @@ public class ParamGenerify extends AbstractTransformer {
      *
      * @param rewritableIdx Set of Method idx that will be generified
      */
-    private void rewriteLocalUsage(JarContext context, Set<String> rewritableIdx) {
+    private void rewriteLocalUsage(JarContext context, Set<MemberKey> rewritableIdx) {
         for (ClassNode classNode : context.jar().getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                String idx = classNode.name + methodNode.name + methodNode.desc;
-                if (!rewritableIdx.contains(idx)) {
+                if (!rewritableIdx.contains(new MemberKey(classNode.name, methodNode.name, methodNode.desc))) {
                     continue;
                 }
 
                 MethodExtension extension = context.pipeline().getExtension(classNode, methodNode);
-                MethodDescriptor methodDesc = DescriptorParser.parseMethodDesc(idx);
+                MethodDescriptor methodDesc = DescriptorParser.parseMethodDesc(methodNode.desc);
                 int localStart = MethodUtil.getLocalsOffset(methodNode);
                 Map<Integer, Integer> arrayIndexByLocal = methodDesc.mapLocalToParamIndex(localStart);
                 int tempLocal = methodNode.maxLocals;
@@ -273,11 +265,11 @@ public class ParamGenerify extends AbstractTransformer {
      * @param rewritableIdx  Set of Method idx that will be generified
      * @param antiCollideMap Maps method idx to anti collide param desc. See {@link #mapAntiCollideParams(JarContext, Set) mapAntiCollideParams}
      */
-    private void rewriteDescriptors(JarArchive jar, Set<String> rewritableIdx, Map<String, String> antiCollideMap) {
+    private void rewriteDescriptors(JarArchive jar, Set<MemberKey> rewritableIdx, Map<MemberKey, String> antiCollideMap) {
         for (ClassNode classNode : jar.getClasses().values()) {
             for (MethodNode methodNode : classNode.methods) {
-                String idx = classNode.name + methodNode.name + methodNode.desc;
-                if (!rewritableIdx.contains(idx)) {
+                MemberKey memberKey = new MemberKey(classNode.name, methodNode.name, methodNode.desc);
+                if (!rewritableIdx.contains(memberKey)) {
                     continue;
                 }
 
@@ -285,7 +277,7 @@ public class ParamGenerify extends AbstractTransformer {
                 methodNode.desc = generifyDesc(methodNode.desc);
 
                 // add anti collision params
-                String antiCollideDesc = antiCollideMap.get(idx);
+                String antiCollideDesc = antiCollideMap.get(memberKey);
                 if (antiCollideDesc != null) {
                     for (char c : antiCollideDesc.toCharArray()) {
                         // thank god I made this util <3
