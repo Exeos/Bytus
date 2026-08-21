@@ -130,7 +130,8 @@ public class ParamGenerify extends AbstractTransformer {
      */
     private boolean groupContainsCollides(Set<MethodEdge> overrideGroup, String desc, String acAddition, Map<MemberKey, Set<String>> usedACMap) {
         for (MethodEdge methodEdge : overrideGroup) {
-            Set<String> usedAntiCollides = usedACMap.get(new MemberKey(methodEdge.getOwnerName(), methodEdge.getName(), ""));
+            var mk = new MemberKey(methodEdge.getOwnerName(), methodEdge.getName(), "");
+            Set<String> usedAntiCollides = usedACMap.get(mk);
             if (usedAntiCollides != null && usedAntiCollides.contains(acAddition)) {
                 return true;
             }
@@ -140,7 +141,9 @@ public class ParamGenerify extends AbstractTransformer {
 
             // check if override group contains pseudo after desc
             Set<MethodEdge> same = methodEdge.owner().findAllMethods(methodEdge.getName(), pseudo);
-            return same.size() > 1;
+            if (same.size() > 1) {
+                return true;
+            }
         }
 
         return false;
