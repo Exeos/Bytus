@@ -54,6 +54,7 @@ public class TransformerManager {
         REGISTRY.add(MethodSaltTransformer::new);
         REGISTRY.add(PreProcessor::new);
         REGISTRY.add(Renamer::new);
+        REGISTRY.add(FlowTestTransformer::new);
     }
 
     private final Pipeline pipeline;

@@ -2,10 +2,7 @@ package me.exeos.bytus.core.utils;
 
 import me.exeos.bytus.core.asm.ObfCodenGen;
 
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class RandomUtil {
@@ -112,5 +109,13 @@ public class RandomUtil {
         }
 
         return null;
+    }
+
+    public static <T> T getRandom(List<T> list) {
+        if (list.isEmpty()) {
+            return null;
+        }
+
+        return list.get(getInt(0, list.size() - 1));
     }
 }

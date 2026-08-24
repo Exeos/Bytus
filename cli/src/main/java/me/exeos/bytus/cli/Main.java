@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class Main {
+
     static void main(String[] args) {
         try {
             new Bytus(Files.readString(Path.of(args[0]), StandardCharsets.UTF_8)).obfuscate();

@@ -41,7 +41,7 @@ public class Renamer extends AbstractTransformer {
     public void transform(JarContext context) {
         renameMethods(context);
         renameFields(context);
-        renameClasses(context);
+//        renameClasses(context);
 
         // needs to be invalidated because classnames changed
         context.getExtension().invalidateHierarchy();
