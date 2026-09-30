@@ -1,6 +1,6 @@
 # Bytus
 
-https://discord.gg/qPvKA5BH
+https://discord.gg/qH3Bx6Sv8v
 
 Bytus is a Java bytecode obfuscator.
 
