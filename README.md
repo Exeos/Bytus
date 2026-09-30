@@ -1,5 +1,7 @@
 # Bytus
 
+https://discord.gg/qPvKA5BH
+
 Bytus is a Java bytecode obfuscator.
 
 ![Bytus](https://github.com/user-attachments/assets/d3eb33d2-e277-421a-94da-a86626bdf03e)
