@@ -62,7 +62,7 @@ public class Pipeline {
             System.out.println("Finished [" + (System.currentTimeMillis() - tStart) + "ms]: " + transformerName);
             System.out.println();
         });
-        System.out.println("Finished all transformers in: " + (1000 / (System.currentTimeMillis() - start)) + "s");
+        System.out.println("Finished all transformers in: " + (1000 / Math.max(1, (System.currentTimeMillis() - start))) + "s");
     }
 
     /**

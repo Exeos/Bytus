@@ -4,6 +4,7 @@ public class NameUtil {
 
     private final static String CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
+    // TODO: Fix hierarchy so this can be used
 //    public static String getName(int value) {
 //        int base = CHARS.length();
 //        StringBuilder builder = new StringBuilder();

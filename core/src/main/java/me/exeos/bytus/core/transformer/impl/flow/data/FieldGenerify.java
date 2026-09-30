@@ -27,7 +27,7 @@ public class FieldGenerify extends AbstractTransformer {
 
     @Override
     public boolean applies() {
-        return true;
+        return false;
     }
 
     @Override

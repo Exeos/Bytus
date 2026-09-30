@@ -29,11 +29,9 @@ public class PreProcessor extends AbstractTransformer {
         classNode.sourceDebug = null;
         classNode.sourceFile = null;
         classNode.signature = null;
-        classNode.nestHostClass = null;
         classNode.outerMethod = null;
         classNode.outerMethodDesc = null;
         classNode.innerClasses.clear();
-        classNode.nestMembers = null;
         classNode.permittedSubclasses = null;
         classNode.fields.forEach(fieldNode -> fieldNode.signature = null);
 
